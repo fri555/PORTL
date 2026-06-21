@@ -6,5 +6,5 @@ export const mockUser: MockUser = {
   displayName: '张三',
   department: '营销部',
   role: 'user',
-  avatarUrl: placeholder('张三', 25, 80, 80),
+  avatarUrl: placeholder('张三', 25, 80, 80, '张'),
 }

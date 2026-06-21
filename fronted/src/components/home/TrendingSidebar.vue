@@ -15,7 +15,7 @@ const rankClass = (i: number) => {
 </script>
 
 <template>
-  <div class="rounded-xl border bg-white p-5 shadow-sm">
+  <div class="flex h-full flex-col rounded-xl border bg-white p-5 shadow-sm">
     <div class="mb-4 flex items-center gap-2">
       <Flame class="h-5 w-5 text-primary" />
       <h2 class="text-lg font-bold tracking-tight">AI热榜</h2>

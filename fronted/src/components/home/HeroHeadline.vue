@@ -12,7 +12,7 @@ defineProps<{ article: Article }>()
 <template>
   <RouterLink
     :to="{ name: 'article-detail', params: { id: article.id } }"
-    class="group relative block overflow-hidden rounded-xl bg-zinc-900 shadow-sm transition-shadow hover:shadow-lg"
+    class="group relative block h-full overflow-hidden rounded-xl bg-zinc-900 shadow-sm transition-shadow hover:shadow-lg"
   >
     <img
       :src="article.coverImage"
