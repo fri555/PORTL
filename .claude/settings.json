@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s \"http://localhost:5176/src/views/WorkspaceChatView.vue\")",
+      "Bash(ls -la /tmp/PORTL/)",
+      "Read(//private/tmp/PORTL/**)",
+      "Bash(ls -R /tmp/PORTL/ | head -80)",
+      "Bash(find /tmp/PORTL/src -type f | sort)",
+      "Read(//private/tmp/PORTL/src/**)",
+      "Read(//tmp/PORTL/**)"
+    ]
+  }
+}
