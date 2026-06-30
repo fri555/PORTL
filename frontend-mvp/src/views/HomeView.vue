@@ -114,6 +114,7 @@ const isProgrammaticScroll = ref(false)
 const userScrollIntent = ref(false)
 let generationToken = 0
 const generationDelayFactor = import.meta.env.MODE === 'test' ? 0.001 : 1
+const ponyAvatarUrl = `${import.meta.env.BASE_URL}assets/pony-avatar.png`
 
 const solutionProcessEvents: ProcessEvent[] = [
   {
@@ -1031,7 +1032,7 @@ onBeforeUnmount(() => {
         <input ref="fileInput" class="hidden" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg" @change="handleFiles" />
         <section v-if="!isChatActive" class="mx-auto flex w-full max-w-[clamp(680px,58vw,1040px)] flex-1 flex-col items-center justify-center pb-[clamp(24px,4vw,48px)]">
           <div class="mb-7 text-center">
-            <img src="/assets/pony-avatar.png" alt="小马头像" class="mx-auto mb-4 h-[clamp(72px,5.4vw,96px)] w-[clamp(72px,5.4vw,96px)] object-contain" />
+            <img :src="ponyAvatarUrl" alt="小马头像" class="mx-auto mb-4 h-[clamp(72px,5.4vw,96px)] w-[clamp(72px,5.4vw,96px)] object-contain" />
             <h1 class="text-[clamp(24px,2.2vw,40px)] font-semibold leading-tight tracking-tight text-zinc-950">小马在线，有事随时说</h1>
           </div>
 
@@ -1183,7 +1184,7 @@ onBeforeUnmount(() => {
           >
             <div v-for="message in messages" :key="message.id" class="flex gap-3" :class="message.role === 'user' ? 'justify-end' : 'justify-start'">
               <div v-if="message.role === 'assistant'" class="mt-1 h-10 w-10 shrink-0">
-                <img src="/assets/pony-avatar.png" alt="小马头像" class="h-full w-full object-contain" />
+                <img :src="ponyAvatarUrl" alt="小马头像" class="h-full w-full object-contain" />
               </div>
               <div class="min-w-0" :class="message.role === 'user' ? 'max-w-[72%]' : 'max-w-[88%] flex-1'">
                 <div v-if="message.role === 'assistant' && message.processEvents?.length" class="mb-4 border-l border-zinc-200 pl-4 text-sm">
