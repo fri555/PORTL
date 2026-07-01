@@ -1,0 +1,72 @@
+name: 部署前端到 GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+    # 只在前端代码变更时触发
+    paths:
+      - 'frontend-mvp/**'
+      - '.github/workflows/deploy-frontend.yml'
+  workflow_dispatch: # 支持手动触发
+
+# 注意: 需要在 GitHub 仓库 Settings > Pages > Source 选择 "GitHub Actions"
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend-mvp
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+          cache-dependency-path: './frontend-mvp/pnpm-lock.yaml'
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: 构建
+        run: pnpm build
+        env:
+          NODE_ENV: production
+
+      - name: 配置 GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: 上传构建产物
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./frontend-mvp/dist
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: 部署到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
