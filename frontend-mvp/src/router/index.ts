@@ -7,8 +7,8 @@ const routes = [
   { path: '/', name: 'home', component: HomeView, meta: { title: 'AI 对话' } },
   { path: '/workspace/chat', name: 'workspace-chat', component: () => import('@/views/WorkspaceChatView.vue'), meta: { title: 'AI 对话' } },
   { path: '/portals', name: 'portals', component: () => import('@/views/SystemPortalsView.vue'), meta: { title: '工作台' } },
-  { path: '/dashboards', name: 'dashboards', component: () => import('@/views/DataDashboardsView.vue'), meta: { title: '仪表盘' } },
-  { path: '/knowledge', name: 'knowledge', component: () => import('@/views/KnowledgeBaseView.vue'), meta: { title: '知识库' } },
+  { path: '/dashboards', redirect: '/knowledge' },
+  { path: '/knowledge', name: 'knowledge', component: () => import('@/views/KnowledgeBaseView.vue'), meta: { title: '知识中心' } },
   { path: '/admin/feedback', name: 'admin-feedback', component: () => import('@/views/FeedbackAdminView.vue'), meta: { title: '建议箱' } },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]

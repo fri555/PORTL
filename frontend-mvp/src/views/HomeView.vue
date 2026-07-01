@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import {
   ArrowUp,
   Bot,
   BarChart3,
+  Bell,
   BookOpen,
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
@@ -32,12 +35,11 @@ import {
   SendHorizontal,
   Sparkles,
   Square,
-  ThumbsDown,
-  ThumbsUp,
   Trash2,
   X,
   Zap,
 } from 'lucide-vue-next'
+import { useAppStore } from '@/stores/app'
 
 type RunMode = 'quick' | 'task'
 type Message = {
@@ -63,6 +65,7 @@ type ConversationItem = {
   time: string
   mode: '日常办公' | '专家模式'
   pinned: boolean
+  status: 'running' | 'completed' | 'failed'
 }
 type IntentRoute = 'greeting' | 'office-rag' | 'expert-task'
 type CaseItem = {
@@ -79,12 +82,25 @@ type ActiveReference = {
   kb: string
   desc: string
 }
+type AttachmentSpace = 'public' | 'personal'
+type AttachmentNode = {
+  id: string
+  label: string
+  type: 'folder' | 'file'
+  children?: AttachmentNode[]
+  meta?: string
+}
+const store = useAppStore()
+const route = useRoute()
 
 const query = ref('')
 const runMode = ref<RunMode>('quick')
 const webSearchEnabled = ref(true)
-const selectedAgent = ref('research')
-const showRecommendations = ref(false)
+const selectedAgent = ref('allround')
+const activeCaseCategory = ref('精选案例')
+const showRecommendations = ref(true)
+const modeMenuOpen = ref(false)
+const agentMenuOpen = ref(false)
 const showHistory = ref(false)
 const isChatActive = ref(false)
 const isThinking = ref(false)
@@ -94,12 +110,22 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const composer = ref<HTMLTextAreaElement | null>(null)
 const messageList = ref<HTMLElement | null>(null)
 const selectedFiles = ref<string[]>([])
+const conversationSearch = ref('')
+const attachmentModalOpen = ref(false)
+const activeAttachmentTab = ref<'local' | 'knowledge'>('local')
+const kbAttachmentSearch = ref('')
+const selectedKbDocNames = ref<string[]>([])
+const attachmentSpace = ref<AttachmentSpace>('public')
+const attachmentScope = ref<'all' | AttachmentSpace>('all')
+const attachmentPath = ref<string[]>([])
 const showUploadTip = ref(false)
 const uploadHintText = '支持 PDF、Word、Excel、PPT、TXT、PNG、JPG，单个文件 20MB 内'
 const messages = ref<Message[]>([])
 const feedbackByMessage = ref<Record<string, 'up' | 'down' | undefined>>({})
 const copiedMessageId = ref('')
 const quotedMessageId = ref('')
+const editingUserMessageId = ref('')
+const editingUserMessageDraft = ref('')
 const hasGeneratedAssets = ref(false)
 const activeReference = ref<ActiveReference | null>(null)
 const selectedKnowledgeRefs = ref<ActiveReference[]>([])
@@ -107,6 +133,7 @@ const expandedProcessEventIds = ref<string[]>([])
 const editingConversationId = ref('')
 const editingConversationTitle = ref('')
 const activeConversationTitle = ref('新会话')
+const activeConversationId = ref('')
 const isAutoScroll = ref(true)
 const showBackToLatest = ref(false)
 const isTextSelecting = ref(false)
@@ -246,17 +273,18 @@ const greetingProcessEvents: ProcessEvent[] = [
 ]
 
 const conversations = ref<ConversationItem[]>([
-  { id: 'conv-1', title: 'B2B团购组货方案', time: '12分钟前', mode: '专家模式', pinned: true },
-  { id: 'conv-2', title: '客户A福利方案优化', time: '昨天', mode: '专家模式', pinned: false },
-  { id: 'conv-3', title: '考勤制度问答', time: '周二', mode: '日常办公', pinned: false },
-  { id: 'conv-4', title: '门店需求字段表', time: '06-18', mode: '专家模式', pinned: false },
+  { id: 'conv-1', title: 'B2B团购组货方案', time: '12分钟前', mode: '专家模式', pinned: true, status: 'running' },
+  { id: 'conv-2', title: '客户A福利方案优化', time: '昨天', mode: '专家模式', pinned: false, status: 'completed' },
+  { id: 'conv-3', title: '考勤制度问答', time: '周二', mode: '日常办公', pinned: true, status: 'failed' },
+  { id: 'conv-4', title: '门店需求字段表', time: '06-18', mode: '专家模式', pinned: false, status: 'completed' },
+  { id: 'conv-5', title: '行业动态简报', time: '刚刚', mode: '日常办公', pinned: false, status: 'running' },
 ])
 
 const officeAgents = [
+  { value: 'allround', label: '全能助手', desc: '日常办公、调研、知识检索和轻量任务整理' },
+  { value: 'knowledge', label: '知识顾问', desc: '查询制度、流程、产品资料并给出引用' },
   { value: 'research', label: '调研帮手', desc: '搜索资料、汇总重点、生成调研提纲' },
   { value: 'dingtalk', label: '钉钉助理', desc: '日程、待办、文档和表格快捷处理' },
-  { value: 'knowledge', label: '知识顾问', desc: '查询制度、流程、产品资料并给出引用' },
-  { value: 'writing', label: '写作助理', desc: '润色文案、生成报告、整理纪要' },
 ]
 
 const expertAgents = [
@@ -265,6 +293,27 @@ const expertAgents = [
 ]
 
 const quickCases: CaseItem[] = [
+  {
+    title: 'AI复合型岗位趋势',
+    icon: BarChart3,
+    desc: '生成趋势洞察和岗位能力框架',
+    prompt: '帮我整理一份AI复合型岗位趋势分析，包含岗位变化、能力要求和企业落地建议。',
+    kb: '组织发展知识库',
+  },
+  {
+    title: '品牌调研报告',
+    icon: Globe2,
+    desc: '汇总竞品信息和市场机会',
+    prompt: '帮我生成一份品牌调研报告，包含竞品动态、用户偏好和可执行建议。',
+    kb: '调研资料库',
+  },
+  {
+    title: '名单双表格',
+    icon: FileSpreadsheet,
+    desc: '把名单整理成可筛选表格',
+    prompt: '帮我把名单信息整理成表格，字段包括姓名、部门、角色、联系方式和跟进状态。',
+    kb: '办公模板库',
+  },
   {
     title: '查知识库',
     icon: Database,
@@ -333,15 +382,40 @@ const solutionCases: CaseItem[] = [
   },
 ]
 
-const hasSessionAssets = computed(() => selectedFiles.value.length > 0 || hasGeneratedAssets.value || selectedKnowledgeRefs.value.length > 0)
+const hasSessionAssets = computed(() => hasGeneratedAssets.value)
 const rightPanelVisible = computed(() => hasSessionAssets.value && !isRightPanelCollapsed.value)
 const sortedConversations = computed(() => [...conversations.value].sort((a, b) => Number(b.pinned) - Number(a.pinned)))
-const pinnedConversations = computed(() => sortedConversations.value.filter((item) => item.pinned))
-const regularConversations = computed(() => sortedConversations.value.filter((item) => !item.pinned))
+const searchedConversations = computed(() => {
+  const keyword = conversationSearch.value.trim().toLowerCase()
+  if (!keyword) return sortedConversations.value
+  return sortedConversations.value.filter((item) =>
+    `${item.title}${item.mode}${getConversationStatusLabel(item.status)}`.toLowerCase().includes(keyword),
+  )
+})
+const modeFilteredConversations = computed(() => searchedConversations.value.filter((item) => item.mode === modeLabel.value))
+const pinnedConversations = computed(() => modeFilteredConversations.value.filter((item) => item.pinned))
+const regularConversations = computed(() => modeFilteredConversations.value.filter((item) => !item.pinned))
 const currentAgentOptions = computed(() => (runMode.value === 'quick' ? officeAgents : expertAgents))
 const currentAgentLabel = computed(() => currentAgentOptions.value.find((agent) => agent.value === selectedAgent.value)?.label ?? '')
-const visibleCases = computed(() => (runMode.value === 'task' ? solutionCases : [...quickCases, ...dingtalkCases]))
-const caseTitle = computed(() => (runMode.value === 'task' ? `${currentAgentLabel.value}推荐案例` : `${currentAgentLabel.value}推荐案例`))
+const currentAgentDescription = computed(() => {
+  if (runMode.value === 'task') return '组货专家擅长拆解复杂客户需求，匹配方案案例并生成可交付的清单、报告和话术。'
+  if (selectedAgent.value === 'allround') return '全能助手擅长处理日常办公、知识查询、资料整理和轻量协同任务。'
+  if (selectedAgent.value === 'knowledge') return '知识顾问擅长查找制度、流程和资料，并把来源引用清楚地带出来。'
+  if (selectedAgent.value === 'research') return '调研帮手擅长快速搜索行业动态、提炼关键信息并沉淀成分析报告。'
+  return '钉钉助理擅长把日程、待办、AI表格和办公协同动作快速落地。'
+})
+const visibleCases = computed(() => {
+  if (runMode.value === 'task') return solutionCases
+  if (selectedAgent.value === 'allround') {
+    if (activeCaseCategory.value === '咨询调研') return quickCases.filter((item) => item.title === '品牌调研报告' || item.title === '搜行业动态')
+    if (activeCaseCategory.value === 'office办公') return [...dingtalkCases, quickCases.find((item) => item.title === '名单双表格')].filter(Boolean) as CaseItem[]
+    if (activeCaseCategory.value === '应用开发') return [{ title: '应用需求拆解', icon: LayoutGrid, desc: '把想法拆成页面和接口清单', prompt: '帮我把一个内部工具需求拆成页面、字段、交互和接口清单。', kb: '应用开发模板库' }]
+    return quickCases.filter((item) => ['AI复合型岗位趋势', '品牌调研报告', '名单双表格'].includes(item.title))
+  }
+  if (selectedAgent.value === 'knowledge') return quickCases.filter((item) => item.title === '查知识库')
+  if (selectedAgent.value === 'research') return quickCases.filter((item) => item.title === '搜行业动态' || item.title === '生成分析报告')
+  return dingtalkCases
+})
 const placeholder = computed(() =>
   runMode.value === 'quick'
     ? `${currentAgentLabel.value || '助理'}在线，试试提问或上传文件吧`
@@ -365,11 +439,87 @@ const chatShellStyle = computed(() => ({
   width: 'min(calc(100vw - var(--left-inset) - var(--right-inset) - clamp(36px,5vw,88px)), clamp(760px,74vw,1320px))',
   transform: 'translateX(calc((var(--left-inset) - var(--right-inset)) / 2))',
 }))
+const homeHeroStyle = computed(() => ({
+  '--left-inset': showHistory.value ? 'clamp(286px,21vw,400px)' : '0px',
+  '--right-inset': rightPanelVisible.value ? 'clamp(286px,21vw,400px)' : '0px',
+  width: 'min(calc(100vw - var(--left-inset) - var(--right-inset) - clamp(36px,5vw,88px)), clamp(760px,72vw,1280px))',
+  transform: 'translateX(calc((var(--left-inset) - var(--right-inset)) / 2))',
+}))
+const attachmentTrees: Record<AttachmentSpace, AttachmentNode[]> = {
+  public: [
+    {
+      id: 'attach-solution',
+      label: '方案中心',
+      type: 'folder',
+      children: [
+        {
+          id: 'attach-solution-cases',
+          label: '方案中心案例库',
+          type: 'folder',
+          children: [
+            { id: 'attach-sneaker-case', label: '运动鞋团购成功案例.md', type: 'file', meta: 'MD · 61.09 KB · 2026/6/25' },
+            { id: 'attach-budget', label: '团购通用预算池.xlsx', type: 'file', meta: 'XLSX · 11.76 KB · 2026/6/24' },
+          ],
+        },
+        {
+          id: 'attach-budget-pool',
+          label: '团购预算池',
+          type: 'folder',
+          children: [
+            { id: 'attach-q1-budget', label: '2026Q1预算执行表.xlsx', type: 'file', meta: 'XLSX · 18.24 KB · 2026/6/20' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'attach-product',
+      label: '商品资料',
+      type: 'folder',
+      children: [
+        { id: 'attach-product-dict', label: '商品数据字典.xlsx', type: 'file', meta: 'XLSX · 13.47 KB · 2026/6/1' },
+      ],
+    },
+  ],
+  personal: [
+    {
+      id: 'attach-my-customer',
+      label: '我的客户资料',
+      type: 'folder',
+      children: [
+        { id: 'attach-customer-a', label: '客户A需求记录.md', type: 'file', meta: 'MD · 9.8 KB · 2026/6/28' },
+      ],
+    },
+    {
+      id: 'attach-drafts',
+      label: '临时方案草稿',
+      type: 'folder',
+      children: [
+        { id: 'attach-draft-note', label: '临时方案笔记.md', type: 'file', meta: 'MD · 7.2 KB · 2026/6/27' },
+      ],
+    },
+  ],
+}
+const currentAttachmentNode = computed(() => findAttachmentNode(attachmentTrees[attachmentSpace.value], attachmentPath.value.at(-1) ?? ''))
+const currentAttachmentItems = computed(() => currentAttachmentNode.value?.children ?? attachmentTrees[attachmentSpace.value])
+const filteredAttachmentItems = computed(() => {
+  const q = kbAttachmentSearch.value.trim().toLowerCase()
+  return q ? currentAttachmentItems.value.filter((item) => item.label.toLowerCase().includes(q)) : currentAttachmentItems.value
+})
 
 function selectMode(mode: RunMode) {
   runMode.value = mode
-  selectedAgent.value = mode === 'quick' ? 'research' : 'solution'
+  selectedAgent.value = mode === 'quick' ? 'allround' : 'solution'
+  activeCaseCategory.value = '精选案例'
   showRecommendations.value = true
+  modeMenuOpen.value = false
+  agentMenuOpen.value = false
+}
+function selectAgent(agentValue: string) {
+  if (agentValue.startsWith('soon')) return
+  selectedAgent.value = agentValue
+  activeCaseCategory.value = '精选案例'
+  showRecommendations.value = true
+  agentMenuOpen.value = false
 }
 
 function createReferenceFromCase(item: CaseItem, mode: RunMode): ActiveReference {
@@ -386,31 +536,85 @@ function createReferenceFromCase(item: CaseItem, mode: RunMode): ActiveReference
 }
 
 async function fillPrompt(item: CaseItem | string, mode: RunMode = runMode.value) {
-  selectMode(mode)
+  if (runMode.value !== mode) selectMode(mode)
   if (typeof item === 'string') {
     query.value = item
   } else {
     query.value = item.prompt
-    activeReference.value = createReferenceFromCase(item, mode)
-    selectedKnowledgeRefs.value = [activeReference.value]
-    hasGeneratedAssets.value = true
-    isRightPanelCollapsed.value = false
   }
   await nextTick()
   resizeComposer()
 }
 
 function triggerFilePicker() {
+  attachmentModalOpen.value = true
+  activeAttachmentTab.value = 'local'
+}
+
+function chooseLocalFiles() {
   fileInput.value?.click()
 }
 
 function handleFiles(event: Event) {
   const files = Array.from((event.target as HTMLInputElement).files || [])
   selectedFiles.value = [...selectedFiles.value, ...files.filter(isSupportedUpload).map((file) => file.name)]
+  ;(event.target as HTMLInputElement).value = ''
 }
 
 function removeFile(index: number) {
   selectedFiles.value.splice(index, 1)
+}
+
+function addKnowledgeAttachment(name: string) {
+  if (!selectedFiles.value.includes(name)) selectedFiles.value.push(name)
+  if (!selectedKbDocNames.value.includes(name)) selectedKbDocNames.value.push(name)
+}
+
+function switchAttachmentSpace(space: AttachmentSpace, scope: 'all' | AttachmentSpace = space) {
+  attachmentSpace.value = space
+  attachmentScope.value = scope
+  attachmentPath.value = []
+  kbAttachmentSearch.value = ''
+}
+
+function chooseAttachmentNode(node: AttachmentNode) {
+  if (node.type === 'file') {
+    addKnowledgeAttachment(node.label)
+    return
+  }
+  attachmentPath.value = [...attachmentPath.value, node.id]
+  kbAttachmentSearch.value = ''
+}
+
+function backAttachmentFolder() {
+  attachmentPath.value = attachmentPath.value.slice(0, -1)
+}
+
+function findAttachmentNode(nodes: AttachmentNode[], id: string): AttachmentNode | undefined {
+  if (!id) return undefined
+  for (const node of nodes) {
+    if (node.id === id) return node
+    const child = node.children ? findAttachmentNode(node.children, id) : undefined
+    if (child) return child
+  }
+  return undefined
+}
+
+function removeAttachmentByName(name: string) {
+  selectedFiles.value = selectedFiles.value.filter((file) => file !== name)
+  selectedKbDocNames.value = selectedKbDocNames.value.filter((file) => file !== name)
+}
+
+function getConversationStatusLabel(status: ConversationItem['status']) {
+  if (status === 'running') return '运行中'
+  if (status === 'failed') return '失败'
+  return '已完成'
+}
+
+function getConversationStatusClass(status: ConversationItem['status']) {
+  if (status === 'running') return 'bg-blue-500 shadow-[0_0_0_4px_rgba(59,130,246,0.12)] animate-pulse'
+  if (status === 'failed') return 'bg-rose-500'
+  return 'bg-emerald-500'
 }
 
 function handlePaste(event: ClipboardEvent) {
@@ -449,7 +653,7 @@ async function scrollToLatest(force = false) {
     isAutoScroll.value = true
     userScrollIntent.value = false
   }
-  if (typeof el.scrollTo === 'function') el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+  if (typeof el.scrollTo === 'function') el.scrollTo({ top: el.scrollHeight, behavior: isThinking.value ? 'auto' : 'smooth' })
   else el.scrollTop = el.scrollHeight
   showBackToLatest.value = false
   await new Promise((resolve) => window.requestAnimationFrame(resolve))
@@ -626,6 +830,27 @@ async function sendMessage() {
   if (!content && selectedFiles.value.length === 0) return
 
   const token = ++generationToken
+  const conversationId = activeConversationId.value || `conv-${Date.now()}`
+  const draftTitle = summarizeDraftTitle(content)
+  activeConversationId.value = conversationId
+  activeConversationTitle.value = draftTitle
+  if (!conversations.value.some((item) => item.id === conversationId)) {
+    conversations.value = [
+      {
+        id: conversationId,
+        title: draftTitle,
+        time: '刚刚',
+        mode: modeLabel.value,
+        pinned: false,
+        status: 'running',
+      },
+      ...conversations.value,
+    ]
+  } else {
+    conversations.value = conversations.value.map((item) => (
+      item.id === conversationId ? { ...item, title: draftTitle, mode: modeLabel.value, time: '刚刚', status: 'running' } : item
+    ))
+  }
   generationInterrupted.value = false
   isChatActive.value = true
   showHistory.value = true
@@ -638,13 +863,16 @@ async function sendMessage() {
     role: 'user',
     content: content || `已上传 ${selectedFiles.value.length} 个附件，请先解析并总结。`,
   })
-  activeConversationTitle.value = summarizeDraftTitle(content)
   query.value = ''
   resizeComposer()
+  await generateAssistantReply(content, conversationId, draftTitle, token, selectedFiles.value.length > 0)
+}
+
+async function generateAssistantReply(content: string, conversationId: string, draftTitle: string, token: number, hasFiles = false) {
   isThinking.value = true
   await scrollToLatest(true)
 
-  const route = classifyIntent(content, selectedFiles.value.length > 0)
+  const route = classifyIntent(content, hasFiles)
   const shouldUseSolutionFlow = route === 'expert-task'
   const assistantId = `assistant-${Date.now()}`
   messages.value.push({
@@ -693,6 +921,16 @@ async function sendMessage() {
   }
   if (token === generationToken) {
     isThinking.value = false
+    conversations.value = conversations.value.map((item) => (
+      item.id === conversationId ? { ...item, status: generationInterrupted.value ? 'failed' : 'completed' } : item
+    ))
+    if (!generationInterrupted.value) {
+      store.addTaskNotification({
+        conversationId,
+        messageId: assistantId,
+        title: `${draftTitle} 已完成`,
+      })
+    }
     await scrollToLatest()
     const el = messageList.value
     showBackToLatest.value = Boolean(el && !isNearBottom(el))
@@ -718,6 +956,11 @@ function pauseThinking() {
   generationInterrupted.value = true
   generationToken += 1
   isThinking.value = false
+  if (activeConversationId.value) {
+    conversations.value = conversations.value.map((item) => (
+      item.id === activeConversationId.value ? { ...item, status: 'failed' } : item
+    ))
+  }
 }
 
 function setFeedback(messageId: string, value: 'up' | 'down') {
@@ -745,6 +988,11 @@ function submitDislike() {
   showDislikeModal.value = false
 }
 
+function closeFloatingMenus() {
+  modeMenuOpen.value = false
+  agentMenuOpen.value = false
+}
+
 async function copyAnswer(message: Message) {
   copiedMessageId.value = message.id
   try {
@@ -752,6 +1000,42 @@ async function copyAnswer(message: Message) {
   } catch {
     // Mock prototype fallback: state feedback is enough when clipboard is unavailable in tests.
   }
+}
+
+async function copyUserMessage(message: Message) {
+  copiedMessageId.value = message.id
+  try {
+    await navigator.clipboard?.writeText(message.content)
+  } catch {
+    // Prototype feedback is enough when clipboard is blocked.
+  }
+}
+
+function beginEditUserMessage(message: Message) {
+  editingUserMessageId.value = message.id
+  editingUserMessageDraft.value = message.content
+}
+
+async function saveAndResendUserMessage(message: Message) {
+  const nextContent = editingUserMessageDraft.value.trim()
+  if (!nextContent) return
+  const token = ++generationToken
+  message.content = nextContent
+  const messageIndex = messages.value.findIndex((item) => item.id === message.id)
+  if (messageIndex >= 0) messages.value = messages.value.slice(0, messageIndex + 1)
+  const conversationId = activeConversationId.value || `conv-${Date.now()}`
+  const draftTitle = summarizeDraftTitle(nextContent)
+  activeConversationId.value = conversationId
+  activeConversationTitle.value = draftTitle
+  conversations.value = conversations.value.map((item) => (
+    item.id === conversationId ? { ...item, title: draftTitle, time: '刚刚', status: 'running' } : item
+  ))
+  query.value = ''
+  resizeComposer()
+  editingUserMessageId.value = ''
+  editingUserMessageDraft.value = ''
+  generationInterrupted.value = false
+  await generateAssistantReply(nextContent, conversationId, draftTitle, token)
 }
 
 function quoteAnswer(message: Message) {
@@ -767,13 +1051,20 @@ function resetConversationDraft() {
   messages.value = []
   query.value = ''
   selectedFiles.value = []
+  selectedKbDocNames.value = []
+  attachmentModalOpen.value = false
+  activeAttachmentTab.value = 'local'
+  attachmentScope.value = 'all'
+  attachmentSpace.value = 'public'
+  attachmentPath.value = []
   hasGeneratedAssets.value = false
   activeReference.value = null
   selectedKnowledgeRefs.value = []
   isRightPanelCollapsed.value = false
-  selectedAgent.value = 'research'
+  selectedAgent.value = 'allround'
   runMode.value = 'quick'
   activeConversationTitle.value = '新会话'
+  activeConversationId.value = ''
   showRecommendations.value = false
   isAutoScroll.value = true
   showBackToLatest.value = false
@@ -786,18 +1077,18 @@ function resetConversationDraft() {
 
 async function newTask() {
   resetConversationDraft()
-  isChatActive.value = true
+  isChatActive.value = false
   showHistory.value = true
-  await nextTick()
-  composer.value?.focus()
+  showRecommendations.value = false
 }
 
 function openConversation(item: ConversationItem) {
   isChatActive.value = true
   showHistory.value = true
+  activeConversationId.value = item.id
   activeConversationTitle.value = item.title
   runMode.value = item.mode === '专家模式' ? 'task' : 'quick'
-  selectedAgent.value = item.mode === '专家模式' ? 'solution' : 'research'
+  selectedAgent.value = item.mode === '专家模式' ? 'solution' : 'knowledge'
   hasGeneratedAssets.value = item.mode === '专家模式'
   isRightPanelCollapsed.value = item.mode !== '专家模式'
   messages.value = [
@@ -817,6 +1108,7 @@ function openConversation(item: ConversationItem) {
     },
   ]
   nextTick(() => { void scrollToLatest() })
+  store.clearConversationNotification(item.id)
 }
 
 function toggleConversationPinned(id: string) {
@@ -858,76 +1150,131 @@ function resetToHome() {
 onMounted(() => {
   window.addEventListener('tianma:home-reset', resetToHome)
   document.addEventListener('selectionchange', handleSelectionChange)
+  document.addEventListener('click', closeFloatingMenus)
 })
+
+watch(() => route.query.conversationId, (id) => {
+  if (!id || typeof id !== 'string') return
+  const item = conversations.value.find((conversation) => conversation.id === id)
+  if (item) {
+    openConversation(item)
+    nextTick(() => {
+      const target = document.querySelector(`[data-conversation-anchor="${id}"]`)
+      target?.scrollIntoView({ block: 'center' })
+    })
+  } else {
+    isChatActive.value = true
+    showHistory.value = true
+    activeConversationId.value = id
+    activeConversationTitle.value = '任务结果'
+  }
+}, { immediate: true })
 
 onBeforeUnmount(() => {
   window.removeEventListener('tianma:home-reset', resetToHome)
   document.removeEventListener('selectionchange', handleSelectionChange)
+  document.removeEventListener('click', closeFloatingMenus)
   generationToken += 1
 })
 </script>
 
 <template>
   <div class="min-h-[calc(100vh-3.5rem)] bg-[#f6f7f9] text-zinc-950 md:min-h-[calc(100vh-4rem)]">
-    <Teleport to="#app-header-left-control">
+    <div v-if="!showHistory" data-testid="home-side-dock" class="fixed left-3 top-[4.75rem] z-40 flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white/95 p-1 shadow-sm backdrop-blur">
       <button
         type="button"
         data-testid="home-sidebar-toggle"
-        class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-600 transition hover:border-zinc-300 hover:bg-zinc-50"
-        :aria-label="showHistory ? '收起历史对话栏' : '展开历史对话栏'"
-        @click="showHistory = !showHistory"
+        class="inline-flex h-9 w-9 items-center justify-center rounded-xl text-zinc-600 transition hover:bg-zinc-100"
+        aria-label="展开历史对话栏"
+        @click="showHistory = true"
       >
-        <ChevronLeft v-if="showHistory" class="h-4 w-4" />
-        <ChevronsRight v-else class="h-4 w-4" />
+        <ChevronsRight class="h-4 w-4" />
       </button>
-    </Teleport>
-    <Teleport to="#app-header-right-control">
       <button
-        v-if="hasSessionAssets"
-        class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-600 transition hover:border-zinc-300 hover:bg-zinc-50"
-        :aria-label="isRightPanelCollapsed ? '展开资产栏' : '折叠资产栏'"
-        @click="isRightPanelCollapsed = !isRightPanelCollapsed"
+        type="button"
+        class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white transition hover:bg-blue-700"
+        aria-label="新建对话"
+        title="新建对话"
+        @click="newTask"
       >
-        <ChevronsLeft v-if="isRightPanelCollapsed" class="h-4 w-4" />
-        <ChevronRight v-else class="h-4 w-4" />
+        <Plus class="h-4 w-4" />
       </button>
-    </Teleport>
+    </div>
+    <div v-if="hasSessionAssets && isRightPanelCollapsed" data-testid="home-right-dock" class="fixed right-3 top-[4.75rem] z-40">
+      <div class="flex items-center gap-2">
+        <button
+          class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-600 transition hover:border-zinc-300 hover:bg-zinc-50"
+          aria-label="展开资产栏"
+          @click="isRightPanelCollapsed = false"
+        >
+          <ChevronsLeft class="h-4 w-4" />
+        </button>
+      </div>
+    </div>
     <div class="relative mx-auto min-h-[calc(100vh-3.5rem)] w-full max-w-[1800px] md:min-h-[calc(100vh-4rem)]">
       <aside
         class="fixed inset-y-0 left-0 z-50 flex w-[clamp(286px,21vw,400px)] flex-col border-r border-zinc-200 bg-white transition-transform duration-300 lg:top-16 lg:h-[calc(100vh-4rem)]"
         :class="showHistory ? 'translate-x-0' : '-translate-x-full'"
       >
-        <div class="flex h-14 items-center justify-between border-b border-zinc-100 px-4">
-          <div class="flex items-center gap-2 text-sm font-semibold">
-            <History class="h-4 w-4 text-zinc-500" />
-            历史对话
-          </div>
+        <div data-testid="home-sidebar-subheader" class="flex h-16 items-center gap-3 border-b border-zinc-100 px-3">
           <button
-            class="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
-            aria-label="新建对话"
+            class="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+            aria-label="新建任务"
+            title="新建任务"
             @click="newTask"
           >
-            <Plus class="h-3.5 w-3.5" />
-            新建
+            <Plus class="h-4 w-4" />
+            新建任务
+          </button>
+          <button
+            type="button"
+            data-testid="home-sidebar-toggle"
+            class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-zinc-200 bg-white text-zinc-500 shadow-sm hover:bg-zinc-50"
+            aria-label="收起历史对话栏"
+            @click="showHistory = false"
+          >
+            <ChevronLeft class="h-4 w-4" />
           </button>
         </div>
-        <div class="border-b border-zinc-100 p-3">
+        <div class="space-y-3 border-b border-zinc-100 p-3">
+          <div class="grid grid-cols-2 gap-1 rounded-full bg-zinc-100 p-1">
+            <button
+              class="rounded-full px-3 py-2 text-center text-sm font-semibold transition"
+              :class="runMode === 'quick' ? 'bg-zinc-950 text-white' : 'text-zinc-500 hover:text-zinc-800'"
+              @click.stop="selectMode('quick')"
+            >
+              日常办公
+            </button>
+            <button
+              class="rounded-full px-3 py-2 text-center text-sm font-semibold transition"
+              :class="runMode === 'task' ? 'bg-zinc-950 text-white' : 'text-zinc-500 hover:text-zinc-800'"
+              @click.stop="selectMode('task')"
+            >
+              专家模式
+            </button>
+          </div>
           <label class="flex h-9 items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-xs text-zinc-400">
             <Search class="h-3.5 w-3.5" />
-            <input class="min-w-0 flex-1 bg-transparent outline-none" placeholder="搜索历史对话..." />
+            <input
+              v-model="conversationSearch"
+              class="min-w-0 flex-1 bg-transparent outline-none"
+              placeholder="搜索任务"
+              aria-label="搜索任务"
+            />
           </label>
         </div>
-        <div class="flex-1 space-y-1 overflow-y-auto p-2">
-          <template v-if="pinnedConversations.length">
+        <div class="flex-1 overflow-y-auto p-2">
+          <div class="px-2 pb-2 text-[11px] font-medium text-zinc-400">任务队列 · {{ modeLabel }}</div>
           <div
             v-for="item in pinnedConversations"
             :key="item.id"
             data-testid="history-conversation-item"
-            class="group rounded-lg border border-transparent px-3 py-2.5 transition hover:border-amber-200 hover:bg-amber-50"
-            :class="item.pinned ? 'bg-amber-50/70' : ''"
+            class="group rounded-lg border border-transparent px-3 py-2.5 transition hover:border-blue-200 hover:bg-blue-50"
+            :class="activeConversationId === item.id ? 'border-blue-200 bg-blue-50' : item.pinned ? 'bg-amber-50/70' : ''"
             @click="openConversation(item)"
           >
             <div class="flex items-center gap-2">
+              <span class="h-2.5 w-2.5 shrink-0 rounded-full" :class="getConversationStatusClass(item.status)" />
               <Pin v-if="item.pinned" class="h-3.5 w-3.5 shrink-0 fill-amber-500 text-amber-500" />
               <input
                 v-if="editingConversationId === item.id"
@@ -940,10 +1287,16 @@ onBeforeUnmount(() => {
                 @blur="commitRenameConversation(item.id)"
               />
               <span v-else class="min-w-0 flex-1 truncate text-sm font-medium text-zinc-800">{{ item.title }}</span>
-              <span class="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[10px] text-zinc-500">{{ item.mode }}</span>
+              <span class="shrink-0 rounded-md border border-amber-200 bg-white/80 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">{{ item.mode }}任务</span>
             </div>
             <div class="mt-2 flex items-center justify-between gap-2">
-              <div class="text-[11px] text-zinc-400">{{ item.time }}</div>
+              <div class="flex min-w-0 items-center gap-1.5 text-[11px] text-zinc-400">
+                <span>{{ item.time }}</span>
+                <span>·</span>
+                <span>{{ item.mode }}</span>
+                <span>·</span>
+                <span>{{ getConversationStatusLabel(item.status) }}</span>
+              </div>
               <div class="flex items-center gap-0.5 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
                 <button
                   type="button"
@@ -972,16 +1325,19 @@ onBeforeUnmount(() => {
               </div>
             </div>
           </div>
-          <div v-if="regularConversations.length" class="my-2 border-t border-zinc-200 pt-2 text-[11px] font-medium text-zinc-400">普通会话</div>
-          </template>
+          <div v-if="pinnedConversations.length && regularConversations.length" data-testid="history-pinned-divider" class="my-2 border-t border-zinc-200 px-2 pt-2 text-[11px] font-medium text-zinc-400">
+            其他任务
+          </div>
           <div
             v-for="item in regularConversations"
             :key="item.id"
             data-testid="history-conversation-item"
-            class="group rounded-lg border border-transparent px-3 py-2.5 transition hover:border-amber-200 hover:bg-amber-50"
+            class="group rounded-lg border border-transparent px-3 py-2.5 transition hover:border-blue-200 hover:bg-blue-50"
+            :class="activeConversationId === item.id ? 'border-blue-200 bg-blue-50' : ''"
             @click="openConversation(item)"
           >
             <div class="flex items-center gap-2">
+              <span class="h-2.5 w-2.5 shrink-0 rounded-full" :class="getConversationStatusClass(item.status)" />
               <input
                 v-if="editingConversationId === item.id"
                 v-model="editingConversationTitle"
@@ -993,18 +1349,22 @@ onBeforeUnmount(() => {
                 @blur="commitRenameConversation(item.id)"
               />
               <span v-else class="min-w-0 flex-1 truncate text-sm font-medium text-zinc-800">{{ item.title }}</span>
-              <span class="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[10px] text-zinc-500">{{ item.mode }}</span>
+              <span class="shrink-0 rounded-md border border-zinc-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-zinc-500">{{ item.mode }}任务</span>
             </div>
             <div class="mt-2 flex items-center justify-between gap-2">
-              <div class="text-[11px] text-zinc-400">{{ item.time }}</div>
+              <div class="flex min-w-0 items-center gap-1.5 text-[11px] text-zinc-400">
+                <span>{{ item.time }}</span>
+                <span>·</span>
+                <span>{{ getConversationStatusLabel(item.status) }}</span>
+              </div>
               <div class="flex items-center gap-0.5 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
                 <button
                   type="button"
                   class="rounded-md p-1 text-zinc-400 hover:bg-white hover:text-amber-600"
-                  aria-label="置顶会话"
+                  :aria-label="item.pinned ? '取消置顶' : '置顶会话'"
                   @click.stop="toggleConversationPinned(item.id)"
                 >
-                  <Pin class="h-3.5 w-3.5" />
+                  <Pin class="h-3.5 w-3.5" :class="item.pinned ? 'fill-amber-500 text-amber-500' : ''" />
                 </button>
                 <button
                   type="button"
@@ -1030,13 +1390,18 @@ onBeforeUnmount(() => {
 
       <main class="flex min-h-[calc(100vh-3.5rem)] flex-col px-[clamp(12px,2.2vw,34px)] py-[clamp(14px,1.6vw,24px)] md:min-h-[calc(100vh-4rem)]">
         <input ref="fileInput" class="hidden" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg" @change="handleFiles" />
-        <section v-if="!isChatActive" class="mx-auto flex w-full max-w-[clamp(680px,58vw,1040px)] flex-1 flex-col items-center justify-center pb-[clamp(24px,4vw,48px)]">
+        <section
+          v-if="!isChatActive"
+          data-testid="home-hero-section"
+          class="mx-auto flex flex-1 flex-col items-center justify-center pb-[clamp(24px,4vw,48px)] transition-[width,transform] duration-300"
+          :style="homeHeroStyle"
+        >
           <div class="mb-7 text-center">
-            <img :src="ponyAvatarUrl" alt="小马头像" class="mx-auto mb-4 h-[clamp(72px,5.4vw,96px)] w-[clamp(72px,5.4vw,96px)] object-contain" />
+            <img :src="ponyAvatarUrl" alt="小马头像" class="mx-auto mb-5 h-[clamp(92px,7vw,132px)] w-[clamp(92px,7vw,132px)] object-contain drop-shadow-[0_18px_32px_rgba(15,23,42,0.12)]" />
             <h1 class="text-[clamp(24px,2.2vw,40px)] font-semibold leading-tight tracking-tight text-zinc-950">小马在线，有事随时说</h1>
           </div>
 
-          <div class="w-full rounded-[28px] border border-white/70 bg-white/65 p-3 shadow-2xl shadow-zinc-300/40 ring-1 ring-white/80 backdrop-blur-2xl">
+          <div data-testid="hero-composer" class="mx-auto w-full max-w-[920px] rounded-[28px] border border-zinc-200 bg-white p-3 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
             <div class="flex items-start gap-2">
               <textarea
                 ref="composer"
@@ -1060,6 +1425,11 @@ onBeforeUnmount(() => {
                 <ArrowUp class="h-5 w-5" />
               </button>
             </div>
+            <div v-if="query" class="flex justify-end px-2 pb-1">
+              <button type="button" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700" aria-label="清空输入内容" @click="query = ''; resizeComposer()">
+                <X class="h-3.5 w-3.5" /> 清空
+              </button>
+            </div>
 
             <div v-if="selectedFiles.length || selectedKnowledgeRefs.length" class="grid gap-2 px-2 pb-2 sm:grid-cols-2">
               <div v-for="refItem in selectedKnowledgeRefs" :key="refItem.kb" class="group flex min-w-0 items-center gap-2 rounded-xl border border-zinc-200 bg-white/70 px-3 py-2 text-xs">
@@ -1075,15 +1445,15 @@ onBeforeUnmount(() => {
                   <div class="truncate font-medium text-zinc-800">{{ file }}</div>
                   <div class="text-[11px] text-zinc-400">等待小马解析</div>
                 </div>
-                <button class="rounded-md p-1 text-zinc-400 opacity-0 transition hover:bg-zinc-100 hover:text-zinc-700 group-hover:opacity-100" @click="removeFile(index)"><X class="h-3 w-3" /></button>
+                <button class="rounded-md p-1 text-zinc-400 opacity-0 transition hover:bg-zinc-100 hover:text-zinc-700 group-hover:opacity-100" :aria-label="`移除附件 ${file}`" @click="removeFile(index)"><X class="h-3 w-3" /></button>
               </div>
             </div>
 
             <div class="flex flex-wrap items-center gap-2 border-t border-zinc-100 px-2 pt-3">
               <div class="relative">
                 <button
-                  class="inline-flex h-8 items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
-                  aria-label="上传业务资料"
+                  class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
+                  aria-label="添加附件"
                   @mouseenter="showUploadTip = true"
                   @mouseleave="showUploadTip = false"
                   @focus="showUploadTip = true"
@@ -1091,7 +1461,6 @@ onBeforeUnmount(() => {
                   @click="triggerFilePicker"
                 >
                   <Paperclip class="h-3.5 w-3.5" />
-                  上传
                 </button>
                 <div v-if="showUploadTip" class="absolute bottom-full left-0 z-50 mb-2 w-[260px] rounded-lg border border-zinc-200 bg-white p-3 text-left shadow-[0_12px_36px_rgba(15,23,42,0.12)]">
                   <div class="text-xs font-semibold text-zinc-900">上传业务资料</div>
@@ -1106,62 +1475,124 @@ onBeforeUnmount(() => {
                 <Globe2 class="h-3.5 w-3.5" />
                 联网
               </button>
-              <div class="flex rounded-full border border-zinc-200 bg-zinc-50 p-1">
+              <div class="relative">
                 <button
-                  class="inline-flex h-8 w-24 items-center justify-center gap-1.5 rounded-full px-0 text-xs font-medium transition"
-                  :class="runMode === 'quick' ? 'bg-orange-500 text-white shadow-sm' : 'text-zinc-500 hover:bg-white'"
-                  aria-label="切换到日常办公"
-                  @click="selectMode('quick')"
+                  type="button"
+                  class="inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition"
+                  :class="runMode === 'quick' ? 'border-orange-200 bg-orange-50 text-orange-700' : 'border-violet-200 bg-violet-50 text-violet-700'"
+                  aria-label="选择模式"
+                  @click.stop="modeMenuOpen = !modeMenuOpen; agentMenuOpen = false"
                 >
-                  <Zap class="h-3.5 w-3.5" />
-                  日常办公
+                  <Zap v-if="runMode === 'quick'" class="h-3.5 w-3.5" />
+                  <Bot v-else class="h-3.5 w-3.5" />
+                  {{ modeLabel }}
+                  <ChevronDown class="h-3.5 w-3.5" />
                 </button>
-                <button
-                  class="inline-flex h-8 w-24 items-center justify-center gap-1.5 rounded-full px-0 text-xs font-medium transition"
-                  :class="runMode === 'task' ? 'bg-violet-600 text-white shadow-sm' : 'text-zinc-500 hover:bg-white'"
-                  aria-label="切换到专家模式"
-                  @click="selectMode('task')"
-                >
-                  <Bot class="h-3.5 w-3.5" />
-                  专家模式
-                </button>
-              </div>
-              <label class="ml-auto inline-flex min-w-32 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium" :class="runMode === 'quick' ? 'border-orange-200 bg-orange-50 text-orange-700' : 'border-violet-200 bg-violet-50 text-violet-700'">
-                {{ agentSelectLabel }}
-                <select v-model="selectedAgent" class="bg-transparent text-xs font-semibold outline-none" :class="runMode === 'quick' ? 'text-orange-900' : 'text-violet-900'" :aria-label="`选择${agentSelectLabel}`" @change="showRecommendations = true">
-                  <option v-for="agent in currentAgentOptions" :key="agent.value" :value="agent.value" :disabled="agent.value.startsWith('soon')">{{ agent.label }}</option>
-                </select>
-              </label>
-            </div>
-
-            <Transition name="recommend">
-              <div v-if="showRecommendations" class="mt-3 rounded-2xl border border-white/80 bg-white/55 p-4 shadow-xl shadow-zinc-300/35 backdrop-blur-2xl ring-1 ring-white/70">
-                <div class="mb-3 flex items-center justify-between">
-                  <div class="text-xs font-semibold text-zinc-500">{{ caseTitle }}<span v-if="runMode === 'quick'"> · 日常办公</span></div>
-                  <button class="rounded-lg p-1 text-zinc-400 hover:bg-white/80 hover:text-zinc-700" aria-label="关闭推荐案例" @click="showRecommendations = false">
-                    <X class="h-4 w-4" />
+                <div v-if="modeMenuOpen" class="absolute bottom-full left-0 z-50 mb-2 w-56 overflow-hidden rounded-2xl border border-zinc-200 bg-white p-1 shadow-2xl">
+                  <button type="button" data-testid="mode-option-quick" class="flex w-full items-start gap-2 rounded-xl px-3 py-2.5 text-left hover:bg-zinc-50" @click.stop="selectMode('quick')">
+                    <Zap class="mt-0.5 h-4 w-4 text-orange-500" />
+                    <span class="min-w-0 flex-1">
+                      <span class="block text-sm font-medium text-zinc-900">日常办公</span>
+                      <span class="block text-xs leading-5 text-zinc-400">适用于大部分情况</span>
+                    </span>
+                    <CheckCircle2 v-if="runMode === 'quick'" class="mt-0.5 h-4 w-4 text-blue-600" />
+                  </button>
+                  <button type="button" data-testid="mode-option-task" class="flex w-full items-start gap-2 rounded-xl px-3 py-2.5 text-left hover:bg-zinc-50" @click.stop="selectMode('task')">
+                    <Bot class="mt-0.5 h-4 w-4 text-violet-600" />
+                    <span class="min-w-0 flex-1">
+                      <span class="block text-sm font-medium text-zinc-900">专家模式</span>
+                      <span class="block text-xs leading-5 text-zinc-400">适合拆解任务并生成产物</span>
+                    </span>
+                    <CheckCircle2 v-if="runMode === 'task'" class="mt-0.5 h-4 w-4 text-blue-600" />
                   </button>
                 </div>
-                <div class="grid gap-2 md:grid-cols-3">
+              </div>
+              <div class="group/agent relative ml-auto">
                 <button
-                  v-for="item in visibleCases"
-                  :key="item.title"
-                  class="rounded-xl border border-white/80 bg-white/80 p-3 text-left transition hover:border-orange-200 hover:bg-orange-50"
-                  @click="fillPrompt(item, runMode); showRecommendations = true"
+                  type="button"
+                  class="inline-flex h-8 min-w-32 items-center justify-between gap-2 rounded-full border px-3 text-xs font-medium"
+                  :class="runMode === 'quick' ? 'border-orange-200 bg-orange-50 text-orange-700' : 'border-violet-200 bg-violet-50 text-violet-700'"
+                  :aria-label="`选择${agentSelectLabel}`"
+                  @click.stop="agentMenuOpen = !agentMenuOpen; modeMenuOpen = false"
                 >
-                  <component :is="'icon' in item ? item.icon : LayoutGrid" class="mb-2 h-4 w-4 text-violet-600" />
-                  <div class="text-sm font-medium text-zinc-900">{{ item.title }}</div>
-                  <div class="mt-1 line-clamp-2 text-xs leading-5 text-zinc-500">{{ item.desc }}</div>
+                  <span class="truncate">{{ currentAgentLabel }}</span>
+                  <ChevronDown class="h-3.5 w-3.5 shrink-0" />
                 </button>
+                <div class="pointer-events-none absolute bottom-full right-0 z-40 mb-2 w-64 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-left text-xs leading-5 text-zinc-500 opacity-0 shadow-xl transition group-hover/agent:opacity-100 group-focus-within/agent:opacity-100">
+                  {{ currentAgentDescription }}
+                </div>
+                <div v-if="agentMenuOpen" class="absolute bottom-full right-0 z-50 mb-2 w-60 overflow-hidden rounded-2xl border border-zinc-200 bg-white p-1 shadow-2xl">
+                  <button
+                    v-for="agent in currentAgentOptions"
+                    :key="agent.value"
+                    type="button"
+                    :data-testid="`agent-option-${agent.value}`"
+                    class="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left transition"
+                    :class="agent.value.startsWith('soon') ? 'cursor-not-allowed text-zinc-300' : 'text-zinc-700 hover:bg-zinc-50'"
+                    @click.stop="selectAgent(agent.value)"
+                  >
+                    <Sparkles class="h-4 w-4 shrink-0" :class="runMode === 'quick' ? 'text-orange-500' : 'text-violet-500'" />
+                    <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ agent.label }}</span>
+                    <CheckCircle2 v-if="selectedAgent === agent.value" class="h-4 w-4 shrink-0 text-blue-600" />
+                  </button>
                 </div>
               </div>
-            </Transition>
+            </div>
+
           </div>
+
+          <Transition name="recommend">
+            <div v-if="showRecommendations" data-testid="home-case-section" class="mt-12 w-full">
+              <div v-if="selectedAgent === 'allround' && runMode === 'quick'" class="mb-7 flex justify-center gap-10 text-sm">
+                <button
+                  v-for="category in ['精选案例', '咨询调研', 'office办公', '应用开发']"
+                  :key="category"
+                  type="button"
+                  class="border-b-2 px-1 pb-1 transition"
+                  :class="activeCaseCategory === category ? 'border-zinc-950 font-semibold text-zinc-950' : 'border-transparent text-zinc-400 hover:text-zinc-500'"
+                  @click="activeCaseCategory = category"
+                >
+                  {{ category }}
+                </button>
+              </div>
+              <div v-else class="mb-7 flex justify-center text-sm">
+                <span class="border-b-2 border-zinc-950 px-1 pb-1 font-semibold text-zinc-950">精选案例</span>
+              </div>
+              <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+                <button
+                  v-for="(item, index) in visibleCases"
+                  :key="item.title"
+                  class="group h-36 overflow-hidden rounded-2xl border border-zinc-200 bg-white text-left shadow-[0_10px_28px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-[0_16px_42px_rgba(15,23,42,0.08)]"
+                  @click="fillPrompt(item, runMode); showRecommendations = true"
+                >
+                  <div class="relative flex h-full flex-col">
+                    <div class="z-10 px-5 pt-4">
+                      <div class="truncate text-base font-semibold text-zinc-950">{{ item.title }}</div>
+                    </div>
+                    <div class="relative mt-auto h-24 overflow-hidden bg-gradient-to-br" :class="[
+                      index % 4 === 0 ? 'from-blue-50 via-indigo-50 to-white' : '',
+                      index % 4 === 1 ? 'from-emerald-50 via-lime-50 to-white' : '',
+                      index % 4 === 2 ? 'from-violet-50 via-sky-50 to-white' : '',
+                      index % 4 === 3 ? 'from-slate-50 via-blue-50 to-white' : '',
+                    ]">
+                      <div class="absolute left-8 top-7 h-12 w-28 rounded-xl border border-white/80 bg-white/70 shadow-sm transition group-hover:translate-y-[-2px]" />
+                      <div class="absolute right-7 top-5 grid h-11 w-11 place-items-center rounded-xl border border-white/80 bg-white/80 shadow-sm">
+                        <component :is="'icon' in item ? item.icon : LayoutGrid" class="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div class="absolute bottom-3 left-16 h-2 w-32 rounded-full bg-white/80" />
+                      <div class="absolute bottom-8 right-20 h-2 w-20 rounded-full bg-white/70" />
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </Transition>
         </section>
 
         <section
           v-else
           data-testid="responsive-chat-shell"
+          :data-conversation-anchor="activeConversationId || 'draft'"
           class="mx-auto flex h-[calc(100vh-5.5rem)] w-full flex-1 flex-col"
           :style="chatShellStyle"
         >
@@ -1182,11 +1613,11 @@ onBeforeUnmount(() => {
             @touchstart.passive="markUserScrollIntent"
             @pointerdown="markUserScrollIntent"
           >
-            <div v-for="message in messages" :key="message.id" class="flex gap-3" :class="message.role === 'user' ? 'justify-end' : 'justify-start'">
+            <div v-for="message in messages" :key="message.id" class="group/message flex gap-3" :class="message.role === 'user' ? 'justify-end' : 'justify-start'">
               <div v-if="message.role === 'assistant'" class="mt-1 h-10 w-10 shrink-0">
                 <img :src="ponyAvatarUrl" alt="小马头像" class="h-full w-full object-contain" />
               </div>
-              <div class="min-w-0" :class="message.role === 'user' ? 'max-w-[72%]' : 'max-w-[88%] flex-1'">
+              <div class="min-w-0" :class="message.role === 'user' ? (editingUserMessageId === message.id ? 'max-w-[88%] flex-1' : 'max-w-[72%]') : 'max-w-[88%] flex-1'">
                 <div v-if="message.role === 'assistant' && message.processEvents?.length" class="mb-4 border-l border-zinc-200 pl-4 text-sm">
                   <div class="mb-3 inline-flex items-center gap-2 rounded-md px-1 text-zinc-400">
                     <ChevronRight class="h-4 w-4" />
@@ -1237,34 +1668,45 @@ onBeforeUnmount(() => {
                     </div>
                   </div>
                 </div>
+                <div v-if="message.role === 'user' && editingUserMessageId === message.id" class="flex w-full items-center gap-4 py-1">
+                  <button
+                    type="button"
+                    class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900"
+                    aria-label="取消编辑"
+                    title="取消编辑"
+                    @click="editingUserMessageId = ''; editingUserMessageDraft = ''"
+                  >
+                    <X class="h-6 w-6" />
+                  </button>
+                  <textarea
+                    v-model="editingUserMessageDraft"
+                    aria-label="编辑已发送消息"
+                    class="min-h-20 flex-1 resize-none rounded-2xl border-2 border-blue-600 bg-white px-4 py-3 text-base leading-7 text-zinc-950 outline-none placeholder:text-zinc-400"
+                  />
+                  <button
+                    type="button"
+                    class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white transition hover:bg-blue-700"
+                    aria-label="保存并重新发送"
+                    title="发送修改"
+                    @click="saveAndResendUserMessage(message)"
+                  >
+                    <ArrowUp class="h-5 w-5" />
+                  </button>
+                </div>
                 <div
+                  v-else
                   class="text-sm leading-7"
-                  :class="message.role === 'user' ? 'rounded-2xl bg-zinc-950 px-4 py-3 text-white shadow-sm' : 'prose prose-zinc max-w-none text-zinc-800'"
+                  :class="message.role === 'user' ? 'rounded-2xl bg-zinc-100 px-4 py-3 text-zinc-900 shadow-sm' : 'prose prose-zinc max-w-none text-zinc-800'"
                 >
                   <div v-if="message.role === 'assistant'" class="ai-markdown" v-html="renderMarkdown(message.content)" />
                   <div v-else class="whitespace-pre-wrap">{{ message.content }}</div>
-                  <div v-if="message.role === 'assistant'" class="not-prose mt-3 flex flex-wrap items-center gap-1.5 pt-2">
-                    <button
-                      class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs transition"
-                      :class="feedbackByMessage[message.id] === 'up' ? 'bg-emerald-50 text-emerald-700' : 'text-zinc-500 hover:bg-emerald-50 hover:text-emerald-700'"
-                      aria-label="点赞"
-                      @click="setFeedback(message.id, 'up')"
-                    >
-                      <ThumbsUp class="h-3.5 w-3.5" />{{ feedbackByMessage[message.id] === 'up' ? '已点赞' : '点赞' }}
+                  <div v-if="message.role === 'assistant'" class="not-prose mt-3 flex flex-wrap items-center gap-1.5 pt-2 opacity-0 transition group-hover/message:opacity-100 group-focus-within/message:opacity-100">
+                    <button class="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800" :aria-label="copiedMessageId === message.id ? '已复制回答' : '复制回答'" :title="copiedMessageId === message.id ? '已复制回答' : '复制回答'" @click="copyAnswer(message)">
+                      <CheckCircle2 v-if="copiedMessageId === message.id" class="h-4 w-4 text-emerald-600" />
+                      <Copy v-else class="h-4 w-4" />
                     </button>
-                    <button
-                      class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs transition"
-                      :class="feedbackByMessage[message.id] === 'down' ? 'bg-red-50 text-red-600' : 'text-zinc-500 hover:bg-red-50 hover:text-red-600'"
-                      aria-label="点踩"
-                      @click="openDislikeModal(message.id)"
-                    >
-                      <ThumbsDown class="h-3.5 w-3.5" />{{ feedbackByMessage[message.id] === 'down' ? '已点踩' : '点踩' }}
-                    </button>
-                    <button class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800" aria-label="复制回答" @click="copyAnswer(message)">
-                      <Copy class="h-3.5 w-3.5" />{{ copiedMessageId === message.id ? '已复制' : '复制' }}
-                    </button>
-                    <button class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800" aria-label="引用回答" @click="quoteAnswer(message)">
-                      <Quote class="h-3.5 w-3.5" />{{ quotedMessageId === message.id ? '已引用' : '引用' }}
+                    <button class="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800" aria-label="引用回答" title="引用回答" @click="quoteAnswer(message)">
+                      <Quote class="h-4 w-4" :class="quotedMessageId === message.id ? 'text-blue-600' : ''" />
                     </button>
                   </div>
                   <div v-if="message.role === 'assistant' && (selectedKnowledgeRefs.length || hasGeneratedAssets)" class="not-prose mt-3 rounded-xl border border-zinc-200 bg-white/70 p-3">
@@ -1288,9 +1730,15 @@ onBeforeUnmount(() => {
                     </div>
                   </div>
                 </div>
-              </div>
-              <div v-if="message.role === 'user'" class="mt-1 grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-zinc-900 to-zinc-600 text-sm font-bold text-white shadow-sm">
-                张
+                <div v-if="message.role === 'user' && editingUserMessageId !== message.id" class="mt-2 flex justify-end gap-1.5 pr-1 opacity-0 transition group-hover/message:opacity-100 group-focus-within/message:opacity-100">
+                  <button type="button" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 transition hover:bg-zinc-200/70 hover:text-zinc-900" :aria-label="copiedMessageId === message.id ? '已复制消息' : '复制消息'" :title="copiedMessageId === message.id ? '已复制消息' : '复制消息'" @click="copyUserMessage(message)">
+                    <CheckCircle2 v-if="copiedMessageId === message.id" class="h-4 w-4 text-emerald-500" />
+                    <Copy v-else class="h-4 w-4" />
+                  </button>
+                  <button type="button" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 transition hover:bg-zinc-200/70 hover:text-zinc-900" aria-label="编辑消息" title="编辑消息" @click="beginEditUserMessage(message)">
+                    <Pencil class="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1320,7 +1768,7 @@ onBeforeUnmount(() => {
                     <div class="truncate font-medium text-zinc-800">{{ file }}</div>
                     <div class="text-[11px] text-zinc-400">等待小马解析</div>
                   </div>
-                  <button class="rounded-md p-1 text-zinc-400 opacity-0 transition hover:bg-zinc-100 hover:text-zinc-700 group-hover:opacity-100" @click="removeFile(index)"><X class="h-3 w-3" /></button>
+                  <button class="rounded-md p-1 text-zinc-400 opacity-0 transition hover:bg-zinc-100 hover:text-zinc-700 group-hover:opacity-100" :aria-label="`移除附件 ${file}`" @click="removeFile(index)"><X class="h-3 w-3" /></button>
                 </div>
               </div>
             <div class="flex items-end gap-2">
@@ -1348,8 +1796,8 @@ onBeforeUnmount(() => {
               <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-zinc-100 px-1 pt-3">
                 <div class="relative">
                   <button
-                    class="inline-flex h-8 items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
-                    aria-label="上传业务资料"
+                    class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
+                    aria-label="添加附件"
                     @mouseenter="showUploadTip = true"
                     @mouseleave="showUploadTip = false"
                     @focus="showUploadTip = true"
@@ -1357,7 +1805,6 @@ onBeforeUnmount(() => {
                     @click="triggerFilePicker"
                   >
                     <Paperclip class="h-3.5 w-3.5" />
-                    上传
                   </button>
                   <div v-if="showUploadTip" class="absolute bottom-full left-0 z-50 mb-2 w-[260px] rounded-lg border border-zinc-200 bg-white p-3 text-left shadow-[0_12px_36px_rgba(15,23,42,0.12)]">
                     <div class="text-xs font-semibold text-zinc-900">上传业务资料</div>
@@ -1372,32 +1819,65 @@ onBeforeUnmount(() => {
                   <Globe2 class="h-3.5 w-3.5" />
                   联网
                 </button>
-                <div class="flex rounded-full border border-zinc-200 bg-zinc-50 p-1">
+                <div class="relative">
                   <button
-                    class="inline-flex h-8 w-24 items-center justify-center gap-1.5 rounded-full px-0 text-xs font-medium transition"
-                    :class="runMode === 'quick' ? 'bg-orange-500 text-white shadow-sm' : 'text-zinc-500 hover:bg-white'"
-                    aria-label="切换到日常办公"
-                    @click="selectMode('quick')"
+                    type="button"
+                    class="inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition"
+                    :class="runMode === 'quick' ? 'border-orange-200 bg-orange-50 text-orange-700' : 'border-violet-200 bg-violet-50 text-violet-700'"
+                    aria-label="选择模式"
+                    @click.stop="modeMenuOpen = !modeMenuOpen; agentMenuOpen = false"
                   >
-                    <Zap class="h-3.5 w-3.5" />
-                    日常办公
+                    <Zap v-if="runMode === 'quick'" class="h-3.5 w-3.5" />
+                    <Bot v-else class="h-3.5 w-3.5" />
+                    {{ modeLabel }}
+                    <ChevronDown class="h-3.5 w-3.5" />
                   </button>
-                  <button
-                    class="inline-flex h-8 w-24 items-center justify-center gap-1.5 rounded-full px-0 text-xs font-medium transition"
-                    :class="runMode === 'task' ? 'bg-violet-600 text-white shadow-sm' : 'text-zinc-500 hover:bg-white'"
-                    aria-label="切换到专家模式"
-                    @click="selectMode('task')"
-                  >
-                    <Bot class="h-3.5 w-3.5" />
-                    专家模式
-                  </button>
+                  <div v-if="modeMenuOpen" class="absolute bottom-full left-0 z-50 mb-2 w-56 overflow-hidden rounded-2xl border border-zinc-200 bg-white p-1 shadow-2xl">
+                    <button type="button" data-testid="mode-option-quick" class="flex w-full items-start gap-2 rounded-xl px-3 py-2.5 text-left hover:bg-zinc-50" @click.stop="selectMode('quick')">
+                      <Zap class="mt-0.5 h-4 w-4 text-orange-500" />
+                      <span class="min-w-0 flex-1">
+                        <span class="block text-sm font-medium text-zinc-900">日常办公</span>
+                    <span class="block text-xs leading-5 text-zinc-400">适用于大部分情况</span>
+                      </span>
+                      <CheckCircle2 v-if="runMode === 'quick'" class="mt-0.5 h-4 w-4 text-blue-600" />
+                    </button>
+                    <button type="button" data-testid="mode-option-task" class="flex w-full items-start gap-2 rounded-xl px-3 py-2.5 text-left hover:bg-zinc-50" @click.stop="selectMode('task')">
+                      <Bot class="mt-0.5 h-4 w-4 text-violet-600" />
+                      <span class="min-w-0 flex-1">
+                        <span class="block text-sm font-medium text-zinc-900">专家模式</span>
+                        <span class="block text-xs leading-5 text-zinc-400">适合拆解任务并生成产物</span>
+                      </span>
+                      <CheckCircle2 v-if="runMode === 'task'" class="mt-0.5 h-4 w-4 text-blue-600" />
+                    </button>
+                  </div>
                 </div>
-                <label class="ml-auto inline-flex min-w-32 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium" :class="runMode === 'quick' ? 'border-orange-200 bg-orange-50 text-orange-700' : 'border-violet-200 bg-violet-50 text-violet-700'">
-                  {{ agentSelectLabel }}
-                  <select v-model="selectedAgent" class="bg-transparent text-xs font-semibold outline-none" :class="runMode === 'quick' ? 'text-orange-900' : 'text-violet-900'" :aria-label="`选择${agentSelectLabel}`">
-                    <option v-for="agent in currentAgentOptions" :key="agent.value" :value="agent.value" :disabled="agent.value.startsWith('soon')">{{ agent.label }}</option>
-                  </select>
-                </label>
+                <div class="relative ml-auto">
+                  <button
+                    type="button"
+                    class="inline-flex h-8 min-w-32 items-center justify-between gap-2 rounded-full border px-3 text-xs font-medium"
+                    :class="runMode === 'quick' ? 'border-orange-200 bg-orange-50 text-orange-700' : 'border-violet-200 bg-violet-50 text-violet-700'"
+                    :aria-label="`选择${agentSelectLabel}`"
+                    @click.stop="agentMenuOpen = !agentMenuOpen; modeMenuOpen = false"
+                  >
+                    <span class="truncate">{{ currentAgentLabel }}</span>
+                    <ChevronDown class="h-3.5 w-3.5 shrink-0" />
+                  </button>
+                  <div v-if="agentMenuOpen" class="absolute bottom-full right-0 z-50 mb-2 w-60 overflow-hidden rounded-2xl border border-zinc-200 bg-white p-1 shadow-2xl">
+                    <button
+                      v-for="agent in currentAgentOptions"
+                      :key="agent.value"
+                      type="button"
+                      :data-testid="`agent-option-${agent.value}`"
+                      class="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left transition"
+                      :class="agent.value.startsWith('soon') ? 'cursor-not-allowed text-zinc-300' : 'text-zinc-700 hover:bg-zinc-50'"
+                      @click.stop="selectAgent(agent.value)"
+                    >
+                      <Sparkles class="h-4 w-4 shrink-0" :class="runMode === 'quick' ? 'text-orange-500' : 'text-violet-500'" />
+                      <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ agent.label }}</span>
+                      <CheckCircle2 v-if="selectedAgent === agent.value" class="h-4 w-4 shrink-0 text-blue-600" />
+                    </button>
+                  </div>
+                </div>
                 <span class="inline-flex items-center justify-center rounded-full border border-zinc-200 bg-white p-2" :style="contextRingStyle" title="上下文">
                   <span class="h-3.5 w-3.5 rounded-full bg-white" />
                 </span>
@@ -1407,10 +1887,18 @@ onBeforeUnmount(() => {
         </section>
       </main>
 
-      <aside v-if="rightPanelVisible" class="fixed bottom-0 right-0 top-14 z-30 hidden w-[clamp(286px,21vw,400px)] border-l border-zinc-200 bg-white lg:top-16 lg:block">
+      <aside v-if="rightPanelVisible" data-testid="right-asset-panel" class="fixed bottom-0 right-0 top-14 z-30 hidden w-[clamp(286px,21vw,400px)] border-l border-zinc-200 bg-white lg:top-16 lg:block">
         <div class="flex h-full flex-col">
           <div class="flex h-14 items-center justify-between border-b border-zinc-100 px-4">
             <div class="text-sm font-semibold text-zinc-900">会话产物栏</div>
+            <button
+              type="button"
+              class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 text-zinc-500 hover:bg-zinc-50"
+              aria-label="折叠资产栏"
+              @click="isRightPanelCollapsed = true"
+            >
+              <ChevronRight class="h-4 w-4" />
+            </button>
           </div>
           <div class="flex-1 space-y-2 overflow-y-auto p-2">
           <section class="rounded-lg border border-transparent px-3 py-2.5 hover:border-zinc-200 hover:bg-zinc-50">
@@ -1521,6 +2009,158 @@ onBeforeUnmount(() => {
       </aside>
     </div>
   </div>
+
+  <!-- Attachment modal -->
+  <Teleport to="body">
+    <div v-if="attachmentModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/45 px-4 py-8" @click.self="attachmentModalOpen = false">
+      <div class="flex max-h-[86vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-zinc-200">
+        <div class="flex items-center justify-between gap-4 border-b border-zinc-200 px-6 py-4">
+          <div class="flex min-w-0 items-center gap-5">
+            <h3 class="shrink-0 text-base font-semibold text-zinc-950">添加附件</h3>
+            <span class="h-5 w-px bg-zinc-200" />
+            <p class="truncate text-sm text-slate-500">支持上传本地文件或从知识库中选择。</p>
+          </div>
+          <button type="button" class="rounded-lg p-2 text-zinc-500 hover:bg-zinc-100" aria-label="关闭附件弹窗" @click="attachmentModalOpen = false">
+            <X class="h-5 w-5" />
+          </button>
+        </div>
+
+        <div class="border-b border-zinc-200 px-6">
+          <div class="flex gap-2">
+            <button
+              type="button"
+              class="border-b-2 px-4 py-3 text-sm font-semibold transition"
+              :class="activeAttachmentTab === 'local' ? 'border-blue-600 text-zinc-950' : 'border-transparent text-slate-500 hover:text-zinc-800'"
+              @click="activeAttachmentTab = 'local'"
+            >
+              本地文件
+            </button>
+            <button
+              type="button"
+              class="border-b-2 px-4 py-3 text-sm font-semibold transition"
+              :class="activeAttachmentTab === 'knowledge' ? 'border-blue-600 text-zinc-950' : 'border-transparent text-slate-500 hover:text-zinc-800'"
+              @click="activeAttachmentTab = 'knowledge'"
+            >
+              知识库文档
+            </button>
+          </div>
+        </div>
+
+        <div class="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+          <div v-if="activeAttachmentTab === 'local'" class="space-y-4">
+            <button
+              type="button"
+              class="flex min-h-40 w-full flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white px-6 py-8 text-center transition hover:border-blue-300 hover:bg-blue-50/40"
+              @click="chooseLocalFiles"
+            >
+              <div class="flex items-center gap-5 text-slate-500">
+                <div class="grid h-12 w-12 place-items-center rounded-full bg-slate-100"><Paperclip class="h-5 w-5" /></div>
+                <div class="grid h-12 w-12 place-items-center rounded-full bg-slate-100"><Folder class="h-5 w-5" /></div>
+                <div class="grid h-12 w-12 place-items-center rounded-full bg-slate-100"><FileText class="h-5 w-5" /></div>
+              </div>
+              <div class="mt-5 text-sm font-semibold text-zinc-950">点击上传文件，或点击文件夹/压缩包图标</div>
+              <div class="mt-2 text-xs text-slate-500">{{ uploadHintText }}</div>
+            </button>
+            <div class="flex min-h-40 flex-col items-center justify-center rounded-xl border border-dashed border-blue-100 bg-blue-50/20 text-center">
+              <FileText class="h-8 w-8 text-blue-500" />
+              <div class="mt-3 text-sm font-semibold text-zinc-900">{{ selectedFiles.length ? `已选择 ${selectedFiles.length} 个文件` : '暂无本地文件' }}</div>
+              <div class="mt-1 text-xs text-slate-500">请在上方点击或拖拽上传文件</div>
+            </div>
+          </div>
+
+          <div v-else class="space-y-4">
+            <div class="flex flex-wrap items-center gap-3 border-b border-zinc-200 pb-4">
+              <label class="flex h-10 min-w-[220px] flex-1 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-slate-400 shadow-sm">
+                <Search class="h-4 w-4" />
+                <input v-model="kbAttachmentSearch" class="min-w-0 flex-1 bg-transparent outline-none" placeholder="搜索文件夹或文档..." />
+              </label>
+              <div class="inline-flex rounded-xl border border-zinc-200 bg-zinc-50 p-1 shadow-sm">
+                <button
+                  type="button"
+                  class="rounded-lg px-3 py-1.5 text-sm font-medium transition"
+                  :class="attachmentScope === 'all' ? 'bg-white text-zinc-950 shadow-sm' : 'text-slate-500 hover:text-zinc-800'"
+                  @click="switchAttachmentSpace('public', 'all')"
+                >
+                  全部
+                </button>
+                <button
+                  type="button"
+                  class="rounded-lg px-3 py-1.5 text-sm font-medium transition"
+                  :class="attachmentScope === 'public' ? 'bg-white text-zinc-950 shadow-sm' : 'text-slate-500 hover:text-zinc-800'"
+                  @click="switchAttachmentSpace('public')"
+                >
+                  公共空间
+                </button>
+                <button
+                  type="button"
+                  class="rounded-lg px-3 py-1.5 text-sm font-medium transition"
+                  :class="attachmentScope === 'personal' ? 'bg-white text-zinc-950 shadow-sm' : 'text-slate-500 hover:text-zinc-800'"
+                  @click="switchAttachmentSpace('personal')"
+                >
+                  个人空间
+                </button>
+              </div>
+              <button type="button" class="inline-flex h-10 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50">
+                所有类型
+                <ChevronDown class="h-4 w-4 text-zinc-400" />
+              </button>
+            </div>
+
+            <div class="flex items-center gap-2 text-xs text-slate-500">
+              <button
+                v-if="attachmentPath.length"
+                type="button"
+                class="rounded-lg border border-zinc-200 px-2 py-1 text-zinc-600 hover:bg-zinc-50"
+                @click="backAttachmentFolder"
+              >
+                返回上级
+              </button>
+              <span class="font-medium text-zinc-800">{{ attachmentSpace === 'public' ? '公共空间' : '个人空间' }}</span>
+              <span v-if="attachmentSpace === 'public'" class="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-500">共享空间</span>
+              <template v-if="currentAttachmentNode">
+                <ChevronRight class="h-3 w-3 text-zinc-300" />
+                <span class="font-medium text-zinc-800">{{ currentAttachmentNode.label }}</span>
+              </template>
+              <span class="ml-auto text-slate-400">{{ filteredAttachmentItems.length }} 项</span>
+            </div>
+
+            <div class="grid gap-3 md:grid-cols-2">
+              <button
+                v-for="item in filteredAttachmentItems"
+                :key="item.id"
+                type="button"
+                class="flex min-h-20 items-center gap-3 rounded-xl border p-4 text-left transition hover:border-blue-300 hover:bg-blue-50/40"
+                :class="item.type === 'file' && selectedKbDocNames.includes(item.label) ? 'border-blue-500 bg-blue-50' : 'border-zinc-200 bg-white'"
+                @click="chooseAttachmentNode(item)"
+              >
+                <div class="grid h-10 w-10 shrink-0 place-items-center rounded-lg" :class="item.type === 'folder' ? 'bg-sky-50 text-sky-600' : 'bg-blue-50 text-blue-600'">
+                  <Folder v-if="item.type === 'folder'" class="h-5 w-5" />
+                  <FileText v-else class="h-5 w-5" />
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="truncate text-sm font-semibold text-zinc-950">{{ item.label }}</div>
+                  <div class="mt-1 text-xs text-slate-500">{{ item.type === 'folder' ? `${item.children?.length ?? 0} 项 · 文件夹` : item.meta }}</div>
+                </div>
+                <ChevronRight v-if="item.type === 'folder'" class="h-4 w-4 text-zinc-300" />
+                <span v-else class="h-5 w-5 rounded-full border" :class="selectedKbDocNames.includes(item.label) ? 'border-blue-600 bg-blue-600' : 'border-blue-600 bg-white'" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between gap-3 border-t border-zinc-200 px-6 py-4">
+          <div class="min-w-0 text-sm text-slate-500">
+            <span v-if="selectedFiles.length">已选择 {{ selectedFiles.length }} 个文件</span>
+            <span v-else>请选择文件</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" class="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50" @click="attachmentModalOpen = false">取消</button>
+            <button type="button" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50" :disabled="selectedFiles.length === 0" @click="attachmentModalOpen = false">确认添加</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 
   <!-- Dislike popup modal -->
   <Teleport to="body">

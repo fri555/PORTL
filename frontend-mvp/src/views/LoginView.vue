@@ -11,7 +11,7 @@ const route = useRoute()
 function onSuccess() {
   store.login()
   const redirect = (route.query.redirect as string) || '/'
-  router.push(redirect)
+  router.replace(redirect)
 }
 
 const features = [
@@ -22,9 +22,9 @@ const features = [
 </script>
 
 <template>
-  <div class="w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl md:grid md:grid-cols-2">
+  <div data-testid="login-screen" class="flex min-h-screen w-screen overflow-hidden bg-white">
     <!-- brand panel -->
-    <div class="relative hidden flex-col justify-between bg-gradient-to-br from-primary to-orange-600 p-10 text-white md:flex">
+    <div class="relative hidden w-[36vw] min-w-[360px] flex-col justify-between bg-gradient-to-br from-primary to-orange-600 p-10 text-white md:flex">
       <div class="flex items-center gap-2">
         <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-white/20 backdrop-blur">
           <Zap class="h-5 w-5" />
@@ -53,7 +53,7 @@ const features = [
     </div>
 
     <!-- login panel -->
-    <div class="flex flex-col items-center justify-center px-8 py-12">
+    <div class="flex min-w-0 flex-1 flex-col items-center justify-center px-8 py-12">
       <div class="mb-6 text-center md:hidden">
         <div class="mb-2 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
           <Zap class="h-6 w-6" />

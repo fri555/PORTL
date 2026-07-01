@@ -7,6 +7,13 @@ const LIKES_KEY = 'tianma_ai_likes'
 const BOOKMARKS_KEY = 'tianma_ai_bookmarks'
 const USER_KEY = 'tianma_ai_user'
 
+export type TaskNotification = {
+  id: string
+  conversationId: string
+  messageId?: string
+  title: string
+}
+
 function loadSet(key: string): Set<string> {
   try {
     const raw = localStorage.getItem(key)
@@ -33,6 +40,7 @@ export const useAppStore = defineStore('app', () => {
   const user = ref<MockUser | null>(loadUser())
   const likes = ref<Set<string>>(loadSet(LIKES_KEY))
   const bookmarks = ref<Set<string>>(loadSet(BOOKMARKS_KEY))
+  const taskNotifications = ref<TaskNotification[]>([])
 
   function login(u: MockUser = mockUser) {
     user.value = u
@@ -42,6 +50,21 @@ export const useAppStore = defineStore('app', () => {
   function logout() {
     user.value = null
     localStorage.removeItem(USER_KEY)
+  }
+
+  function addTaskNotification(notification: Omit<TaskNotification, 'id'>) {
+    taskNotifications.value = [
+      { ...notification, id: `notice-${Date.now()}` },
+      ...taskNotifications.value.filter((item) => item.conversationId !== notification.conversationId),
+    ].slice(0, 5)
+  }
+
+  function dismissTaskNotification(id: string) {
+    taskNotifications.value = taskNotifications.value.filter((item) => item.id !== id)
+  }
+
+  function clearConversationNotification(conversationId: string) {
+    taskNotifications.value = taskNotifications.value.filter((item) => item.conversationId !== conversationId)
   }
 
   function updateUser(patch: Partial<Pick<MockUser, 'displayName' | 'department' | 'avatarUrl'>>) {
@@ -70,5 +93,20 @@ export const useAppStore = defineStore('app', () => {
     return bookmarks.value.has(id)
   }
 
-  return { user, likes, bookmarks, login, logout, updateUser, toggleLike, toggleBookmark, isLiked, isBookmarked }
+  return {
+    user,
+    likes,
+    bookmarks,
+    taskNotifications,
+    login,
+    logout,
+    updateUser,
+    addTaskNotification,
+    dismissTaskNotification,
+    clearConversationNotification,
+    toggleLike,
+    toggleBookmark,
+    isLiked,
+    isBookmarked,
+  }
 })

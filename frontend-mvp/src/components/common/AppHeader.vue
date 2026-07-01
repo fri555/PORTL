@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import {
+  Bell,
+  BookOpen,
   Brain,
   BriefcaseBusiness,
   ChevronDown,
-  Database,
-  LayoutDashboard,
   LogOut,
   MessageSquareText,
   RefreshCw,
@@ -34,21 +34,32 @@ const profileUploadError = ref('')
 const profileFileInput = ref<HTMLInputElement | null>(null)
 
 const navItems = [
+  { label: '知识中心', to: '/knowledge' },
   { label: '工作台', to: '/portals' },
-  { label: '仪表盘', to: '/dashboards' },
-  { label: '知识库', to: '/knowledge' },
 ]
 
 const mobileNavItems = [
   { label: '工作区', to: '/', icon: MessageSquareText },
+  { label: '知识中心', to: '/knowledge', icon: BookOpen },
   { label: '工作台', to: '/portals', icon: BriefcaseBusiness },
-  { label: '仪表盘', to: '/dashboards', icon: LayoutDashboard },
-  { label: '知识库', to: '/knowledge', icon: Database },
 ]
 
 function logout() {
   store.logout()
-  router.push({ name: 'login' })
+  router.replace({ name: 'login' })
+}
+
+async function openTaskNotification() {
+  const notification = store.taskNotifications[0]
+  if (!notification) return
+  await router.push({
+    name: 'home',
+    query: {
+      conversationId: notification.conversationId,
+      messageId: notification.messageId,
+    },
+  })
+  store.dismissTaskNotification(notification.id)
 }
 
 function handleBrandClick() {
@@ -93,9 +104,8 @@ function saveProfile() {
 
 <template>
   <header class="sticky top-0 z-40 border-b border-zinc-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85">
-    <div class="flex h-14 w-full items-center gap-[clamp(10px,1vw,16px)] px-[clamp(8px,1vw,16px)] md:h-16">
-      <div class="flex shrink-0 items-center gap-5">
-        <div id="app-header-left-control" data-testid="app-header-left-control" class="flex h-9 w-10 shrink-0 items-center justify-center" />
+    <div class="flex h-14 w-full items-center gap-[clamp(8px,1vw,14px)] px-[clamp(6px,0.8vw,12px)] md:h-16">
+      <div class="flex shrink-0 items-center gap-3">
         <RouterLink
           :to="{ name: 'home' }"
           data-testid="header-brand-anchor"
@@ -163,7 +173,31 @@ function saveProfile() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <div id="app-header-right-control" data-testid="app-header-right-control" class="flex h-9 w-9 shrink-0 items-center justify-center" />
+        <div v-if="store.taskNotifications.length" class="relative">
+          <button
+            type="button"
+            aria-label="打开任务完成通知"
+            class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 text-blue-700 transition hover:bg-blue-100"
+            @click="openTaskNotification"
+          >
+            <Bell class="h-4 w-4" />
+          </button>
+          <span class="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white">{{ store.taskNotifications.length }}</span>
+          <div class="absolute right-0 top-11 z-50 w-64 rounded-xl border border-zinc-200 bg-white p-3 text-left shadow-xl">
+            <button type="button" class="block w-full pr-7 text-left" @click="openTaskNotification">
+              <div class="text-xs font-semibold text-zinc-900">任务完成通知</div>
+              <div class="mt-1 truncate text-[11px] text-zinc-500">{{ store.taskNotifications[0]?.title }}</div>
+            </button>
+            <button
+              type="button"
+              class="absolute right-2 top-2 rounded-md p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
+              aria-label="关闭任务通知"
+              @click.stop="store.dismissTaskNotification(store.taskNotifications[0].id)"
+            >
+              <X class="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -209,7 +243,7 @@ function saveProfile() {
     class="fixed inset-x-0 bottom-0 z-40 border-t bg-white/95 px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur md:hidden"
     aria-label="移动端主导航"
   >
-    <div class="mx-auto grid max-w-md grid-cols-4 gap-1">
+    <div class="mx-auto grid max-w-md grid-cols-3 gap-1">
       <RouterLink
         v-for="item in mobileNavItems"
         :key="item.to"
