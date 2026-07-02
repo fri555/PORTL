@@ -7,10 +7,12 @@ import {
   Brain,
   BriefcaseBusiness,
   ChevronDown,
+  ChevronRight,
   LogOut,
   MessageSquareText,
   RefreshCw,
   User,
+  Plus,
   X,
 } from 'lucide-vue-next'
 import { useAppStore } from '@/stores/app'
@@ -22,6 +24,9 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from '@/components/ui/dropdown-menu'
 
 const store = useAppStore()
@@ -165,12 +170,21 @@ function saveProfile() {
               <span class="ml-auto text-xs" :class="memoryEnabled ? 'text-emerald-600' : 'text-zinc-400'">{{ memoryEnabled ? '开' : '关' }}</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem @select="router.push({ name: 'login' })">
-              <RefreshCw class="mr-2 h-4 w-4" /> 切换账号
-            </DropdownMenuItem>
-            <DropdownMenuItem class="text-destructive focus:text-destructive" @select="logout">
-              <LogOut class="mr-2 h-4 w-4" /> 退出登录
-            </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <RefreshCw class="mr-2 h-4 w-4" />
+                <span>切换账号</span>
+                <ChevronRight class="ml-auto h-4 w-4" />
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent class="w-44">
+                <DropdownMenuItem @select="router.push({ name: 'login' })">
+                  <Plus class="mr-2 h-4 w-4" /> 添加账号
+                </DropdownMenuItem>
+                <DropdownMenuItem class="text-destructive focus:text-destructive" @select="logout">
+                  <LogOut class="mr-2 h-4 w-4" /> 退出当前账号
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
           </DropdownMenuContent>
         </DropdownMenu>
         <div v-if="store.taskNotifications.length" class="relative">

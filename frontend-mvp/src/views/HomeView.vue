@@ -22,15 +22,17 @@ import {
   Folder,
   Globe2,
   History,
-  LayoutGrid,
-  Link2,
-  Loader2,
-  PanelTop,
+ LayoutGrid,
+ Link2,
+ Loader2,
+  MoreHorizontal,
+ PanelTop,
   Paperclip,
   Pencil,
   Plus,
-  Quote,
-  Search,
+ Quote,
+  RotateCw,
+ Search,
   SendHorizontal,
   Sparkles,
   Square,
@@ -65,7 +67,7 @@ type ConversationItem = {
   time: string
   mode: '日常办公' | '专家模式' | '定时任务'
   pinned: boolean
-  status: 'running' | 'completed' | 'failed'
+ status: 'running' | 'completed' | 'failed' | 'cancelled'
 }
 type IntentRoute = 'greeting' | 'office-rag' | 'expert-task' | 'schedule-task'
 type CaseItem = {
@@ -85,10 +87,12 @@ type CaseItem = {
 }
 type GeneratedArtifact = {
   name: string
-  type: 'Excel' | 'PPT' | 'PDF'
+  type: 'Excel' | 'PPT' | 'PDF' | 'Word' | 'MD'
   size: string
   icon: unknown
   summary: string
+  sections: string[]
+  paragraphs: string[]
   rows: string[][]
 }
 type ExpertAgent = {
@@ -171,6 +175,7 @@ const selectedKnowledgeRefs = ref<ActiveReference[]>([])
 const expandedProcessEventIds = ref<string[]>([])
 const editingConversationId = ref('')
 const editingConversationTitle = ref('')
+const activeMenuConversationId = ref<string | null>(null)
 const activeConversationTitle = ref('新会话')
 const activeConversationId = ref('')
 const isAutoScroll = ref(true)
@@ -317,7 +322,8 @@ const conversations = ref<ConversationItem[]>([
   { id: 'conv-3', title: '考勤制度问答', time: '周二', mode: '日常办公', pinned: true, status: 'failed' },
   { id: 'conv-4', title: '门店需求字段表', time: '06-18', mode: '专家模式', pinned: false, status: 'completed' },
   { id: 'conv-5', title: '行业动态简报', time: '刚刚', mode: '日常办公', pinned: false, status: 'running' },
-  { id: 'conv-6', title: '每日方案池监控', time: '明早4:00', mode: '定时任务', pinned: false, status: 'running' },
+ { id: 'conv-6', title: '每日方案池监控', time: '明早4:00', mode: '定时任务', pinned: false, status: 'running' },
+  { id: 'conv-7', title: 'Q3营销策划方案', time: '06-30', mode: '专家模式', pinned: false, status: 'cancelled' },
 ])
 
 const officeAgents = [
@@ -444,6 +450,11 @@ const generatedArtifactCards: GeneratedArtifact[] = [
     size: '128 KB',
     icon: FileSpreadsheet,
     summary: '三档组货预算清单，含品类、数量、预算占比和沟通口径。',
+    sections: ['组货清单', '预算分档', '执行备注'],
+    paragraphs: [
+      '该 Excel 用于门店现场快速沟通，先按预算约束给出三档组合，再补充适用场景和风险备注。',
+      '均衡档可作为默认沟通稿，保守档用于压预算，品质档用于客户重视员工体验的场景。',
+    ],
     rows: [
       ['档位', '核心组合', '预算', '适用场景'],
       ['保守档', '基础运动鞋 + 通勤袜', '8.6 万', '预算敏感客户'],
@@ -457,6 +468,11 @@ const generatedArtifactCards: GeneratedArtifact[] = [
     size: '2.4 MB',
     icon: FileText,
     summary: '客户现场沟通用 PPT，包含方案目标、三档报价和交付节奏。',
+    sections: ['01 客户需求理解', '02 三档方案对比', '03 下一步确认'],
+    paragraphs: [
+      'PPT 面向客户现场沟通，第一页先说明需求理解和约束条件，避免直接进入报价造成理解偏差。',
+      '中间页面突出三档方案差异，最后沉淀待确认字段、样品确认和交付排期。',
+    ],
     rows: [
       ['页码', '页面主题', '内容摘要'],
       ['01', '客户需求理解', '预算、品类、交付时间与风险假设'],
@@ -470,6 +486,11 @@ const generatedArtifactCards: GeneratedArtifact[] = [
     size: '860 KB',
     icon: FileText,
     summary: '面向客户转发的 PDF 预览稿，突出组合亮点和交付说明。',
+    sections: ['方案概览', '产品组合', '交付说明'],
+    paragraphs: [
+      'PDF 版本适合转发给客户复核，正文保留方案亮点、预算边界和交付说明。',
+      '内容会弱化内部工具调用过程，只展示客户需要理解和确认的信息。',
+    ],
     rows: [
       ['章节', '内容'],
       ['方案概览', '客户背景、预算边界、推荐路径'],
@@ -652,13 +673,13 @@ const contextRingStyle = computed(() => ({
 }))
 const chatShellStyle = computed(() => ({
   '--left-inset': isChatActive.value && showHistory.value ? 'clamp(286px,21vw,400px)' : '0px',
-  '--right-inset': artifactPreviewVisible.value ? 'clamp(360px,30vw,520px)' : '0px',
+  '--right-inset': artifactPreviewVisible.value ? 'clamp(420px,42vw,760px)' : '0px',
   width: 'min(calc(100vw - var(--left-inset) - var(--right-inset) - clamp(36px,5vw,88px)), clamp(760px,74vw,1320px))',
   transform: 'translateX(calc((var(--left-inset) - var(--right-inset)) / 2))',
 }))
 const chatTitleLayerStyle = computed(() => ({
   '--left-inset': isChatActive.value && showHistory.value ? 'clamp(286px,21vw,400px)' : '0px',
-  '--right-inset': artifactPreviewVisible.value ? 'clamp(360px,30vw,520px)' : '0px',
+  '--right-inset': artifactPreviewVisible.value ? 'clamp(420px,42vw,760px)' : '0px',
   left: 'var(--left-inset)',
   right: 'var(--right-inset)',
 }))
@@ -849,6 +870,16 @@ function backAttachmentFolder() {
   attachmentPath.value = attachmentPath.value.slice(0, -1)
 }
 
+function addAttachmentsAndClose() {
+  for (const name of selectedKbDocNames.value) {
+    if (!selectedFiles.value.includes(name)) {
+      selectedFiles.value.push(name)
+    }
+  }
+  selectedKbDocNames.value = []
+  attachmentModalOpen.value = false
+}
+
 function findAttachmentNode(nodes: AttachmentNode[], id: string): AttachmentNode | undefined {
   if (!id) return undefined
   for (const node of nodes) {
@@ -867,12 +898,14 @@ function removeAttachmentByName(name: string) {
 function getConversationStatusLabel(status: ConversationItem['status']) {
   if (status === 'running') return '运行中'
   if (status === 'failed') return '失败'
+  if (status === 'cancelled') return '已取消'
   return '已完成'
 }
 
 function getConversationStatusClass(status: ConversationItem['status']) {
   if (status === 'running') return 'bg-blue-500 shadow-[0_0_0_4px_rgba(59,130,246,0.12)] animate-pulse'
   if (status === 'failed') return 'bg-rose-500'
+  if (status === 'cancelled') return 'bg-zinc-400'
   return 'bg-emerald-500'
 }
 
@@ -1298,6 +1331,7 @@ function submitDislike() {
 function closeFloatingMenus() {
   modeMenuOpen.value = false
   agentMenuOpen.value = false
+  activeMenuConversationId.value = null
 }
 
 async function copyAnswer(message: Message) {
@@ -1364,6 +1398,15 @@ function quoteAnswer(message: Message) {
   quotedMessageId.value = message.id
   query.value = `引用上一条回答继续：${message.content.slice(0, 60)}...`
   nextTick(() => composer.value?.focus())
+}
+
+function retryUserMessage(message: Message) {
+  const msgIndex = messages.value.findIndex((m) => m.id === message.id)
+  if (msgIndex >= 0) {
+    messages.value = messages.value.slice(0, msgIndex)
+  }
+  query.value = message.content
+  sendMessage()
 }
 
 function resetConversationDraft() {
@@ -1471,6 +1514,11 @@ function resetToHome() {
   showHistoryBrowser.value = false
   showHistory.value = false
   resetConversationDraft()
+}
+
+function toggleConversationMenu(id: string, event: MouseEvent) {
+  event.stopPropagation()
+  activeMenuConversationId.value = activeMenuConversationId.value === id ? null : id
 }
 
 onMounted(() => {
@@ -1593,22 +1641,55 @@ onBeforeUnmount(() => {
               </span>
               <span>{{ group.items.length }}</span>
             </button>
-            <template v-if="!isSidebarGroupCollapsed(group.key)">
-            <button
+           <template v-if="!isSidebarGroupCollapsed(group.key)">
+            <div
               v-for="item in group.items.slice(0, 3)"
               :key="item.id"
-              data-testid="history-conversation-item"
-              type="button"
-              class="group mb-1 w-full rounded-lg border border-transparent px-3 py-2.5 text-left transition hover:border-blue-200 hover:bg-blue-50"
-              :class="activeConversationId === item.id ? 'border-blue-200 bg-blue-50' : ''"
-              @click="openConversation(item)"
+              class="group relative mb-1"
             >
-              <div class="flex items-center gap-2">
-                <span class="h-2.5 w-2.5 shrink-0 rounded-full" :class="getConversationStatusClass(item.status)" />
-                <span class="min-w-0 flex-1 truncate text-sm font-medium text-zinc-800">{{ item.title }}</span>
+              <button
+                data-testid="history-conversation-item"
+                type="button"
+                class="w-full rounded-lg border border-transparent px-3 py-2.5 pr-9 text-left transition hover:border-blue-200 hover:bg-blue-50"
+                :class="activeConversationId === item.id ? 'border-blue-200 bg-blue-50' : ''"
+                @click="openConversation(item)"
+              >
+                <div class="flex items-center gap-2">
+                  <span class="h-2.5 w-2.5 shrink-0 rounded-full" :class="getConversationStatusClass(item.status)" />
+                  <span class="min-w-0 flex-1 truncate text-sm font-medium text-zinc-800">{{ item.title }}</span>
+                </div>
+                <div class="mt-1.5 truncate pl-4 text-[11px] leading-5 text-zinc-400">{{ item.time }} · {{ getConversationStatusLabel(item.status) }}</div>
+              </button>
+              <button
+                type="button"
+                class="absolute right-1.5 top-2 hidden h-6 w-6 items-center justify-center rounded-md text-zinc-400 opacity-0 transition hover:bg-zinc-200 hover:text-zinc-600 group-hover:flex group-hover:opacity-100"
+                @click="toggleConversationMenu(item.id, $event)"
+              >
+                <MoreHorizontal class="h-3.5 w-3.5" />
+              </button>
+              <div
+                v-if="activeMenuConversationId === item.id"
+                class="absolute right-0 top-9 z-50 w-32 overflow-hidden rounded-lg border border-zinc-200 bg-white py-1 shadow-lg"
+                @click.stop
+              >
+                <button
+                  type="button"
+                  class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-700 transition hover:bg-zinc-50"
+                  @click="beginRenameConversation(item); activeMenuConversationId = null"
+                >
+                  <Pencil class="h-3.5 w-3.5 text-zinc-400" />
+                  <span>重命名</span>
+                </button>
+                <button
+                  type="button"
+                  class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-rose-600 transition hover:bg-rose-50"
+                  @click="deleteConversation(item.id); activeMenuConversationId = null"
+                >
+                  <Trash2 class="h-3.5 w-3.5" />
+                  <span>删除</span>
+                </button>
               </div>
-              <div class="mt-1.5 truncate pl-4 text-[11px] leading-5 text-zinc-400">{{ item.time }} · {{ getConversationStatusLabel(item.status) }}</div>
-            </button>
+            </div>
             <button
               v-if="group.items.length > 3"
               type="button"
@@ -1672,26 +1753,10 @@ onBeforeUnmount(() => {
               </button>
             </div>
 
-            <div v-if="selectedFiles.length || selectedKnowledgeRefs.length" class="grid gap-2 px-2 pb-2 sm:grid-cols-2">
-              <div v-for="refItem in selectedKnowledgeRefs" :key="refItem.kb" class="group flex min-w-0 items-center gap-2 rounded-xl border border-zinc-200 bg-white/70 px-3 py-2 text-xs">
-                <Database class="h-4 w-4 shrink-0 text-emerald-600" />
-                <div class="min-w-0 flex-1">
-                  <div class="truncate font-medium text-zinc-800">{{ refItem.kb }}</div>
-                  <div class="truncate text-[11px] text-zinc-400">{{ refItem.mode }} · {{ refItem.agent }} · {{ refItem.title }}</div>
-                </div>
-              </div>
-              <div v-for="(file, index) in selectedFiles" :key="file" class="group flex min-w-0 items-center gap-2 rounded-xl border border-zinc-200 bg-white/70 px-3 py-2 text-xs">
-                <FileText class="h-4 w-4 shrink-0 text-blue-600" />
-                <div class="min-w-0 flex-1">
-                  <div class="truncate font-medium text-zinc-800">{{ file }}</div>
-                  <div class="text-[11px] text-zinc-400">等待小马解析</div>
-                </div>
-                <button class="rounded-md p-1 text-zinc-400 opacity-0 transition hover:bg-zinc-100 hover:text-zinc-700 group-hover:opacity-100" :aria-label="`移除附件 ${file}`" @click="removeFile(index)"><X class="h-3 w-3" /></button>
-              </div>
-            </div>
+
 
             <div class="flex flex-wrap items-center gap-2 border-t border-zinc-100 px-2 pt-3">
-              <div class="relative">
+              <div v-if="runMode !== 'schedule'" class="relative">
                 <button
                   class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
                   aria-label="添加附件"
@@ -1788,23 +1853,65 @@ onBeforeUnmount(() => {
               </div>
             </div>
 
-            <div v-if="runMode === 'schedule'" class="schedule-panel mt-3">
-              <div class="schedule-row">
-                <span class="schedule-title">周期</span>
-                <select :value="scheduleCycle" class="schedule-field schedule-field-main" aria-label="选择定时周期" @change="updateScheduleCycle(($event.target as HTMLSelectElement).value as ScheduleCycle)">
+         <div v-if="runMode === 'schedule'" class="schedule-panel mt-3">
+           <div class="schedule-layer schedule-layer-top">
+             <span class="schedule-title">周期</span>
+             <select :value="scheduleCycle" class="schedule-field schedule-field-main" aria-label="选择定时周期" @change="updateScheduleCycle(($event.target as HTMLSelectElement).value as ScheduleCycle)">
+               <option v-for="cycle in scheduleCycles" :key="cycle.value" :value="cycle.value">{{ cycle.label }}</option>
+             </select>
+           </div>
+           <div class="schedule-layer schedule-layer-bottom">
+             <template v-if="scheduleCycle === 'once'">
+               <input v-model="scheduleDate" type="date" class="schedule-field schedule-field-main" aria-label="选择执行日期" />
+               <input v-model="scheduleTime" type="time" class="schedule-field schedule-field-main" aria-label="输入执行时间" />
+             </template>
+             <template v-else-if="scheduleCycle === 'weekly'">
+               <select v-model="scheduleWeekday" class="schedule-field schedule-field-main" aria-label="选择星期">
+                 <option v-for="day in weekdayOptions" :key="day" :value="day">{{ day }}</option>
+               </select>
+               <input v-model="scheduleTime" type="time" class="schedule-field schedule-field-main" aria-label="输入执行时间" />
+             </template>
+             <template v-else-if="scheduleCycle === 'monthly'">
+               <select v-model="scheduleMonthDay" class="schedule-field schedule-field-main" aria-label="选择日期">
+                 <option v-for="day in monthDayOptions" :key="day" :value="day">{{ day }}</option>
+               </select>
+               <input v-model="scheduleTime" type="time" class="schedule-field schedule-field-main" aria-label="输入执行时间" />
+             </template>
+             <template v-else-if="scheduleCycle === 'cron'">
+               <input v-model="scheduleCron" class="schedule-field schedule-field-cron font-mono" placeholder="0 9 * * *" aria-label="输入 Cron 表达式" />
+             </template>
+             <template v-else>
+               <span class="schedule-field schedule-field-main schedule-field-muted">{{ scheduleCycle === 'daily' ? '每天' : '周一至周五' }}</span>
+               <input v-model="scheduleTime" type="time" class="schedule-field schedule-field-main" aria-label="输入执行时间" />
+             </template>
+             <span class="schedule-summary">{{ scheduleCycle === 'cron' ? 'Cron 例：0 9 * * *' : scheduleSummary }}</span>
+           </div>
+         </div>
+            <div v-if="runMode === 'schedule'" class="mt-3 space-y-1.5">
+              <div class="schedule-card">
+                <span class="schedule-card-label">执行</span>
+                <template v-if="scheduleCycle === 'once'">
+                  <input v-model="scheduleDate" type="date" class="schedule-card-input" aria-label="选择执行日期" />
+                </template>
+                <template v-else-if="scheduleCycle === 'weekly'">
+                  <select v-model="scheduleWeekday" class="schedule-card-input" aria-label="选择星期">
+                    <option v-for="day in weekdayOptions" :key="day" :value="day">{{ day }}</option>
+                  </select>
+                </template>
+                <template v-else-if="scheduleCycle === 'monthly'">
+                  <select v-model="scheduleMonthDay" class="schedule-card-input" aria-label="选择日期">
+                    <option v-for="day in monthDayOptions" :key="day" :value="day">{{ day }}</option>
+                  </select>
+                </template>
+                <input v-if="scheduleCycle === 'cron'" v-model="scheduleCron" class="schedule-card-input schedule-card-cron font-mono" placeholder="0 9 * * *" aria-label="输入 Cron 表达式" />
+                <input v-else v-model="scheduleTime" type="time" class="schedule-card-input" aria-label="输入执行时间" />
+                <span class="schedule-card-summary">{{ scheduleCycle === 'cron' ? '例：0 9 * * *' : scheduleSummary }}</span>
+              </div>
+              <div class="schedule-card">
+                <span class="schedule-card-label">周期</span>
+                <select :value="scheduleCycle" class="schedule-card-input" aria-label="选择定时周期" @change="updateScheduleCycle(($event.target as HTMLSelectElement).value as ScheduleCycle)">
                   <option v-for="cycle in scheduleCycles" :key="cycle.value" :value="cycle.value">{{ cycle.label }}</option>
                 </select>
-                <input v-if="scheduleCycle === 'once'" v-model="scheduleDate" type="date" class="schedule-field schedule-field-main" aria-label="选择执行日期" />
-                <select v-else-if="scheduleCycle === 'weekly'" v-model="scheduleWeekday" class="schedule-field schedule-field-main" aria-label="选择星期">
-                  <option v-for="day in weekdayOptions" :key="day" :value="day">{{ day }}</option>
-                </select>
-                <select v-else-if="scheduleCycle === 'monthly'" v-model="scheduleMonthDay" class="schedule-field schedule-field-main" aria-label="选择日期">
-                  <option v-for="day in monthDayOptions" :key="day" :value="day">{{ day }}</option>
-                </select>
-                <span v-else-if="scheduleCycle !== 'cron'" class="schedule-field schedule-field-main schedule-field-muted">{{ scheduleCycle === 'daily' ? '每天' : '周一至周五' }}</span>
-                <input v-if="scheduleCycle === 'cron'" v-model="scheduleCron" class="schedule-field schedule-field-cron font-mono" placeholder="0 9 * * *" aria-label="输入 Cron 表达式" />
-                <input v-else v-model="scheduleTime" type="time" class="schedule-field schedule-field-main" aria-label="输入执行时间" />
-                <span class="schedule-summary">{{ scheduleCycle === 'cron' ? '例：0 9 * * *' : scheduleSummary }}</span>
               </div>
             </div>
 
@@ -2086,12 +2193,13 @@ onBeforeUnmount(() => {
                 >
                   <div v-if="message.role === 'assistant'" class="ai-markdown" v-html="renderMarkdown(message.content)" />
                   <div v-else class="whitespace-pre-wrap">{{ message.content }}</div>
-                  <div v-if="message.role === 'assistant' && hasGeneratedAssets" class="not-prose mt-4 grid gap-2 sm:grid-cols-3">
+                  <div v-if="message.role === 'assistant' && hasGeneratedAssets" class="not-prose mt-4 space-y-2">
                     <div
                       v-for="file in generatedArtifactCards"
                       :key="file.name"
-                      class="group flex min-w-0 items-center gap-3 rounded-xl border border-zinc-200 bg-white p-3 text-left transition hover:border-blue-200 hover:bg-blue-50/40"
+                      class="group flex min-w-0 cursor-pointer items-center gap-3 rounded-xl border border-zinc-200 bg-white p-3 text-left transition hover:border-blue-200 hover:bg-blue-50/40"
                       :class="activeArtifactPreview?.name === file.name ? 'border-blue-300 bg-blue-50/50' : ''"
+                      @click="openArtifactPreview(file)"
                     >
                       <div class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-blue-50 text-blue-600">
                         <component :is="file.icon" class="h-5 w-5" />
@@ -2099,12 +2207,12 @@ onBeforeUnmount(() => {
                       <div class="min-w-0 flex-1">
                         <div class="truncate text-xs font-semibold text-zinc-900">{{ file.name }}</div>
                         <div class="mt-1 text-[11px] text-zinc-400">{{ file.type }} · {{ file.size }}</div>
-                        <div class="mt-2 flex gap-2 text-[11px] font-medium text-blue-600">
-                          <button type="button" class="rounded px-1 py-0.5 hover:bg-blue-100" @click="openArtifactPreview(file)">预览</button>
-                          <button type="button" class="rounded px-1 py-0.5 hover:bg-blue-100" @click="downloadArtifact(file)">
-                            {{ copiedMessageId === `download:${file.name}` ? '已加入下载' : '下载' }}
-                          </button>
-                        </div>
+                      </div>
+                      <div class="flex shrink-0 items-center gap-1 text-[11px] font-medium text-blue-600">
+                        <button type="button" class="rounded px-2 py-1 hover:bg-blue-100" @click.stop="openArtifactPreview(file)">预览</button>
+                        <button type="button" class="rounded px-2 py-1 hover:bg-blue-100" @click.stop="downloadArtifact(file)">
+                          {{ copiedMessageId === `download:${file.name}` ? '已加入下载' : '下载' }}
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -2143,8 +2251,11 @@ onBeforeUnmount(() => {
                     <CheckCircle2 v-if="copiedMessageId === message.id" class="h-4 w-4 text-emerald-500" />
                     <Copy v-else class="h-4 w-4" />
                   </button>
-                  <button type="button" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 transition hover:bg-zinc-200/70 hover:text-zinc-900" aria-label="编辑消息" title="编辑消息" @click="beginEditUserMessage(message)">
-                    <Pencil class="h-4 w-4" />
+                 <button type="button" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 transition hover:bg-zinc-200/70 hover:text-zinc-900" aria-label="编辑消息" title="编辑消息" @click="beginEditUserMessage(message)">
+                   <Pencil class="h-4 w-4" />
+                 </button>
+                  <button type="button" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 transition hover:bg-zinc-200/70 hover:text-zinc-900" aria-label="重试" title="重试" @click="retryUserMessage(message)">
+                    <RotateCw class="h-4 w-4" />
                   </button>
                 </div>
               </div>
@@ -2209,7 +2320,7 @@ onBeforeUnmount(() => {
               </button>
             </div>
               <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-zinc-100 px-1 pt-3">
-                <div class="relative">
+                <div v-if="runMode !== 'schedule'" class="relative">
                   <button
                     class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
                     aria-label="添加附件"
@@ -2305,25 +2416,40 @@ onBeforeUnmount(() => {
                   <span class="h-3.5 w-3.5 rounded-full bg-white" />
                 </span>
               </div>
-              <div v-if="runMode === 'schedule'" class="schedule-panel mt-3">
-                <div class="schedule-row">
+             <div v-if="runMode === 'schedule'" class="schedule-panel mt-3">
+                <div class="schedule-layer schedule-layer-top">
                   <span class="schedule-title">周期</span>
                   <select :value="scheduleCycle" class="schedule-field schedule-field-main" aria-label="选择定时周期" @change="updateScheduleCycle(($event.target as HTMLSelectElement).value as ScheduleCycle)">
                     <option v-for="cycle in scheduleCycles" :key="cycle.value" :value="cycle.value">{{ cycle.label }}</option>
                   </select>
-                  <input v-if="scheduleCycle === 'once'" v-model="scheduleDate" type="date" class="schedule-field schedule-field-main" aria-label="选择执行日期" />
-                  <select v-else-if="scheduleCycle === 'weekly'" v-model="scheduleWeekday" class="schedule-field schedule-field-main" aria-label="选择星期">
-                    <option v-for="day in weekdayOptions" :key="day" :value="day">{{ day }}</option>
-                  </select>
-                  <select v-else-if="scheduleCycle === 'monthly'" v-model="scheduleMonthDay" class="schedule-field schedule-field-main" aria-label="选择日期">
-                    <option v-for="day in monthDayOptions" :key="day" :value="day">{{ day }}</option>
-                  </select>
-                  <span v-else-if="scheduleCycle !== 'cron'" class="schedule-field schedule-field-main schedule-field-muted">{{ scheduleCycle === 'daily' ? '每天' : '周一至周五' }}</span>
-                  <input v-if="scheduleCycle === 'cron'" v-model="scheduleCron" class="schedule-field schedule-field-cron font-mono" placeholder="0 9 * * *" aria-label="输入 Cron 表达式" />
-                  <input v-else v-model="scheduleTime" type="time" class="schedule-field schedule-field-main" aria-label="输入执行时间" />
-                  <span class="schedule-summary">{{ scheduleCycle === 'cron' ? '例：0 9 * * *' : scheduleSummary }}</span>
                 </div>
-              </div>
+                <div class="schedule-layer schedule-layer-bottom">
+                  <template v-if="scheduleCycle === 'once'">
+                    <input v-model="scheduleDate" type="date" class="schedule-field schedule-field-main" aria-label="选择执行日期" />
+                    <input v-model="scheduleTime" type="time" class="schedule-field schedule-field-main" aria-label="输入执行时间" />
+                  </template>
+                  <template v-else-if="scheduleCycle === 'weekly'">
+                    <select v-model="scheduleWeekday" class="schedule-field schedule-field-main" aria-label="选择星期">
+                      <option v-for="day in weekdayOptions" :key="day" :value="day">{{ day }}</option>
+                    </select>
+                    <input v-model="scheduleTime" type="time" class="schedule-field schedule-field-main" aria-label="输入执行时间" />
+                  </template>
+                  <template v-else-if="scheduleCycle === 'monthly'">
+                    <select v-model="scheduleMonthDay" class="schedule-field schedule-field-main" aria-label="选择日期">
+                      <option v-for="day in monthDayOptions" :key="day" :value="day">{{ day }}</option>
+                    </select>
+                    <input v-model="scheduleTime" type="time" class="schedule-field schedule-field-main" aria-label="输入执行时间" />
+                  </template>
+                  <template v-else-if="scheduleCycle === 'cron'">
+                    <input v-model="scheduleCron" class="schedule-field schedule-field-cron font-mono" placeholder="0 9 * * *" aria-label="输入 Cron 表达式" />
+                  </template>
+                  <template v-else>
+                    <span class="schedule-field schedule-field-main schedule-field-muted">{{ scheduleCycle === 'daily' ? '每天' : '周一至周五' }}</span>
+                    <input v-model="scheduleTime" type="time" class="schedule-field schedule-field-main" aria-label="输入执行时间" />
+                  </template>
+                  <span class="schedule-summary">{{ scheduleCycle === 'cron' ? 'Cron 例：0 9 * * *' : scheduleSummary }}</span>
+                </div>
+             </div>
             </div>
           </div>
         </section>
@@ -2332,7 +2458,7 @@ onBeforeUnmount(() => {
       <aside
         v-if="activeArtifactPreview"
         data-testid="artifact-preview-panel"
-        class="fixed bottom-0 right-0 top-14 z-40 hidden w-[clamp(360px,30vw,520px)] border-l border-zinc-200 bg-white lg:top-16 lg:block"
+        class="fixed bottom-0 right-0 top-14 z-40 hidden w-[clamp(420px,42vw,760px)] border-l border-zinc-200 bg-white lg:top-16 lg:block"
       >
         <div class="flex h-full flex-col">
           <header class="flex h-14 shrink-0 items-center justify-between border-b border-zinc-100 px-4">
@@ -2340,55 +2466,76 @@ onBeforeUnmount(() => {
               <div class="truncate text-sm font-semibold text-zinc-950">{{ activeArtifactPreview.name }}</div>
               <div class="mt-0.5 text-xs text-zinc-400">{{ activeArtifactPreview.type }} · {{ activeArtifactPreview.size }}</div>
             </div>
-            <button
-              type="button"
-              class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900"
-              aria-label="关闭预览"
-              @click="closeArtifactPreview"
-            >
-              <X class="h-4 w-4" />
-            </button>
+            <div class="flex items-center gap-1">
+              <button type="button" class="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-xs font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900" @click="downloadArtifact(activeArtifactPreview)">
+                <Download class="h-4 w-4" />
+                下载
+              </button>
+              <button
+                type="button"
+                class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900"
+                aria-label="关闭预览"
+                @click="closeArtifactPreview"
+              >
+                <X class="h-4 w-4" />
+              </button>
+            </div>
           </header>
-          <div class="min-h-0 flex-1 overflow-y-auto p-4">
-            <div class="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-              <div class="flex items-start gap-3">
-                <div class="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600">
-                  <component :is="activeArtifactPreview.icon" class="h-5 w-5" />
+          <div class="grid min-h-0 flex-1 grid-cols-[156px_1fr] overflow-hidden">
+            <nav class="overflow-y-auto border-r border-zinc-100 bg-zinc-50 px-4 py-5 text-sm">
+              <button type="button" class="mb-5 inline-flex items-center gap-1 text-zinc-400 hover:text-zinc-700" @click="closeArtifactPreview">
+                <ChevronLeft class="h-4 w-4" />
+                返回
+              </button>
+              <div class="mb-3 truncate font-semibold text-blue-600">{{ activeArtifactPreview.name }}</div>
+              <div class="space-y-3 text-zinc-500">
+                <div
+                  v-for="section in activeArtifactPreview.sections"
+                  :key="section"
+                  class="border-l-4 border-zinc-300 pl-3"
+                  :class="section === activeArtifactPreview.sections[0] ? 'border-blue-500 text-zinc-800' : ''"
+                >
+                  {{ section }}
+                </div>
+              </div>
+            </nav>
+            <article class="overflow-y-auto px-8 py-8 text-zinc-900">
+              <div class="mb-6 flex items-start gap-3">
+                <div class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-blue-50 text-blue-600">
+                  <component :is="activeArtifactPreview.icon" class="h-6 w-6" />
                 </div>
                 <div class="min-w-0">
-                  <div class="text-sm font-semibold text-zinc-950">文件预览</div>
-                  <p class="mt-1 text-xs leading-5 text-zinc-500">{{ activeArtifactPreview.summary }}</p>
+                  <h1 class="truncate text-2xl font-bold tracking-normal">{{ activeArtifactPreview.name.replace(/\.[^.]+$/, '') }}</h1>
+                  <p class="mt-2 text-sm leading-6 text-zinc-500">{{ activeArtifactPreview.summary }}</p>
                 </div>
               </div>
-            </div>
-            <div class="mt-4 overflow-hidden rounded-2xl border border-zinc-200 bg-white">
-              <div class="border-b border-zinc-100 bg-zinc-50 px-4 py-2 text-xs font-medium text-zinc-500">预览内容</div>
-              <div class="overflow-x-auto">
-                <table class="w-full min-w-[420px] text-left text-xs">
-                  <tbody>
-                    <tr
-                      v-for="(row, rowIndex) in activeArtifactPreview.rows"
-                      :key="`${activeArtifactPreview.name}-${rowIndex}`"
-                      class="border-b border-zinc-100 last:border-b-0"
-                      :class="rowIndex === 0 ? 'bg-zinc-50 font-semibold text-zinc-700' : 'text-zinc-600'"
-                    >
-                      <td v-for="cell in row" :key="cell" class="px-3 py-2.5">{{ cell }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
+              <section class="space-y-4 text-base leading-8">
+                <h2 class="border-l-4 border-zinc-900 pl-3 text-xl font-bold">{{ activeArtifactPreview.sections[0] }}</h2>
+                <p v-for="paragraph in activeArtifactPreview.paragraphs" :key="paragraph">{{ paragraph }}</p>
+              </section>
+              <section class="mt-8">
+                <h2 class="mb-4 border-l-4 border-zinc-900 pl-3 text-xl font-bold">
+                  {{ activeArtifactPreview.type === 'Excel' ? '表格预览' : activeArtifactPreview.type === 'PPT' ? '页面预览' : '内容摘录' }}
+                </h2>
+                <div class="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+                  <div class="overflow-x-auto">
+                    <table class="w-full min-w-[520px] text-left text-sm">
+                      <tbody>
+                        <tr
+                          v-for="(row, rowIndex) in activeArtifactPreview.rows"
+                          :key="`${activeArtifactPreview.name}-${rowIndex}`"
+                          class="border-b border-zinc-100 last:border-b-0"
+                          :class="rowIndex === 0 ? 'bg-zinc-50 font-semibold text-zinc-700' : 'text-zinc-600'"
+                        >
+                          <td v-for="cell in row" :key="cell" class="px-4 py-3">{{ cell }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </section>
+            </article>
           </div>
-          <footer class="shrink-0 border-t border-zinc-100 p-4">
-            <button
-              type="button"
-              class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-zinc-950 text-sm font-medium text-white transition hover:bg-zinc-800"
-              @click="downloadArtifact(activeArtifactPreview)"
-            >
-              <Download class="h-4 w-4" />
-              {{ copiedMessageId === `download:${activeArtifactPreview.name}` ? '已加入下载' : '下载文件' }}
-            </button>
-          </footer>
         </div>
       </aside>
 
@@ -2560,10 +2707,8 @@ onBeforeUnmount(() => {
             >
               <div class="flex items-center gap-5 text-slate-500">
                 <div class="grid h-12 w-12 place-items-center rounded-full bg-slate-100"><Paperclip class="h-5 w-5" /></div>
-                <div class="grid h-12 w-12 place-items-center rounded-full bg-slate-100"><Folder class="h-5 w-5" /></div>
-                <div class="grid h-12 w-12 place-items-center rounded-full bg-slate-100"><FileText class="h-5 w-5" /></div>
               </div>
-              <div class="mt-5 text-sm font-semibold text-zinc-950">点击上传文件，或点击文件夹/压缩包图标</div>
+              <div class="mt-5 text-sm font-semibold text-zinc-950">点击上传文件</div>
               <div class="mt-2 text-xs text-slate-500">{{ uploadHintText }}</div>
             </button>
             <div class="flex min-h-40 flex-col items-center justify-center rounded-xl border border-dashed border-blue-100 bg-blue-50/20 text-center">
@@ -2660,7 +2805,7 @@ onBeforeUnmount(() => {
           </div>
           <div class="flex items-center gap-2">
             <button type="button" class="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50" @click="attachmentModalOpen = false">取消</button>
-            <button type="button" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50" :disabled="selectedFiles.length === 0" @click="attachmentModalOpen = false">确认添加</button>
+            <button type="button" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50" :disabled="selectedFiles.length === 0 && selectedKbDocNames.length === 0" @click="addAttachmentsAndClose()">确认上传</button>
           </div>
         </div>
       </div>
@@ -2777,76 +2922,84 @@ onBeforeUnmount(() => {
   transform: translateY(3px) scale(1.01);
 }
 
-.schedule-panel {
-  border-radius: 20px;
-  background: #f4f4f5;
-  padding: 12px 14px;
-}
-
-.schedule-row {
-  display: grid;
-  grid-template-columns: auto minmax(118px, 148px) minmax(118px, 148px) minmax(118px, 148px) minmax(120px, 1fr);
+.schedule-bar {
+  display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  background: #f4f4f5;
+  border-radius: 12px;
+  padding: 8px 12px;
 }
 
-.schedule-title {
-  color: #52525b;
-  font-size: 0.875rem;
+.schedule-bar-label {
+  color: #71717a;
+  font-size: 0.8rem;
   font-weight: 600;
   white-space: nowrap;
 }
 
-.schedule-field {
-  width: 100%;
-  height: 38px;
-  border-radius: 12px;
-  border: 1px solid #e4e4e7;
+.schedule-bar-select {
+  height: 32px;
+  border-radius: 8px;
+  border: none;
   background: #fff;
-  padding: 0 11px;
+  padding: 0 10px;
   color: #27272a;
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   outline: none;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  cursor: pointer;
+  min-width: 0;
 }
 
-.schedule-field-main {
-  max-width: 148px;
+.schedule-bar-input {
+  height: 32px;
+  width: auto;
+  min-width: 0;
+  border-radius: 8px;
+  border: none;
+  background: #fff;
+  padding: 0 10px;
+  color: #27272a;
+  font-size: 0.8rem;
+  outline: none;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
 
-.schedule-field-cron {
-  width: 184px;
-  max-width: 184px;
+.schedule-bar-cron {
+  flex: 1 1 auto;
+  font-family: ui-monospace, monospace;
+  max-width: 200px;
 }
 
-.schedule-field-muted {
+.schedule-bar-muted {
   display: inline-flex;
   align-items: center;
+  height: 32px;
+  border-radius: 8px;
+  background: #fff;
+  padding: 0 10px;
   color: #71717a;
-  background: #fafafa;
+  font-size: 0.8rem;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
 
-.schedule-field:focus {
-  border-color: #bfdbfe;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.08);
-}
-
-.schedule-summary {
-  min-width: 0;
+.schedule-bar-summary {
+  flex: 0 0 auto;
   color: #a1a1aa;
   font-size: 0.75rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  margin-left: auto;
   white-space: nowrap;
 }
 
-@media (max-width: 720px) {
-  .schedule-row {
-    grid-template-columns: auto minmax(110px, 1fr) minmax(110px, 1fr);
+@media (max-width: 640px) {
+  .schedule-bar {
+    flex-wrap: wrap;
+    gap: 6px;
   }
-
-  .schedule-summary {
-    grid-column: 2 / -1;
+  .schedule-bar-summary {
+    margin-left: 0;
+    order: 10;
   }
 }
 
