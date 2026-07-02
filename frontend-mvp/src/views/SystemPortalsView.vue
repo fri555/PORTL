@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useAppStore } from '@/stores/app'
-import { Globe, ExternalLink, Search } from 'lucide-vue-next'
+import { Activity, Clock3, ExternalLink, Globe, Search, ShieldCheck, Star } from 'lucide-vue-next'
 
 const store = useAppStore()
 const searchQuery = ref('')
@@ -24,6 +24,17 @@ const portals = ref<PortalItem[]>([
 ])
 
 const categories = computed(() => [...new Set(portals.value.map(p => p.category))])
+const frequentPortals = computed(() => portals.value.slice(0, 4))
+const recentVisits = [
+  { name: 'BI 数据平台', action: '查看经营看板', time: '10分钟前' },
+  { name: 'OA 办公', action: '处理采购审批', time: '38分钟前' },
+  { name: 'CRM 客户管理', action: '更新客户跟进', time: '昨天 18:20' },
+]
+const systemStats = [
+  { label: '免登系统', value: '5', desc: '已接入统一身份' },
+  { label: '今日访问', value: '128', desc: 'Mock 数据' },
+  { label: '运行状态', value: '正常', desc: '8 个系统可用' },
+]
 const filteredPortals = computed(() => {
   let result = portals.value
   if (selectedCategory.value) result = result.filter(p => p.category === selectedCategory.value)
@@ -45,13 +56,54 @@ function handlePortalClick(portal: PortalItem) {
 </script>
 
 <template>
-  <div class="mx-auto max-w-6xl px-4 py-8">
-    <div class="mb-8">
-      <div class="flex items-center gap-3">
-        <Globe class="h-7 w-7 text-blue-600" />
-        <h1 class="text-2xl font-bold text-zinc-900">系统门户</h1>
+  <div class="mx-auto max-w-7xl px-4 py-6">
+    <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <div class="flex items-center gap-3">
+          <Globe class="h-7 w-7 text-blue-600" />
+          <h1 class="text-2xl font-bold text-zinc-900">系统门户</h1>
+        </div>
+        <p class="mt-2 text-sm text-zinc-500">统一入口访问内部业务系统，常用应用、最近访问和状态集中展示</p>
       </div>
-      <p class="mt-2 text-sm text-zinc-500">统一入口访问所有内部业务系统，无需重复登录</p>
+      <div class="grid grid-cols-3 gap-2">
+        <div v-for="stat in systemStats" :key="stat.label" class="min-w-28 rounded-xl border border-zinc-200 bg-white px-3 py-2">
+          <div class="text-sm font-semibold text-zinc-950">{{ stat.value }}</div>
+          <div class="mt-0.5 text-[11px] text-zinc-400">{{ stat.label }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="mb-6 grid gap-4 lg:grid-cols-[1fr_340px]">
+      <section class="rounded-2xl border border-zinc-200 bg-white p-4">
+        <div class="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-900">
+          <Star class="h-4 w-4 text-orange-500" />
+          今日常用
+        </div>
+        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <button v-for="portal in frequentPortals" :key="portal.id" type="button" class="flex items-center gap-3 rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-3 text-left transition hover:border-blue-200 hover:bg-blue-50/40" @click="handlePortalClick(portal)">
+            <span class="text-2xl">{{ portal.logo }}</span>
+            <span class="min-w-0 flex-1">
+              <span class="block truncate text-sm font-semibold text-zinc-900">{{ portal.name }}</span>
+              <span class="mt-0.5 block truncate text-xs text-zinc-500">{{ portal.description }}</span>
+            </span>
+          </button>
+        </div>
+      </section>
+      <section class="rounded-2xl border border-zinc-200 bg-white p-4">
+        <div class="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-900">
+          <Clock3 class="h-4 w-4 text-blue-600" />
+          最近访问
+        </div>
+        <div class="space-y-2">
+          <div v-for="visit in recentVisits" :key="visit.name" class="flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-zinc-50">
+            <Activity class="h-4 w-4 text-emerald-500" />
+            <div class="min-w-0 flex-1">
+              <div class="truncate text-sm font-medium text-zinc-900">{{ visit.name }}</div>
+              <div class="truncate text-xs text-zinc-400">{{ visit.action }}</div>
+            </div>
+            <span class="text-[11px] text-zinc-400">{{ visit.time }}</span>
+          </div>
+        </div>
+      </section>
     </div>
     <div class="mb-6 flex flex-wrap items-center gap-3">
       <div class="relative flex-1 max-w-sm">
@@ -70,7 +122,7 @@ function handlePortalClick(portal: PortalItem) {
         <p class="mb-3 text-xs leading-relaxed text-zinc-500">{{ portal.description }}</p>
         <div class="mt-auto flex items-center gap-2">
           <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-500">{{ portal.category }}</span>
-          <span v-if="portal.ssoEnabled" class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-600">免登</span>
+          <span v-if="portal.ssoEnabled" class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-600"><ShieldCheck class="h-3 w-3" />免登</span>
         </div>
       </button>
     </div>

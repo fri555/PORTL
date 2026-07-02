@@ -28,7 +28,6 @@ import {
   PanelTop,
   Paperclip,
   Pencil,
-  Pin,
   Plus,
   Quote,
   Search,
@@ -41,7 +40,8 @@ import {
 } from 'lucide-vue-next'
 import { useAppStore } from '@/stores/app'
 
-type RunMode = 'quick' | 'task'
+type RunMode = 'quick' | 'task' | 'schedule'
+type ScheduleCycle = 'once' | 'daily' | 'workday' | 'weekly' | 'monthly' | 'cron'
 type Message = {
   id: string
   role: 'user' | 'assistant'
@@ -63,17 +63,42 @@ type ConversationItem = {
   id: string
   title: string
   time: string
-  mode: '日常办公' | '专家模式'
+  mode: '日常办公' | '专家模式' | '定时任务'
   pinned: boolean
   status: 'running' | 'completed' | 'failed'
 }
-type IntentRoute = 'greeting' | 'office-rag' | 'expert-task'
+type IntentRoute = 'greeting' | 'office-rag' | 'expert-task' | 'schedule-task'
 type CaseItem = {
   title: string
   icon?: unknown
   desc: string
   prompt: string
+  bubble?: string
   kb?: string
+  schedule?: Partial<{
+    cycle: ScheduleCycle
+    date: string
+    time: string
+    weekday: string
+    monthDay: string
+  }>
+}
+type GeneratedArtifact = {
+  name: string
+  type: 'Excel' | 'PPT' | 'PDF'
+  size: string
+  icon: unknown
+  summary: string
+  rows: string[][]
+}
+type ExpertAgent = {
+  value: string
+  label: string
+  role: string
+  desc: string
+  level: string
+  accent: string
+  prompts: CaseItem[]
 }
 type ActiveReference = {
   title: string
@@ -97,11 +122,22 @@ const query = ref('')
 const runMode = ref<RunMode>('quick')
 const webSearchEnabled = ref(true)
 const selectedAgent = ref('allround')
+const scheduleCycle = ref<ScheduleCycle>('daily')
+const scheduleDate = ref('2026-07-02')
+const scheduleTime = ref('09:00')
+const scheduleWeekday = ref('周一')
+const scheduleMonthDay = ref('1号')
+const scheduleCron = ref('0 9 * * *')
 const activeCaseCategory = ref('精选案例')
 const showRecommendations = ref(true)
 const modeMenuOpen = ref(false)
 const agentMenuOpen = ref(false)
 const showHistory = ref(false)
+const sidebarTitle = ref('任务导航')
+const editingSidebarTitle = ref(false)
+const sidebarTitleDraft = ref('任务导航')
+const collapsedSidebarGroups = ref<RunMode[]>([])
+const showHistoryBrowser = ref(false)
 const isChatActive = ref(false)
 const isThinking = ref(false)
 const generationInterrupted = ref(false)
@@ -111,6 +147,8 @@ const composer = ref<HTMLTextAreaElement | null>(null)
 const messageList = ref<HTMLElement | null>(null)
 const selectedFiles = ref<string[]>([])
 const conversationSearch = ref('')
+const historyBrowserSearch = ref('')
+const historyBrowserModeFilter = ref<'all' | RunMode>('all')
 const attachmentModalOpen = ref(false)
 const activeAttachmentTab = ref<'local' | 'knowledge'>('local')
 const kbAttachmentSearch = ref('')
@@ -127,6 +165,7 @@ const quotedMessageId = ref('')
 const editingUserMessageId = ref('')
 const editingUserMessageDraft = ref('')
 const hasGeneratedAssets = ref(false)
+const activeArtifactPreview = ref<GeneratedArtifact | null>(null)
 const activeReference = ref<ActiveReference | null>(null)
 const selectedKnowledgeRefs = ref<ActiveReference[]>([])
 const expandedProcessEventIds = ref<string[]>([])
@@ -278,18 +317,166 @@ const conversations = ref<ConversationItem[]>([
   { id: 'conv-3', title: '考勤制度问答', time: '周二', mode: '日常办公', pinned: true, status: 'failed' },
   { id: 'conv-4', title: '门店需求字段表', time: '06-18', mode: '专家模式', pinned: false, status: 'completed' },
   { id: 'conv-5', title: '行业动态简报', time: '刚刚', mode: '日常办公', pinned: false, status: 'running' },
+  { id: 'conv-6', title: '每日方案池监控', time: '明早4:00', mode: '定时任务', pinned: false, status: 'running' },
 ])
 
 const officeAgents = [
   { value: 'allround', label: '全能助手', desc: '日常办公、调研、知识检索和轻量任务整理' },
-  { value: 'knowledge', label: '知识顾问', desc: '查询制度、流程、产品资料并给出引用' },
-  { value: 'research', label: '调研帮手', desc: '搜索资料、汇总重点、生成调研提纲' },
-  { value: 'dingtalk', label: '钉钉助理', desc: '日程、待办、文档和表格快捷处理' },
 ]
 
-const expertAgents = [
-  { value: 'solution', label: '组货专家', desc: '方案匹配、组货清单和客户交付物生成' },
-  { value: 'soon', label: '敬请期待', desc: '更多专家即将上线' },
+const expertAgents: ExpertAgent[] = [
+  {
+    value: 'solution',
+    label: '组货专家',
+    role: '方案落地专家',
+    desc: '匹配方案池、组织组货清单、生成客户交付物',
+    level: 'P7',
+    accent: 'from-orange-500 to-amber-400',
+    prompts: [
+      {
+        title: 'B2B线下团购方案',
+        desc: '预算10万，运动鞋类目，输出三档组合。',
+        prompt: '帮我给B2B线下客户出一版团购方案。已知：总预算10万，偏运动鞋类目，客户在门店等待，需要先给一版可沟通初稿。请先列出必须追问字段，再按保守档、均衡档、品质档输出组货方案。',
+        bubble: '10万预算团购方案',
+        kb: '方案中心案例库',
+      },
+      {
+        title: '门店需求采集',
+        desc: '把客户口述需求整理成标准字段。',
+        prompt: '请把门店客户的团购需求整理成标准字段表。字段包括客户类型、数量、预算范围、活动场景、品类需求、品牌偏好、交付时间、风险备注。',
+        bubble: '门店需求字段表',
+        kb: '方案中心字段模板',
+      },
+      {
+        title: '成功案例复用',
+        desc: '匹配案例池并给出引用依据。',
+        prompt: '请基于方案中心成功案例池，帮我匹配适合运动鞋团购的相似案例，并说明适用条件、引用依据和可复用话术。',
+        bubble: '匹配相似成功案例',
+        kb: '成功案例池',
+      },
+      { title: '预算分档', desc: '按预算拆三档方案。', prompt: '请按保守档、均衡档、品质档拆解一版团购预算分档，并标注每档适用客户。', bubble: '预算三档拆解', kb: '团购预算池' },
+      { title: '客户话术', desc: '生成现场沟通话术。', prompt: '请把当前团购方案整理成门店可直接沟通的话术，包含开场、推荐理由和异议回应。', bubble: '门店沟通话术', kb: '销售话术库' },
+      { title: '导出清单', desc: '生成可导出字段清单。', prompt: '请把团购方案整理成可导出的 Excel 字段清单，包含品类、数量、价格带、推荐理由和风险备注。', bubble: '导出 Excel 清单', kb: '方案清单模板' },
+    ],
+  },
+  {
+    value: 'analysis',
+    label: '分析专家',
+    role: '经营分析专家',
+    desc: '拆解业务指标、定位变化原因、输出经营诊断',
+    level: 'P6',
+    accent: 'from-blue-500 to-cyan-400',
+    prompts: [
+      { title: '经营周报诊断', desc: '定位指标波动和后续动作。', prompt: '帮我分析本周经营周报，重点看销售额、毛利、转化率变化，并输出原因假设和下周动作。', bubble: '本周经营周报诊断', kb: '经营分析知识库' },
+      { title: '客户分层洞察', desc: '按行业、规模、预算拆分机会。', prompt: '请把客户线索按行业、规模、预算和成交概率做分层，并给出优先跟进建议。', bubble: '客户分层机会分析', kb: '客户线索库' },
+      { title: '毛利波动分析', desc: '分析毛利变化原因。', prompt: '请分析本月毛利波动，拆解品类、客户、价格带三个维度，并给出改善建议。', bubble: '毛利波动原因拆解', kb: '经营分析知识库' },
+      { title: '转化漏斗', desc: '定位转化漏斗卡点。', prompt: '请基于销售漏斗数据找出转化率下降的关键节点，并输出下一步验证动作。', bubble: '转化漏斗卡点定位', kb: '销售漏斗看板' },
+      { title: '预算使用', desc: '检查预算使用效率。', prompt: '请分析当前预算使用效率，判断哪些项目投入产出不合理，并给出优先级建议。', bubble: '预算使用效率分析', kb: '预算台账' },
+    ],
+  },
+  {
+    value: 'marketing',
+    label: '营销大师',
+    role: '内容增长专家',
+    desc: '生成活动方案、营销话术和传播素材框架',
+    level: 'P7',
+    accent: 'from-fuchsia-500 to-rose-400',
+    prompts: [
+      { title: '新品活动策划', desc: '活动节奏、权益、传播内容。', prompt: '帮我设计一版新品上市营销方案，包含活动主题、用户权益、渠道节奏和核心文案。', bubble: '新品上市活动方案', kb: '营销活动模板库' },
+      { title: '客户邀约话术', desc: '多渠道邀约和异议处理。', prompt: '请生成一组客户邀约话术，分别适用于钉钉、电话和面谈场景，并补充常见异议回应。', bubble: '客户邀约话术', kb: '销售话术库' },
+      { title: '私域推文', desc: '生成社群传播素材。', prompt: '请为这次活动生成一组私域社群推文，包含标题、正文和行动按钮文案。', bubble: '私域社群推文', kb: '内容素材库' },
+      { title: '活动复盘', desc: '输出活动复盘框架。', prompt: '请帮我设计活动复盘框架，包含目标达成、渠道表现、用户反馈和下次优化。', bubble: '活动复盘框架', kb: '营销复盘模板' },
+    ],
+  },
+  {
+    value: 'design',
+    label: '高级设计师',
+    role: '视觉设计专家',
+    desc: '整理设计需求、输出视觉方向和页面结构建议',
+    level: 'P6',
+    accent: 'from-violet-500 to-indigo-400',
+    prompts: [
+      { title: '方案页视觉优化', desc: '重构页面信息层级和风格。', prompt: '请帮我优化一版方案页视觉结构，要求更商务、更清晰，输出版式层级、视觉关键词和模块顺序。', bubble: '方案页视觉优化', kb: '品牌设计规范' },
+      { title: 'PPT视觉方向', desc: '生成汇报型PPT设计建议。', prompt: '帮我给客户方案PPT设定视觉方向，包含封面、目录、方案页、报价页和结束页建议。', bubble: 'PPT视觉方向', kb: 'PPT模板库' },
+      { title: '页面信息层级', desc: '整理页面主次关系。', prompt: '请重排这个页面的信息层级，让客户先看到结论、价值和关键数据。', bubble: '页面信息层级调整', kb: '设计规范库' },
+      { title: '视觉关键词', desc: '提炼视觉方向。', prompt: '请基于商务、科技、可信三个关键词，输出一组视觉设计方向建议。', bubble: '商务科技视觉方向', kb: '品牌设计规范' },
+    ],
+  },
+  {
+    value: 'ops',
+    label: '运营策略师',
+    role: '流程运营专家',
+    desc: '梳理协同流程、负责人、节点和风险预案',
+    level: 'P5',
+    accent: 'from-emerald-500 to-lime-400',
+    prompts: [
+      { title: '交付排期拆解', desc: '拆任务、排负责人和里程碑。', prompt: '帮我把这个客户交付任务拆成排期计划，包含负责人、截止时间、风险点和验收标准。', bubble: '交付排期拆解', kb: '项目管理模板库' },
+      { title: '风险预案', desc: '识别风险和应对。', prompt: '请识别这个项目可能出现的交付风险，并给出预案、负责人和触发条件。', bubble: '项目风险预案', kb: '项目管理模板库' },
+      { title: '验收标准', desc: '生成验收口径。', prompt: '请把当前任务整理成可执行的验收标准，包含交付物、质量要求和确认方式。', bubble: '交付验收标准', kb: '项目验收模板' },
+    ],
+  },
+  {
+    value: 'soon',
+    label: '敬请期待',
+    role: '更多专家',
+    desc: '更多行业专家正在接入',
+    level: '--',
+    accent: 'from-zinc-300 to-zinc-200',
+    prompts: [],
+  },
+]
+
+const scheduleCycles = [
+  { value: 'once', label: '不重复' },
+  { value: 'daily', label: '每天' },
+  { value: 'workday', label: '工作日' },
+  { value: 'weekly', label: '每周' },
+  { value: 'monthly', label: '每月' },
+  { value: 'cron', label: '自定义 Cron' },
+] as const
+const weekdayOptions = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+const monthDayOptions = Array.from({ length: 28 }, (_, index) => `${index + 1}号`)
+const scheduleTimeOptions = ['04:00', '08:00', '09:00', '12:00', '18:00', '21:00']
+const generatedArtifactCards: GeneratedArtifact[] = [
+  {
+    name: 'B2B团购组货清单.xlsx',
+    type: 'Excel',
+    size: '128 KB',
+    icon: FileSpreadsheet,
+    summary: '三档组货预算清单，含品类、数量、预算占比和沟通口径。',
+    rows: [
+      ['档位', '核心组合', '预算', '适用场景'],
+      ['保守档', '基础运动鞋 + 通勤袜', '8.6 万', '预算敏感客户'],
+      ['均衡档', '主推运动鞋 + 配件礼包', '9.8 万', '门店快速沟通'],
+      ['品质档', '品牌运动鞋 + 定制礼盒', '10.4 万', '员工体验优先'],
+    ],
+  },
+  {
+    name: '客户方案沟通稿.pptx',
+    type: 'PPT',
+    size: '2.4 MB',
+    icon: FileText,
+    summary: '客户现场沟通用 PPT，包含方案目标、三档报价和交付节奏。',
+    rows: [
+      ['页码', '页面主题', '内容摘要'],
+      ['01', '客户需求理解', '预算、品类、交付时间与风险假设'],
+      ['02', '三档方案对比', '保守档、均衡档、品质档差异'],
+      ['03', '下一步确认', '待补字段、样品确认和交付排期'],
+    ],
+  },
+  {
+    name: '方案画册预览.pdf',
+    type: 'PDF',
+    size: '860 KB',
+    icon: FileText,
+    summary: '面向客户转发的 PDF 预览稿，突出组合亮点和交付说明。',
+    rows: [
+      ['章节', '内容'],
+      ['方案概览', '客户背景、预算边界、推荐路径'],
+      ['产品组合', '运动鞋主推款、补充配件、包装建议'],
+      ['交付说明', '排期、验收标准、风险备注'],
+    ],
+  },
 ]
 
 const quickCases: CaseItem[] = [
@@ -383,46 +570,76 @@ const solutionCases: CaseItem[] = [
 ]
 
 const hasSessionAssets = computed(() => hasGeneratedAssets.value)
-const rightPanelVisible = computed(() => hasSessionAssets.value && !isRightPanelCollapsed.value)
-const sortedConversations = computed(() => [...conversations.value].sort((a, b) => Number(b.pinned) - Number(a.pinned)))
-const searchedConversations = computed(() => {
-  const keyword = conversationSearch.value.trim().toLowerCase()
-  if (!keyword) return sortedConversations.value
-  return sortedConversations.value.filter((item) =>
-    `${item.title}${item.mode}${getConversationStatusLabel(item.status)}`.toLowerCase().includes(keyword),
-  )
+const rightPanelVisible = computed(() => false)
+const sortedConversations = computed(() => [...conversations.value])
+const sidebarConversationGroups = computed(() => [
+  { key: 'task' as const, label: '专家模式', items: sortedConversations.value.filter((item) => item.mode === '专家模式') },
+  { key: 'quick' as const, label: '日常办公', items: sortedConversations.value.filter((item) => item.mode === '日常办公') },
+  { key: 'schedule' as const, label: '定时任务', items: sortedConversations.value.filter((item) => item.mode === '定时任务') },
+].filter((group) => group.items.length))
+const historyBrowserConversations = computed(() => {
+  const keyword = historyBrowserSearch.value.trim().toLowerCase()
+  return sortedConversations.value.filter((item) => {
+    const modeMatched = historyBrowserModeFilter.value === 'all'
+      || (historyBrowserModeFilter.value === 'quick' && item.mode === '日常办公')
+      || (historyBrowserModeFilter.value === 'task' && item.mode === '专家模式')
+      || (historyBrowserModeFilter.value === 'schedule' && item.mode === '定时任务')
+    if (!modeMatched) return false
+    if (!keyword) return true
+    return `${item.title}${item.mode}${item.time}${getConversationDetail(item)}${getConversationStatusLabel(item.status)}`.toLowerCase().includes(keyword)
+  })
 })
-const modeFilteredConversations = computed(() => searchedConversations.value.filter((item) => item.mode === modeLabel.value))
-const pinnedConversations = computed(() => modeFilteredConversations.value.filter((item) => item.pinned))
-const regularConversations = computed(() => modeFilteredConversations.value.filter((item) => !item.pinned))
-const currentAgentOptions = computed(() => (runMode.value === 'quick' ? officeAgents : expertAgents))
+const currentAgentOptions = computed(() => (runMode.value === 'task' ? expertAgents : officeAgents))
 const currentAgentLabel = computed(() => currentAgentOptions.value.find((agent) => agent.value === selectedAgent.value)?.label ?? '')
+const selectedExpert = computed(() => expertAgents.find((agent) => agent.value === selectedAgent.value && agent.value !== 'soon') ?? null)
+const needsExpertSelection = computed(() => runMode.value === 'task' && !selectedExpert.value)
+const canSend = computed(() =>
+  !isThinking.value
+  && Boolean(query.value.trim() || selectedFiles.value.length || selectedKnowledgeRefs.value.length)
+  && !needsExpertSelection.value,
+)
 const currentAgentDescription = computed(() => {
-  if (runMode.value === 'task') return '组货专家擅长拆解复杂客户需求，匹配方案案例并生成可交付的清单、报告和话术。'
-  if (selectedAgent.value === 'allround') return '全能助手擅长处理日常办公、知识查询、资料整理和轻量协同任务。'
-  if (selectedAgent.value === 'knowledge') return '知识顾问擅长查找制度、流程和资料，并把来源引用清楚地带出来。'
-  if (selectedAgent.value === 'research') return '调研帮手擅长快速搜索行业动态、提炼关键信息并沉淀成分析报告。'
-  return '钉钉助理擅长把日程、待办、AI表格和办公协同动作快速落地。'
+  if (runMode.value === 'task') return selectedExpert.value?.desc ?? '先选择一个专家，小马会把任务交给合适的专家执行。'
+  if (runMode.value === 'schedule') return '定时任务用于周期性执行检索、提醒、日报、知识库更新等固定动作。'
+  return '全能助手擅长处理日常办公、知识查询、资料整理和轻量协同任务。'
 })
-const visibleCases = computed(() => {
-  if (runMode.value === 'task') return solutionCases
+const visibleCases = computed<CaseItem[]>(() => {
+  if (runMode.value === 'task') return selectedExpert.value?.prompts ?? []
+  if (runMode.value === 'schedule') return [
+    { title: '每日方案池监控', icon: CalendarDays, desc: '每天 09:00 检查新增方案和过期字段', prompt: '每天早上9点检查方案中心是否有新增或过期字段，并生成一段摘要提醒我。', kb: '方案中心', schedule: { cycle: 'daily', time: '09:00' } },
+    { title: '每周经营简报', icon: FileText, desc: '每周一 09:00 生成经营摘要', prompt: '每周一上午9点汇总上周经营数据、重点风险和建议动作，输出一份简报。', kb: '经营分析知识库', schedule: { cycle: 'weekly', weekday: '周一', time: '09:00' } },
+    { title: '工作日待办巡检', icon: CheckCircle2, desc: '工作日 18:00 提醒未完成任务', prompt: '每个工作日下午6点检查我未完成的钉钉待办，并按优先级提醒。', kb: '钉钉待办', schedule: { cycle: 'workday', time: '18:00' } },
+    { title: '单次客户提醒', icon: Bell, desc: '2026-07-02 14:41 提醒客户跟进', prompt: '在指定时间提醒我跟进客户团购方案，并附上上次沟通要点。', kb: '客户跟进记录', schedule: { cycle: 'once', date: '2026-07-02', time: '14:41' } },
+  ]
   if (selectedAgent.value === 'allround') {
     if (activeCaseCategory.value === '咨询调研') return quickCases.filter((item) => item.title === '品牌调研报告' || item.title === '搜行业动态')
     if (activeCaseCategory.value === 'office办公') return [...dingtalkCases, quickCases.find((item) => item.title === '名单双表格')].filter(Boolean) as CaseItem[]
     if (activeCaseCategory.value === '应用开发') return [{ title: '应用需求拆解', icon: LayoutGrid, desc: '把想法拆成页面和接口清单', prompt: '帮我把一个内部工具需求拆成页面、字段、交互和接口清单。', kb: '应用开发模板库' }]
     return quickCases.filter((item) => ['AI复合型岗位趋势', '品牌调研报告', '名单双表格'].includes(item.title))
   }
-  if (selectedAgent.value === 'knowledge') return quickCases.filter((item) => item.title === '查知识库')
-  if (selectedAgent.value === 'research') return quickCases.filter((item) => item.title === '搜行业动态' || item.title === '生成分析报告')
-  return dingtalkCases
+  return quickCases.filter((item) => ['AI复合型岗位趋势', '品牌调研报告', '名单双表格'].includes(item.title))
 })
-const placeholder = computed(() =>
-  runMode.value === 'quick'
-    ? `${currentAgentLabel.value || '助理'}在线，试试提问或上传文件吧`
-    : `${currentAgentLabel.value || '专家'}已就绪，说说具体任务目标吧`,
-)
-const modeLabel = computed(() => runMode.value === 'quick' ? '日常办公' : '专家模式')
-const agentSelectLabel = computed(() => runMode.value === 'quick' ? '助理' : '专家')
+const artifactPreviewVisible = computed(() => Boolean(activeArtifactPreview.value))
+const placeholder = computed(() => {
+  if (runMode.value === 'task' && !selectedExpert.value) return '请在下方选择合适的专家，小马会把任务托付给他/她高效完成'
+  if (runMode.value === 'task') return `${selectedExpert.value?.label ?? '专家'}已就绪，说说具体任务目标吧`
+  if (runMode.value === 'schedule') return '描述要周期执行的任务，例如每天早上生成方案池更新摘要'
+  return '全能助手在线，试试提问、上传文件或引用知识库吧'
+})
+const modeLabel = computed(() => {
+  if (runMode.value === 'task') return '专家模式'
+  if (runMode.value === 'schedule') return '定时任务'
+  return '日常办公'
+})
+const agentSelectLabel = computed(() => runMode.value === 'task' ? '专家' : '助手')
+const scheduleCycleLabel = computed(() => scheduleCycles.find((item) => item.value === scheduleCycle.value)?.label ?? '每天')
+const scheduleSummary = computed(() => {
+  if (scheduleCycle.value === 'cron') return `Cron：${scheduleCron.value}`
+  if (scheduleCycle.value === 'once') return `${scheduleDate.value} ${scheduleTime.value}`
+  if (scheduleCycle.value === 'weekly') return `${scheduleCycleLabel.value} ${scheduleWeekday.value} ${scheduleTime.value}`
+  if (scheduleCycle.value === 'monthly') return `${scheduleCycleLabel.value} ${scheduleMonthDay.value} ${scheduleTime.value}`
+  return `${scheduleCycleLabel.value} ${scheduleTime.value}`
+})
 const chatTitle = computed(() => activeConversationTitle.value || '新会话')
 const contextPercent = computed(() => {
   const messageText = messages.value.reduce((total, message) => total + message.content.length, 0)
@@ -435,9 +652,15 @@ const contextRingStyle = computed(() => ({
 }))
 const chatShellStyle = computed(() => ({
   '--left-inset': isChatActive.value && showHistory.value ? 'clamp(286px,21vw,400px)' : '0px',
-  '--right-inset': rightPanelVisible.value ? 'clamp(286px,21vw,400px)' : '0px',
+  '--right-inset': artifactPreviewVisible.value ? 'clamp(360px,30vw,520px)' : '0px',
   width: 'min(calc(100vw - var(--left-inset) - var(--right-inset) - clamp(36px,5vw,88px)), clamp(760px,74vw,1320px))',
   transform: 'translateX(calc((var(--left-inset) - var(--right-inset)) / 2))',
+}))
+const chatTitleLayerStyle = computed(() => ({
+  '--left-inset': isChatActive.value && showHistory.value ? 'clamp(286px,21vw,400px)' : '0px',
+  '--right-inset': artifactPreviewVisible.value ? 'clamp(360px,30vw,520px)' : '0px',
+  left: 'var(--left-inset)',
+  right: 'var(--right-inset)',
 }))
 const homeHeroStyle = computed(() => ({
   '--left-inset': showHistory.value ? 'clamp(286px,21vw,400px)' : '0px',
@@ -508,7 +731,7 @@ const filteredAttachmentItems = computed(() => {
 
 function selectMode(mode: RunMode) {
   runMode.value = mode
-  selectedAgent.value = mode === 'quick' ? 'allround' : 'solution'
+  selectedAgent.value = mode === 'task' ? '' : 'allround'
   activeCaseCategory.value = '精选案例'
   showRecommendations.value = true
   modeMenuOpen.value = false
@@ -522,10 +745,45 @@ function selectAgent(agentValue: string) {
   agentMenuOpen.value = false
 }
 
+function clearSelectedExpert() {
+  if (runMode.value !== 'task') return
+  selectedAgent.value = ''
+  query.value = ''
+  activeReference.value = null
+  showRecommendations.value = true
+}
+
+function updateScheduleCycle(value: ScheduleCycle) {
+  scheduleCycle.value = value
+  if (!scheduleTimeOptions.includes(scheduleTime.value)) scheduleTime.value = '09:00'
+}
+
+function applySchedulePreset(item: CaseItem) {
+  if (!item.schedule) return
+  if (item.schedule.cycle) scheduleCycle.value = item.schedule.cycle
+  if (item.schedule.date) scheduleDate.value = item.schedule.date
+  if (item.schedule.time) scheduleTime.value = item.schedule.time
+  if (item.schedule.weekday) scheduleWeekday.value = item.schedule.weekday
+  if (item.schedule.monthDay) scheduleMonthDay.value = item.schedule.monthDay
+}
+
+function updateComposerGlow(event: PointerEvent) {
+  const target = event.currentTarget as HTMLElement
+  const rect = target.getBoundingClientRect()
+  target.style.setProperty('--composer-x', `${((event.clientX - rect.left) / rect.width) * 100}%`)
+  target.style.setProperty('--composer-y', `${((event.clientY - rect.top) / rect.height) * 100}%`)
+}
+
+function resetComposerGlow(event: PointerEvent) {
+  const target = event.currentTarget as HTMLElement
+  target.style.setProperty('--composer-x', '50%')
+  target.style.setProperty('--composer-y', '50%')
+}
+
 function createReferenceFromCase(item: CaseItem, mode: RunMode): ActiveReference {
-  const nextMode = mode === 'quick' ? '日常办公' : '专家模式'
+  const nextMode = mode === 'task' ? '专家模式' : mode === 'schedule' ? '定时任务' : '日常办公'
   const agent = currentAgentOptions.value.find((option) => option.value === selectedAgent.value)?.label
-    ?? (mode === 'quick' ? '调研帮手' : '组货专家')
+    ?? (mode === 'task' ? '未选择专家' : '全能助手')
   return {
     title: item.title,
     mode: nextMode,
@@ -541,6 +799,7 @@ async function fillPrompt(item: CaseItem | string, mode: RunMode = runMode.value
     query.value = item
   } else {
     query.value = item.prompt
+    if (mode === 'schedule') applySchedulePreset(item)
   }
   await nextTick()
   resizeComposer()
@@ -617,6 +876,45 @@ function getConversationStatusClass(status: ConversationItem['status']) {
   return 'bg-emerald-500'
 }
 
+function getConversationDetail(item: ConversationItem) {
+  if (item.mode === '专家模式') {
+    if (item.title.includes('团购')) return '围绕客户预算、品类偏好和现场沟通诉求，沉淀方案匹配、组货清单和交付建议。'
+    if (item.title.includes('门店')) return '把门店客户口述需求整理为标准字段，便于后续进入组货专家流程。'
+    return '复杂专项任务，包含任务理解、计划拆解、工具调用和最终方案整合。'
+  }
+  if (item.mode === '定时任务') return '周期性自动化任务，用于监控方案池、提醒待办或生成固定简报。'
+  if (item.title.includes('考勤')) return '围绕集团考勤制度进行轻量问答，未触发复杂专家流程。'
+  return '日常办公对话，适合资料整理、知识库查询、联网检索和轻量协同。'
+}
+
+function isSidebarGroupCollapsed(key: RunMode) {
+  return collapsedSidebarGroups.value.includes(key)
+}
+
+function toggleSidebarGroup(key: RunMode) {
+  collapsedSidebarGroups.value = isSidebarGroupCollapsed(key)
+    ? collapsedSidebarGroups.value.filter((item) => item !== key)
+    : [...collapsedSidebarGroups.value, key]
+}
+
+function beginEditSidebarTitle() {
+  sidebarTitleDraft.value = sidebarTitle.value
+  editingSidebarTitle.value = true
+}
+
+function commitSidebarTitle() {
+  const next = sidebarTitleDraft.value.trim()
+  if (next) sidebarTitle.value = next
+  editingSidebarTitle.value = false
+}
+
+function openHistoryBrowser() {
+  showHistoryBrowser.value = true
+  isChatActive.value = false
+  showHistory.value = true
+  showRecommendations.value = true
+}
+
 function handlePaste(event: ClipboardEvent) {
   const items = event.clipboardData?.items
   if (!items) return
@@ -668,10 +966,6 @@ function isNearBottom(el: HTMLElement) {
 function handleMessageScroll() {
   const el = messageList.value
   if (!el || isTextSelecting.value) return
-  if (isProgrammaticScroll.value) {
-    showBackToLatest.value = false
-    return
-  }
   const nearBottom = isNearBottom(el)
   if (nearBottom) {
     isAutoScroll.value = true
@@ -679,7 +973,7 @@ function handleMessageScroll() {
     showBackToLatest.value = false
     return
   }
-  if (userScrollIntent.value) {
+  if (userScrollIntent.value || !nearBottom) {
     isAutoScroll.value = false
   }
 }
@@ -700,6 +994,7 @@ function delay(ms: number) {
 }
 
 function classifyIntent(content: string, hasFiles = false): IntentRoute {
+  if (runMode.value === 'schedule') return 'schedule-task'
   const normalized = content.trim().replace(/[!！。.\s]/g, '')
   const greetingPatterns = ['你好', '您好', '嗨', 'hi', 'hello', '哈喽', '在吗', '谢谢', '感谢', '再见', '拜拜', '你是谁']
   if (!hasFiles && greetingPatterns.some((item) => normalized.toLowerCase() === item.toLowerCase())) {
@@ -719,10 +1014,11 @@ function classifyIntent(content: string, hasFiles = false): IntentRoute {
 
 function getGenerationEvents(route: IntentRoute) {
   if (route === 'greeting') return greetingProcessEvents
+  if (route === 'schedule-task') return quickProcessEvents
   return route === 'expert-task' ? solutionProcessEvents : quickProcessEvents
 }
 
-function getGenerationChunks(route: IntentRoute) {
+function getGenerationChunks(route: IntentRoute, prompt = '') {
   if (route === 'greeting') {
     return [
       '你好，我是小马。有什么需要我帮你处理的，直接告诉我就行。',
@@ -736,6 +1032,17 @@ function getGenerationChunks(route: IntentRoute) {
       '3. 如果后续需要导出文件、创建待办或跨系统执行，可以切换到专家模式继续处理。',
     ]
   }
+  if (route === 'schedule-task') {
+    return [
+      '## 定时任务已安排\n\n',
+      `### 执行周期\n${scheduleSummary.value}\n\n`,
+      '### 任务内容\n',
+      `${prompt || '按当前设置周期执行提醒与资料整理。'}\n\n`,
+      '### 后续管理\n',
+      '- 可在左侧栏「自动化」中查看状态、暂停任务或立即启动。\n',
+      '- 执行结果会沉淀到对应会话，涉及文件的产物会以文件卡片展示在对话中。',
+    ]
+  }
   return [
     '## B2B线下团购方案初稿\n\n',
     '### 一、需要先确认的字段\n',
@@ -747,7 +1054,7 @@ function getGenerationChunks(route: IntentRoute) {
     '### 三、交付建议\n',
     '- 先用均衡档作为客户现场沟通初稿，保留保守档作为压预算备选。\n',
     '- 品质档适合客户重视员工体验、愿意提高单品预算的场景。\n',
-    '- Excel 组货清单、PPT 客户方案和 PDF 方案画册已进入右侧会话产物栏。',
+    '- 已生成 Excel 组货清单、PPT 客户方案和 PDF 方案画册，可在下方文件卡片中预览或下载。',
   ]
 }
 
@@ -817,6 +1124,7 @@ function runningEvent(event: ProcessEvent): ProcessEvent {
 
 function summarizeDraftTitle(content: string) {
   if (classifyIntent(content) === 'greeting') return '轻量问候'
+  if (runMode.value === 'schedule') return '定时任务安排'
   if (content.includes('团购')) return 'B2B团购组货方案'
   if (content.includes('考勤')) return '考勤制度问答'
   if (content.includes('待办')) return '钉钉待办创建'
@@ -825,9 +1133,8 @@ function summarizeDraftTitle(content: string) {
 }
 
 async function sendMessage() {
-  if (isThinking.value) return
+  if (!canSend.value) return
   const content = query.value.trim()
-  if (!content && selectedFiles.value.length === 0) return
 
   const token = ++generationToken
   const conversationId = activeConversationId.value || `conv-${Date.now()}`
@@ -853,6 +1160,7 @@ async function sendMessage() {
   }
   generationInterrupted.value = false
   isChatActive.value = true
+  showHistoryBrowser.value = false
   showHistory.value = true
   showRecommendations.value = false
   isAutoScroll.value = true
@@ -886,7 +1194,6 @@ async function generateAssistantReply(content: string, conversationId: string, d
 
   if (shouldUseSolutionFlow) {
     hasGeneratedAssets.value = true
-    isRightPanelCollapsed.value = false
   }
 
   const events = getGenerationEvents(route)
@@ -906,7 +1213,7 @@ async function generateAssistantReply(content: string, conversationId: string, d
     await scrollToLatest()
   }
 
-  const chunks = getGenerationChunks(route)
+  const chunks = getGenerationChunks(route, content)
   for (const chunk of chunks) {
     if (token !== generationToken || generationInterrupted.value) break
     await delay(route === 'greeting' ? 350 : shouldUseSolutionFlow ? 850 : 700)
@@ -1011,6 +1318,21 @@ async function copyUserMessage(message: Message) {
   }
 }
 
+function openArtifactPreview(file: GeneratedArtifact) {
+  activeArtifactPreview.value = file
+}
+
+function closeArtifactPreview() {
+  activeArtifactPreview.value = null
+}
+
+function downloadArtifact(file: GeneratedArtifact) {
+  copiedMessageId.value = `download:${file.name}`
+  window.setTimeout(() => {
+    if (copiedMessageId.value === `download:${file.name}`) copiedMessageId.value = ''
+  }, 1600)
+}
+
 function beginEditUserMessage(message: Message) {
   editingUserMessageId.value = message.id
   editingUserMessageDraft.value = message.content
@@ -1058,6 +1380,7 @@ function resetConversationDraft() {
   attachmentSpace.value = 'public'
   attachmentPath.value = []
   hasGeneratedAssets.value = false
+  activeArtifactPreview.value = null
   activeReference.value = null
   selectedKnowledgeRefs.value = []
   isRightPanelCollapsed.value = false
@@ -1078,19 +1401,21 @@ function resetConversationDraft() {
 async function newTask() {
   resetConversationDraft()
   isChatActive.value = false
+  showHistoryBrowser.value = false
   showHistory.value = true
-  showRecommendations.value = false
+  showRecommendations.value = true
 }
 
 function openConversation(item: ConversationItem) {
   isChatActive.value = true
+  showHistoryBrowser.value = false
   showHistory.value = true
   activeConversationId.value = item.id
   activeConversationTitle.value = item.title
   runMode.value = item.mode === '专家模式' ? 'task' : 'quick'
   selectedAgent.value = item.mode === '专家模式' ? 'solution' : 'knowledge'
   hasGeneratedAssets.value = item.mode === '专家模式'
-  isRightPanelCollapsed.value = item.mode !== '专家模式'
+  activeArtifactPreview.value = null
   messages.value = [
     {
       id: `history-user-${item.id}`,
@@ -1143,6 +1468,7 @@ function deleteConversation(id: string) {
 
 function resetToHome() {
   isChatActive.value = false
+  showHistoryBrowser.value = false
   showHistory.value = false
   resetConversationDraft()
 }
@@ -1200,7 +1526,7 @@ onBeforeUnmount(() => {
         <Plus class="h-4 w-4" />
       </button>
     </div>
-    <div v-if="hasSessionAssets && isRightPanelCollapsed" data-testid="home-right-dock" class="fixed right-3 top-[4.75rem] z-40">
+    <div v-if="false" data-testid="home-right-dock" class="fixed right-3 top-[4.75rem] z-40">
       <div class="flex items-center gap-2">
         <button
           class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-600 transition hover:border-zinc-300 hover:bg-zinc-50"
@@ -1216,20 +1542,30 @@ onBeforeUnmount(() => {
         class="fixed inset-y-0 left-0 z-50 flex w-[clamp(286px,21vw,400px)] flex-col border-r border-zinc-200 bg-white transition-transform duration-300 lg:top-16 lg:h-[calc(100vh-4rem)]"
         :class="showHistory ? 'translate-x-0' : '-translate-x-full'"
       >
-        <div data-testid="home-sidebar-subheader" class="flex h-16 items-center gap-3 border-b border-zinc-100 px-3">
-          <button
-            class="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
-            aria-label="新建任务"
-            title="新建任务"
-            @click="newTask"
-          >
-            <Plus class="h-4 w-4" />
-            新建任务
-          </button>
+        <div data-testid="home-sidebar-subheader" class="flex items-center justify-between gap-2 border-b border-zinc-100 px-3 py-3">
+          <div class="group/title min-w-0 flex-1">
+            <div v-if="editingSidebarTitle" class="flex items-center gap-1">
+              <input
+                v-model="sidebarTitleDraft"
+                class="h-7 min-w-0 flex-1 rounded-lg border border-blue-200 bg-white px-2 text-sm font-semibold text-zinc-900 outline-none ring-2 ring-blue-50"
+                aria-label="修改侧边栏标题"
+                @keydown.enter.prevent="commitSidebarTitle"
+                @keydown.esc.prevent="editingSidebarTitle = false"
+                @blur="commitSidebarTitle"
+              />
+            </div>
+            <div v-else class="flex min-w-0 items-center gap-1">
+              <div class="truncate text-sm font-semibold text-zinc-900">{{ sidebarTitle }}</div>
+              <button type="button" class="rounded-md p-1 text-zinc-300 opacity-0 transition hover:bg-zinc-100 hover:text-zinc-700 group-hover/title:opacity-100" aria-label="修改侧边栏标题" @click="beginEditSidebarTitle">
+                <Pencil class="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <div class="mt-0.5 text-[11px] text-zinc-400">按模式预览最近任务</div>
+          </div>
           <button
             type="button"
             data-testid="home-sidebar-toggle"
-            class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-zinc-200 bg-white text-zinc-500 shadow-sm hover:bg-zinc-50"
+            class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-500 hover:bg-zinc-50"
             aria-label="收起历史对话栏"
             @click="showHistory = false"
           >
@@ -1237,153 +1573,51 @@ onBeforeUnmount(() => {
           </button>
         </div>
         <div class="space-y-3 border-b border-zinc-100 p-3">
-          <div class="grid grid-cols-2 gap-1 rounded-full bg-zinc-100 p-1">
-            <button
-              class="rounded-full px-3 py-2 text-center text-sm font-semibold transition"
-              :class="runMode === 'quick' ? 'bg-zinc-950 text-white' : 'text-zinc-500 hover:text-zinc-800'"
-              @click.stop="selectMode('quick')"
-            >
-              日常办公
+          <div class="grid gap-1">
+            <button type="button" class="flex min-h-[38px] items-center gap-2 rounded-lg px-2.5 text-left text-xs font-medium text-zinc-600 transition hover:bg-zinc-50 hover:text-zinc-900" @click="newTask">
+              <Plus class="h-3.5 w-3.5" />
+              <span class="min-w-0 flex-1">新对话</span>
             </button>
-            <button
-              class="rounded-full px-3 py-2 text-center text-sm font-semibold transition"
-              :class="runMode === 'task' ? 'bg-zinc-950 text-white' : 'text-zinc-500 hover:text-zinc-800'"
-              @click.stop="selectMode('task')"
-            >
-              专家模式
+            <button type="button" class="flex min-h-[38px] items-center gap-2 rounded-lg px-2.5 text-left text-xs font-medium text-zinc-600 transition hover:bg-zinc-50 hover:text-zinc-900" @click="openHistoryBrowser">
+              <History class="h-3.5 w-3.5" />
+              <span class="min-w-0 flex-1">历史会话</span>
             </button>
           </div>
-          <label class="flex h-9 items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-xs text-zinc-400">
-            <Search class="h-3.5 w-3.5" />
-            <input
-              v-model="conversationSearch"
-              class="min-w-0 flex-1 bg-transparent outline-none"
-              placeholder="搜索任务"
-              aria-label="搜索任务"
-            />
-          </label>
         </div>
         <div class="flex-1 overflow-y-auto p-2">
-          <div class="px-2 pb-2 text-[11px] font-medium text-zinc-400">任务队列 · {{ modeLabel }}</div>
-          <div
-            v-for="item in pinnedConversations"
-            :key="item.id"
-            data-testid="history-conversation-item"
-            class="group rounded-lg border border-transparent px-3 py-2.5 transition hover:border-blue-200 hover:bg-blue-50"
-            :class="activeConversationId === item.id ? 'border-blue-200 bg-blue-50' : item.pinned ? 'bg-amber-50/70' : ''"
-            @click="openConversation(item)"
-          >
-            <div class="flex items-center gap-2">
-              <span class="h-2.5 w-2.5 shrink-0 rounded-full" :class="getConversationStatusClass(item.status)" />
-              <Pin v-if="item.pinned" class="h-3.5 w-3.5 shrink-0 fill-amber-500 text-amber-500" />
-              <input
-                v-if="editingConversationId === item.id"
-                v-model="editingConversationTitle"
-                class="min-w-0 flex-1 rounded-md border border-amber-200 bg-white px-2 py-1 text-sm font-medium text-zinc-900 outline-none ring-2 ring-amber-100"
-                aria-label="修改会话标题"
-                @click.stop
-                @keydown.enter.prevent.stop="commitRenameConversation(item.id)"
-                @keydown.esc.prevent.stop="editingConversationId = ''; editingConversationTitle = ''"
-                @blur="commitRenameConversation(item.id)"
-              />
-              <span v-else class="min-w-0 flex-1 truncate text-sm font-medium text-zinc-800">{{ item.title }}</span>
-              <span class="shrink-0 rounded-md border border-amber-200 bg-white/80 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">{{ item.mode }}任务</span>
-            </div>
-            <div class="mt-2 flex items-center justify-between gap-2">
-              <div class="flex min-w-0 items-center gap-1.5 text-[11px] text-zinc-400">
-                <span>{{ item.time }}</span>
-                <span>·</span>
-                <span>{{ item.mode }}</span>
-                <span>·</span>
-                <span>{{ getConversationStatusLabel(item.status) }}</span>
+          <div v-for="group in sidebarConversationGroups" :key="group.key" class="mb-4">
+            <button type="button" class="mb-1 flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-[11px] font-medium text-zinc-400 transition hover:bg-zinc-50 hover:text-zinc-700" :aria-expanded="!isSidebarGroupCollapsed(group.key)" @click="toggleSidebarGroup(group.key)">
+              <span class="inline-flex min-w-0 items-center gap-1.5">
+                <ChevronRight class="h-3.5 w-3.5 transition" :class="isSidebarGroupCollapsed(group.key) ? '' : 'rotate-90'" />
+                <span>{{ group.label }}</span>
+              </span>
+              <span>{{ group.items.length }}</span>
+            </button>
+            <template v-if="!isSidebarGroupCollapsed(group.key)">
+            <button
+              v-for="item in group.items.slice(0, 3)"
+              :key="item.id"
+              data-testid="history-conversation-item"
+              type="button"
+              class="group mb-1 w-full rounded-lg border border-transparent px-3 py-2.5 text-left transition hover:border-blue-200 hover:bg-blue-50"
+              :class="activeConversationId === item.id ? 'border-blue-200 bg-blue-50' : ''"
+              @click="openConversation(item)"
+            >
+              <div class="flex items-center gap-2">
+                <span class="h-2.5 w-2.5 shrink-0 rounded-full" :class="getConversationStatusClass(item.status)" />
+                <span class="min-w-0 flex-1 truncate text-sm font-medium text-zinc-800">{{ item.title }}</span>
               </div>
-              <div class="flex items-center gap-0.5 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
-                <button
-                  type="button"
-                  class="rounded-md p-1 text-zinc-400 hover:bg-white hover:text-amber-600"
-                  :aria-label="item.pinned ? '取消置顶' : '置顶会话'"
-                  @click.stop="toggleConversationPinned(item.id)"
-                >
-                  <Pin class="h-3.5 w-3.5" :class="item.pinned ? 'fill-amber-500 text-amber-500' : ''" />
-                </button>
-                <button
-                  type="button"
-                  class="rounded-md p-1 text-zinc-400 hover:bg-white hover:text-zinc-800"
-                  aria-label="修改标题"
-                  @click.stop="beginRenameConversation(item)"
-                >
-                  <Pencil class="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  class="rounded-md p-1 text-zinc-400 hover:bg-white hover:text-red-600"
-                  aria-label="删除会话"
-                  @click.stop="deleteConversation(item.id)"
-                >
-                  <Trash2 class="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-          </div>
-          <div v-if="pinnedConversations.length && regularConversations.length" data-testid="history-pinned-divider" class="my-2 border-t border-zinc-200 px-2 pt-2 text-[11px] font-medium text-zinc-400">
-            其他任务
-          </div>
-          <div
-            v-for="item in regularConversations"
-            :key="item.id"
-            data-testid="history-conversation-item"
-            class="group rounded-lg border border-transparent px-3 py-2.5 transition hover:border-blue-200 hover:bg-blue-50"
-            :class="activeConversationId === item.id ? 'border-blue-200 bg-blue-50' : ''"
-            @click="openConversation(item)"
-          >
-            <div class="flex items-center gap-2">
-              <span class="h-2.5 w-2.5 shrink-0 rounded-full" :class="getConversationStatusClass(item.status)" />
-              <input
-                v-if="editingConversationId === item.id"
-                v-model="editingConversationTitle"
-                class="min-w-0 flex-1 rounded-md border border-amber-200 bg-white px-2 py-1 text-sm font-medium text-zinc-900 outline-none ring-2 ring-amber-100"
-                aria-label="修改会话标题"
-                @click.stop
-                @keydown.enter.prevent.stop="commitRenameConversation(item.id)"
-                @keydown.esc.prevent.stop="editingConversationId = ''; editingConversationTitle = ''"
-                @blur="commitRenameConversation(item.id)"
-              />
-              <span v-else class="min-w-0 flex-1 truncate text-sm font-medium text-zinc-800">{{ item.title }}</span>
-              <span class="shrink-0 rounded-md border border-zinc-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-zinc-500">{{ item.mode }}任务</span>
-            </div>
-            <div class="mt-2 flex items-center justify-between gap-2">
-              <div class="flex min-w-0 items-center gap-1.5 text-[11px] text-zinc-400">
-                <span>{{ item.time }}</span>
-                <span>·</span>
-                <span>{{ getConversationStatusLabel(item.status) }}</span>
-              </div>
-              <div class="flex items-center gap-0.5 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
-                <button
-                  type="button"
-                  class="rounded-md p-1 text-zinc-400 hover:bg-white hover:text-amber-600"
-                  :aria-label="item.pinned ? '取消置顶' : '置顶会话'"
-                  @click.stop="toggleConversationPinned(item.id)"
-                >
-                  <Pin class="h-3.5 w-3.5" :class="item.pinned ? 'fill-amber-500 text-amber-500' : ''" />
-                </button>
-                <button
-                  type="button"
-                  class="rounded-md p-1 text-zinc-400 hover:bg-white hover:text-zinc-800"
-                  aria-label="修改标题"
-                  @click.stop="beginRenameConversation(item)"
-                >
-                  <Pencil class="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  class="rounded-md p-1 text-zinc-400 hover:bg-white hover:text-red-600"
-                  aria-label="删除会话"
-                  @click.stop="deleteConversation(item.id)"
-                >
-                  <Trash2 class="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
+              <div class="mt-1.5 truncate pl-4 text-[11px] leading-5 text-zinc-400">{{ item.time }} · {{ getConversationStatusLabel(item.status) }}</div>
+            </button>
+            <button
+              v-if="group.items.length > 3"
+              type="button"
+              class="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-zinc-400 hover:bg-zinc-50 hover:text-zinc-700"
+              @click="openHistoryBrowser"
+            >
+              更多 {{ group.label }} 会话...
+            </button>
+            </template>
           </div>
         </div>
       </aside>
@@ -1391,9 +1625,9 @@ onBeforeUnmount(() => {
       <main class="flex min-h-[calc(100vh-3.5rem)] flex-col px-[clamp(12px,2.2vw,34px)] py-[clamp(14px,1.6vw,24px)] md:min-h-[calc(100vh-4rem)]">
         <input ref="fileInput" class="hidden" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg" @change="handleFiles" />
         <section
-          v-if="!isChatActive"
+          v-if="!isChatActive && !showHistoryBrowser"
           data-testid="home-hero-section"
-          class="mx-auto flex flex-1 flex-col items-center justify-center pb-[clamp(24px,4vw,48px)] transition-[width,transform] duration-300"
+          class="mx-auto flex flex-1 flex-col items-center justify-start pb-[clamp(18px,3vw,36px)] pt-[clamp(58px,10vh,118px)] transition-[width,transform] duration-300"
           :style="homeHeroStyle"
         >
           <div class="mb-7 text-center">
@@ -1401,8 +1635,15 @@ onBeforeUnmount(() => {
             <h1 class="text-[clamp(24px,2.2vw,40px)] font-semibold leading-tight tracking-tight text-zinc-950">小马在线，有事随时说</h1>
           </div>
 
-          <div data-testid="hero-composer" class="mx-auto w-full max-w-[920px] rounded-[28px] border border-zinc-200 bg-white p-3 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-            <div class="flex items-start gap-2">
+          <div data-testid="hero-composer" class="composer-shell mx-auto w-full max-w-[920px] rounded-[28px] border border-zinc-200 bg-white p-3 shadow-[0_18px_60px_rgba(15,23,42,0.08)]" @pointermove="updateComposerGlow" @pointerleave="resetComposerGlow">
+            <div class="flex items-start gap-2 px-2">
+              <div v-if="runMode === 'task' && selectedExpert" class="mt-2 inline-flex max-w-[180px] shrink-0 items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-1.5 text-sm font-medium text-violet-700">
+                <Sparkles class="h-3.5 w-3.5 shrink-0" />
+                <span class="truncate">{{ selectedExpert.label }}</span>
+                <button type="button" class="rounded-md p-0.5 hover:bg-violet-100" aria-label="移除已选专家" @click="clearSelectedExpert">
+                  <X class="h-3.5 w-3.5" />
+                </button>
+              </div>
               <textarea
                 ref="composer"
                 v-model="query"
@@ -1417,8 +1658,8 @@ onBeforeUnmount(() => {
               />
               <button
                 class="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition"
-                :class="query.trim() || selectedFiles.length ? 'bg-zinc-950 text-white hover:bg-zinc-800' : 'bg-zinc-100 text-zinc-300'"
-                :disabled="isThinking || (!query.trim() && !selectedFiles.length)"
+                :class="canSend ? 'bg-zinc-950 text-white hover:bg-zinc-800' : 'cursor-not-allowed bg-zinc-100 text-zinc-300'"
+                :disabled="!canSend"
                 :aria-label="isThinking ? '小马正在生成中' : '发送给小马'"
                 @click="sendMessage"
               >
@@ -1478,13 +1719,14 @@ onBeforeUnmount(() => {
               <div class="relative">
                 <button
                   type="button"
-                  class="inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition"
-                  :class="runMode === 'quick' ? 'border-orange-200 bg-orange-50 text-orange-700' : 'border-violet-200 bg-violet-50 text-violet-700'"
+                  class="inline-flex h-8 items-center gap-1.5 px-2 text-xs font-medium transition"
+                  :class="'text-zinc-950'"
                   aria-label="选择模式"
                   @click.stop="modeMenuOpen = !modeMenuOpen; agentMenuOpen = false"
                 >
                   <Zap v-if="runMode === 'quick'" class="h-3.5 w-3.5" />
-                  <Bot v-else class="h-3.5 w-3.5" />
+                  <Bot v-else-if="runMode === 'task'" class="h-3.5 w-3.5" />
+                  <CalendarDays v-else class="h-3.5 w-3.5" />
                   {{ modeLabel }}
                   <ChevronDown class="h-3.5 w-3.5" />
                 </button>
@@ -1493,7 +1735,7 @@ onBeforeUnmount(() => {
                     <Zap class="mt-0.5 h-4 w-4 text-orange-500" />
                     <span class="min-w-0 flex-1">
                       <span class="block text-sm font-medium text-zinc-900">日常办公</span>
-                      <span class="block text-xs leading-5 text-zinc-400">适用于大部分情况</span>
+                      <span class="block text-xs leading-5 text-zinc-400">适合日常轻度办公任务</span>
                     </span>
                     <CheckCircle2 v-if="runMode === 'quick'" class="mt-0.5 h-4 w-4 text-blue-600" />
                   </button>
@@ -1501,17 +1743,24 @@ onBeforeUnmount(() => {
                     <Bot class="mt-0.5 h-4 w-4 text-violet-600" />
                     <span class="min-w-0 flex-1">
                       <span class="block text-sm font-medium text-zinc-900">专家模式</span>
-                      <span class="block text-xs leading-5 text-zinc-400">适合拆解任务并生成产物</span>
+                      <span class="block text-xs leading-5 text-zinc-400">处理复杂的专项类任务</span>
                     </span>
                     <CheckCircle2 v-if="runMode === 'task'" class="mt-0.5 h-4 w-4 text-blue-600" />
                   </button>
+                  <button type="button" data-testid="mode-option-schedule" class="flex w-full items-start gap-2 rounded-xl px-3 py-2.5 text-left hover:bg-zinc-50" @click.stop="selectMode('schedule')">
+                    <CalendarDays class="mt-0.5 h-4 w-4 text-blue-600" />
+                    <span class="min-w-0 flex-1">
+                      <span class="block text-sm font-medium text-zinc-900">定时任务</span>
+                      <span class="block text-xs leading-5 text-zinc-400">设置周期性自动化任务</span>
+                    </span>
+                    <CheckCircle2 v-if="runMode === 'schedule'" class="mt-0.5 h-4 w-4 text-blue-600" />
+                  </button>
                 </div>
               </div>
-              <div class="group/agent relative ml-auto">
+              <div v-if="runMode === 'task' && selectedExpert" class="group/agent relative ml-auto">
                 <button
                   type="button"
-                  class="inline-flex h-8 min-w-32 items-center justify-between gap-2 rounded-full border px-3 text-xs font-medium"
-                  :class="runMode === 'quick' ? 'border-orange-200 bg-orange-50 text-orange-700' : 'border-violet-200 bg-violet-50 text-violet-700'"
+                  class="inline-flex h-8 min-w-28 items-center justify-between gap-2 px-2 text-xs font-medium text-violet-700"
                   :aria-label="`选择${agentSelectLabel}`"
                   @click.stop="agentMenuOpen = !agentMenuOpen; modeMenuOpen = false"
                 >
@@ -1531,7 +1780,7 @@ onBeforeUnmount(() => {
                     :class="agent.value.startsWith('soon') ? 'cursor-not-allowed text-zinc-300' : 'text-zinc-700 hover:bg-zinc-50'"
                     @click.stop="selectAgent(agent.value)"
                   >
-                    <Sparkles class="h-4 w-4 shrink-0" :class="runMode === 'quick' ? 'text-orange-500' : 'text-violet-500'" />
+                    <Sparkles class="h-4 w-4 shrink-0 text-violet-500" />
                     <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ agent.label }}</span>
                     <CheckCircle2 v-if="selectedAgent === agent.value" class="h-4 w-4 shrink-0 text-blue-600" />
                   </button>
@@ -1539,11 +1788,31 @@ onBeforeUnmount(() => {
               </div>
             </div>
 
+            <div v-if="runMode === 'schedule'" class="schedule-panel mt-3">
+              <div class="schedule-row">
+                <span class="schedule-title">周期</span>
+                <select :value="scheduleCycle" class="schedule-field schedule-field-main" aria-label="选择定时周期" @change="updateScheduleCycle(($event.target as HTMLSelectElement).value as ScheduleCycle)">
+                  <option v-for="cycle in scheduleCycles" :key="cycle.value" :value="cycle.value">{{ cycle.label }}</option>
+                </select>
+                <input v-if="scheduleCycle === 'once'" v-model="scheduleDate" type="date" class="schedule-field schedule-field-main" aria-label="选择执行日期" />
+                <select v-else-if="scheduleCycle === 'weekly'" v-model="scheduleWeekday" class="schedule-field schedule-field-main" aria-label="选择星期">
+                  <option v-for="day in weekdayOptions" :key="day" :value="day">{{ day }}</option>
+                </select>
+                <select v-else-if="scheduleCycle === 'monthly'" v-model="scheduleMonthDay" class="schedule-field schedule-field-main" aria-label="选择日期">
+                  <option v-for="day in monthDayOptions" :key="day" :value="day">{{ day }}</option>
+                </select>
+                <span v-else-if="scheduleCycle !== 'cron'" class="schedule-field schedule-field-main schedule-field-muted">{{ scheduleCycle === 'daily' ? '每天' : '周一至周五' }}</span>
+                <input v-if="scheduleCycle === 'cron'" v-model="scheduleCron" class="schedule-field schedule-field-cron font-mono" placeholder="0 9 * * *" aria-label="输入 Cron 表达式" />
+                <input v-else v-model="scheduleTime" type="time" class="schedule-field schedule-field-main" aria-label="输入执行时间" />
+                <span class="schedule-summary">{{ scheduleCycle === 'cron' ? '例：0 9 * * *' : scheduleSummary }}</span>
+              </div>
+            </div>
+
           </div>
 
           <Transition name="recommend">
-            <div v-if="showRecommendations" data-testid="home-case-section" class="mt-12 w-full">
-              <div v-if="selectedAgent === 'allround' && runMode === 'quick'" class="mb-7 flex justify-center gap-10 text-sm">
+            <div v-if="showRecommendations" data-testid="home-case-section" class="mt-8 w-full">
+              <div v-if="runMode === 'quick'" class="mb-7 flex justify-center gap-10 text-sm">
                 <button
                   v-for="category in ['精选案例', '咨询调研', 'office办公', '应用开发']"
                   :key="category"
@@ -1555,32 +1824,83 @@ onBeforeUnmount(() => {
                   {{ category }}
                 </button>
               </div>
-              <div v-else class="mb-7 flex justify-center text-sm">
-                <span class="border-b-2 border-zinc-950 px-1 pb-1 font-semibold text-zinc-950">精选案例</span>
+
+              <div v-if="runMode === 'task' && !selectedExpert" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <button
+                  v-for="expert in expertAgents"
+                  :key="expert.value"
+                  type="button"
+                  class="group min-h-56 rounded-2xl border border-zinc-200 bg-white p-5 text-center transition hover:border-violet-200 hover:bg-violet-50/30"
+                  :class="expert.value === 'soon' ? 'cursor-not-allowed opacity-60' : ''"
+                  @click="selectAgent(expert.value)"
+                >
+                  <div class="relative mx-auto grid h-20 w-20 place-items-center rounded-full border border-violet-100 bg-white">
+                    <div class="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br text-lg font-semibold text-white" :class="expert.accent">
+                      {{ expert.label.slice(0, 1) }}
+                    </div>
+                    <span class="absolute right-0 top-0 rounded-lg border border-orange-200 bg-orange-50 px-2 py-0.5 text-xs font-semibold text-orange-600">{{ expert.level }}</span>
+                  </div>
+                  <div class="mt-4 text-base font-semibold text-zinc-950">{{ expert.label }}</div>
+                  <div class="mt-2 inline-flex rounded-full bg-violet-50 px-3 py-1 text-xs font-medium text-violet-600">{{ expert.role }}</div>
+                  <p class="mx-auto mt-3 line-clamp-2 max-w-52 text-sm leading-6 text-zinc-500">{{ expert.desc }}</p>
+                </button>
               </div>
-              <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+
+              <div v-else-if="runMode === 'task' && selectedExpert" class="grid items-start gap-5 lg:grid-cols-[280px_1fr]">
+                <div class="group relative min-h-56 rounded-2xl border border-violet-200 bg-white p-5 text-center transition hover:bg-violet-50/40">
+                  <button type="button" class="absolute right-3 top-3 inline-flex h-7 w-7 items-center justify-center rounded-lg text-zinc-300 opacity-0 transition hover:bg-white hover:text-zinc-700 group-hover:opacity-100" aria-label="移除已选专家" @click.stop="clearSelectedExpert">
+                    <X class="h-3.5 w-3.5" />
+                  </button>
+                  <button type="button" class="block w-full text-center" @click="clearSelectedExpert">
+                  <div class="relative mx-auto grid h-20 w-20 place-items-center rounded-full border border-violet-100 bg-white">
+                    <div class="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br text-lg font-semibold text-white" :class="selectedExpert.accent">
+                      {{ selectedExpert.label.slice(0, 1) }}
+                    </div>
+                    <span class="absolute right-0 top-0 rounded-lg border border-orange-200 bg-orange-50 px-2 py-0.5 text-xs font-semibold text-orange-600">{{ selectedExpert.level }}</span>
+                  </div>
+                  <div class="mt-4 text-base font-semibold text-zinc-950">{{ selectedExpert.label }}</div>
+                  <div class="mt-2 inline-flex rounded-full bg-violet-50 px-3 py-1 text-xs font-medium text-violet-600">{{ selectedExpert.role }}</div>
+                  <p class="mx-auto mt-3 line-clamp-2 max-w-52 text-sm leading-6 text-zinc-500">{{ selectedExpert.desc }}</p>
+                  </button>
+                </div>
+                <div class="min-w-0 pt-1">
+                  <div class="mb-3 text-left text-sm font-semibold text-zinc-900">精选示例</div>
+                  <div class="flex flex-wrap content-start gap-3">
+                  <button
+                    v-for="(item, index) in visibleCases"
+                    :key="item.title"
+                    type="button"
+                    class="max-w-[min(520px,100%)] rounded-[22px] bg-zinc-100 px-5 py-3 text-left text-base leading-7 text-zinc-900 transition hover:bg-violet-50 hover:text-violet-700"
+                    :class="[
+                      index % 5 === 0 ? 'w-[280px]' : '',
+                      index % 5 === 1 ? 'w-[220px]' : '',
+                      index % 5 === 2 ? 'w-[340px]' : '',
+                      index % 5 === 3 ? 'w-[260px]' : '',
+                      index % 5 === 4 ? 'w-[300px]' : '',
+                    ]"
+                    @click="fillPrompt(item, runMode); showRecommendations = true"
+                  >
+                    <span class="block truncate">{{ item.bubble ?? item.title }}</span>
+                  </button>
+                  </div>
+                </div>
+              </div>
+
+              <div v-else class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <button
                   v-for="(item, index) in visibleCases"
                   :key="item.title"
-                  class="group h-36 overflow-hidden rounded-2xl border border-zinc-200 bg-white text-left shadow-[0_10px_28px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-[0_16px_42px_rgba(15,23,42,0.08)]"
+                  class="group min-h-32 rounded-2xl border border-zinc-200 bg-white p-4 text-left transition hover:border-blue-200 hover:bg-blue-50/30"
                   @click="fillPrompt(item, runMode); showRecommendations = true"
                 >
-                  <div class="relative flex h-full flex-col">
-                    <div class="z-10 px-5 pt-4">
-                      <div class="truncate text-base font-semibold text-zinc-950">{{ item.title }}</div>
+                  <div class="flex h-full gap-3">
+                    <div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl" :class="index % 3 === 0 ? 'bg-blue-50 text-blue-600' : index % 3 === 1 ? 'bg-orange-50 text-orange-600' : 'bg-emerald-50 text-emerald-600'">
+                      <component :is="'icon' in item ? item.icon : LayoutGrid" class="h-5 w-5" />
                     </div>
-                    <div class="relative mt-auto h-24 overflow-hidden bg-gradient-to-br" :class="[
-                      index % 4 === 0 ? 'from-blue-50 via-indigo-50 to-white' : '',
-                      index % 4 === 1 ? 'from-emerald-50 via-lime-50 to-white' : '',
-                      index % 4 === 2 ? 'from-violet-50 via-sky-50 to-white' : '',
-                      index % 4 === 3 ? 'from-slate-50 via-blue-50 to-white' : '',
-                    ]">
-                      <div class="absolute left-8 top-7 h-12 w-28 rounded-xl border border-white/80 bg-white/70 shadow-sm transition group-hover:translate-y-[-2px]" />
-                      <div class="absolute right-7 top-5 grid h-11 w-11 place-items-center rounded-xl border border-white/80 bg-white/80 shadow-sm">
-                        <component :is="'icon' in item ? item.icon : LayoutGrid" class="h-5 w-5 text-blue-600" />
-                      </div>
-                      <div class="absolute bottom-3 left-16 h-2 w-32 rounded-full bg-white/80" />
-                      <div class="absolute bottom-8 right-20 h-2 w-20 rounded-full bg-white/70" />
+                    <div class="min-w-0">
+                      <div class="truncate text-base font-semibold text-zinc-950">{{ item.title }}</div>
+                      <div class="mt-2 line-clamp-2 text-sm leading-6 text-zinc-500">{{ item.desc }}</div>
+                      <div class="mt-3 text-xs text-blue-500">引用 {{ item.kb }}</div>
                     </div>
                   </div>
                 </button>
@@ -1590,15 +1910,81 @@ onBeforeUnmount(() => {
         </section>
 
         <section
+          v-else-if="showHistoryBrowser"
+          data-testid="history-browser-section"
+          class="mx-auto flex h-[calc(100vh-5.5rem)] w-full max-w-[1180px] flex-col transition-[width,transform] duration-300"
+          :style="homeHeroStyle"
+        >
+          <div class="mb-5 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h1 class="text-2xl font-semibold tracking-tight text-zinc-950">历史会话</h1>
+              <p class="mt-1 text-sm text-zinc-500">按任务模式浏览全部会话，侧边栏只保留最近预览。</p>
+            </div>
+            <button type="button" class="inline-flex h-10 items-center gap-2 rounded-xl bg-zinc-950 px-4 text-sm font-medium text-white hover:bg-zinc-800" @click="newTask">
+              <Plus class="h-4 w-4" />
+              新对话
+            </button>
+          </div>
+          <div class="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-zinc-200 bg-white p-3">
+            <label class="flex h-10 min-w-[260px] flex-1 items-center gap-2 rounded-xl bg-zinc-50 px-3 text-sm text-zinc-400">
+              <Search class="h-4 w-4" />
+              <input v-model="historyBrowserSearch" class="min-w-0 flex-1 bg-transparent outline-none placeholder:text-zinc-300" placeholder="搜索标题、内容、时间或状态" />
+            </label>
+            <div class="inline-flex rounded-xl bg-zinc-100 p-1">
+              <button
+                v-for="option in [
+                  { key: 'all', label: '全部' },
+                  { key: 'task', label: '专家模式' },
+                  { key: 'quick', label: '日常办公' },
+                  { key: 'schedule', label: '定时任务' },
+                ]"
+                :key="option.key"
+                type="button"
+                class="rounded-lg px-3 py-2 text-xs font-medium transition"
+                :class="historyBrowserModeFilter === option.key ? 'bg-white text-zinc-950 shadow-sm' : 'text-zinc-500 hover:text-zinc-800'"
+                @click="historyBrowserModeFilter = option.key as 'all' | RunMode"
+              >
+                {{ option.label }}
+              </button>
+            </div>
+          </div>
+          <div class="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-zinc-200 bg-white">
+            <button
+              v-for="item in historyBrowserConversations"
+              :key="item.id"
+              type="button"
+              class="group grid w-full gap-3 border-b border-zinc-100 px-5 py-4 text-left transition last:border-b-0 hover:bg-zinc-50 md:grid-cols-[1fr_160px_120px]"
+              @click="openConversation(item)"
+            >
+              <div class="min-w-0">
+                <div class="flex items-center gap-2">
+                  <span class="h-2.5 w-2.5 shrink-0 rounded-full" :class="getConversationStatusClass(item.status)" />
+                  <span class="truncate text-sm font-semibold text-zinc-950">{{ item.title }}</span>
+                </div>
+                <p class="mt-1 line-clamp-2 pl-4 text-xs leading-5 text-zinc-500">{{ getConversationDetail(item) }}</p>
+              </div>
+              <div class="flex items-center gap-2 text-xs text-zinc-500 md:justify-end">
+                <span class="rounded-full border border-zinc-200 bg-white px-2 py-1">{{ item.mode }}</span>
+                <span>{{ getConversationStatusLabel(item.status) }}</span>
+              </div>
+              <div class="flex items-center text-xs text-zinc-400 md:justify-end">{{ item.time }}</div>
+            </button>
+            <div v-if="!historyBrowserConversations.length" class="grid h-64 place-items-center text-sm text-zinc-400">
+              没有找到匹配的历史会话
+            </div>
+          </div>
+        </section>
+
+        <section
           v-else
           data-testid="responsive-chat-shell"
           :data-conversation-anchor="activeConversationId || 'draft'"
           class="mx-auto flex h-[calc(100vh-5.5rem)] w-full flex-1 flex-col"
           :style="chatShellStyle"
         >
-          <div class="mb-3 flex h-10 items-center justify-center">
+          <div class="fixed top-[4.25rem] z-30 flex h-10 items-center justify-center pointer-events-none" :style="chatTitleLayerStyle">
             <div class="flex items-center gap-2" data-testid="workspace-title-controls">
-              <div class="flex items-center justify-center gap-2">
+              <div class="pointer-events-auto flex items-center justify-center gap-2 rounded-full bg-[#f6f7f9]/90 px-3 py-1 backdrop-blur">
                 <h1 class="truncate text-center text-base font-semibold">{{ chatTitle }}</h1>
                 <span class="rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[11px] text-zinc-500">{{ modeLabel }}</span>
               </div>
@@ -1607,7 +1993,7 @@ onBeforeUnmount(() => {
 
           <div
             ref="messageList"
-            class="min-h-0 flex-1 scroll-smooth space-y-5 overflow-y-auto px-0 pb-36 pt-3 md:px-2"
+            class="min-h-0 flex-1 scroll-smooth space-y-5 overflow-y-auto px-0 pb-36 pt-14 md:px-2"
             @scroll.passive="handleMessageScroll"
             @wheel.passive="markUserScrollIntent"
             @touchstart.passive="markUserScrollIntent"
@@ -1700,6 +2086,28 @@ onBeforeUnmount(() => {
                 >
                   <div v-if="message.role === 'assistant'" class="ai-markdown" v-html="renderMarkdown(message.content)" />
                   <div v-else class="whitespace-pre-wrap">{{ message.content }}</div>
+                  <div v-if="message.role === 'assistant' && hasGeneratedAssets" class="not-prose mt-4 grid gap-2 sm:grid-cols-3">
+                    <div
+                      v-for="file in generatedArtifactCards"
+                      :key="file.name"
+                      class="group flex min-w-0 items-center gap-3 rounded-xl border border-zinc-200 bg-white p-3 text-left transition hover:border-blue-200 hover:bg-blue-50/40"
+                      :class="activeArtifactPreview?.name === file.name ? 'border-blue-300 bg-blue-50/50' : ''"
+                    >
+                      <div class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-blue-50 text-blue-600">
+                        <component :is="file.icon" class="h-5 w-5" />
+                      </div>
+                      <div class="min-w-0 flex-1">
+                        <div class="truncate text-xs font-semibold text-zinc-900">{{ file.name }}</div>
+                        <div class="mt-1 text-[11px] text-zinc-400">{{ file.type }} · {{ file.size }}</div>
+                        <div class="mt-2 flex gap-2 text-[11px] font-medium text-blue-600">
+                          <button type="button" class="rounded px-1 py-0.5 hover:bg-blue-100" @click="openArtifactPreview(file)">预览</button>
+                          <button type="button" class="rounded px-1 py-0.5 hover:bg-blue-100" @click="downloadArtifact(file)">
+                            {{ copiedMessageId === `download:${file.name}` ? '已加入下载' : '下载' }}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                   <div v-if="message.role === 'assistant'" class="not-prose mt-3 flex flex-wrap items-center gap-1.5 pt-2 opacity-0 transition group-hover/message:opacity-100 group-focus-within/message:opacity-100">
                     <button class="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800" :aria-label="copiedMessageId === message.id ? '已复制回答' : '复制回答'" :title="copiedMessageId === message.id ? '已复制回答' : '复制回答'" @click="copyAnswer(message)">
                       <CheckCircle2 v-if="copiedMessageId === message.id" class="h-4 w-4 text-emerald-600" />
@@ -1753,7 +2161,7 @@ onBeforeUnmount(() => {
             >
               回到最新回复
             </button>
-            <div data-testid="responsive-composer" class="mx-auto w-full max-w-[clamp(720px,72vw,1180px)] rounded-2xl border border-white/80 bg-white/80 p-3 shadow-2xl shadow-zinc-300/40 ring-1 ring-white/70 backdrop-blur-2xl">
+            <div data-testid="responsive-composer" class="composer-shell mx-auto w-full max-w-[clamp(720px,72vw,1180px)] rounded-2xl border border-white/80 bg-white/80 p-3 shadow-2xl shadow-zinc-300/40 ring-1 ring-white/70 backdrop-blur-2xl" @pointermove="updateComposerGlow" @pointerleave="resetComposerGlow">
               <div v-if="selectedFiles.length || selectedKnowledgeRefs.length" class="mb-2 grid gap-2 px-1 sm:grid-cols-2">
                 <div v-for="refItem in selectedKnowledgeRefs" :key="refItem.kb" class="flex min-w-0 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs">
                   <Database class="h-4 w-4 shrink-0 text-emerald-600" />
@@ -1772,6 +2180,13 @@ onBeforeUnmount(() => {
                 </div>
               </div>
             <div class="flex items-end gap-2">
+              <div v-if="runMode === 'task' && selectedExpert" class="mb-1 inline-flex max-w-[160px] shrink-0 items-center gap-1.5 rounded-xl bg-violet-50 px-2.5 py-1.5 text-xs font-medium text-violet-700">
+                <Sparkles class="h-3.5 w-3.5 shrink-0" />
+                <span class="truncate">{{ selectedExpert.label }}</span>
+                <button type="button" class="rounded p-0.5 hover:bg-violet-100" aria-label="移除已选专家" @click="clearSelectedExpert">
+                  <X class="h-3 w-3" />
+                </button>
+              </div>
               <textarea
                 ref="composer"
                 v-model="query"
@@ -1786,7 +2201,7 @@ onBeforeUnmount(() => {
               <button
                 class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-zinc-950 text-white hover:bg-zinc-800 disabled:bg-zinc-100 disabled:text-zinc-300"
                 :aria-label="isThinking ? '停止生成' : '发送给小马'"
-                :disabled="!isThinking && !query.trim() && !selectedFiles.length"
+                :disabled="!isThinking && !canSend"
                 @click="isThinking ? pauseThinking() : sendMessage()"
               >
                 <Square v-if="isThinking" class="h-4 w-4 fill-current" />
@@ -1822,13 +2237,14 @@ onBeforeUnmount(() => {
                 <div class="relative">
                   <button
                     type="button"
-                    class="inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition"
-                    :class="runMode === 'quick' ? 'border-orange-200 bg-orange-50 text-orange-700' : 'border-violet-200 bg-violet-50 text-violet-700'"
+                    class="inline-flex h-8 items-center gap-1.5 px-2 text-xs font-medium transition"
+                    :class="'text-zinc-950'"
                     aria-label="选择模式"
                     @click.stop="modeMenuOpen = !modeMenuOpen; agentMenuOpen = false"
                   >
                     <Zap v-if="runMode === 'quick'" class="h-3.5 w-3.5" />
-                    <Bot v-else class="h-3.5 w-3.5" />
+                    <Bot v-else-if="runMode === 'task'" class="h-3.5 w-3.5" />
+                    <CalendarDays v-else class="h-3.5 w-3.5" />
                     {{ modeLabel }}
                     <ChevronDown class="h-3.5 w-3.5" />
                   </button>
@@ -1837,7 +2253,7 @@ onBeforeUnmount(() => {
                       <Zap class="mt-0.5 h-4 w-4 text-orange-500" />
                       <span class="min-w-0 flex-1">
                         <span class="block text-sm font-medium text-zinc-900">日常办公</span>
-                    <span class="block text-xs leading-5 text-zinc-400">适用于大部分情况</span>
+                        <span class="block text-xs leading-5 text-zinc-400">适合日常轻度办公任务</span>
                       </span>
                       <CheckCircle2 v-if="runMode === 'quick'" class="mt-0.5 h-4 w-4 text-blue-600" />
                     </button>
@@ -1845,17 +2261,24 @@ onBeforeUnmount(() => {
                       <Bot class="mt-0.5 h-4 w-4 text-violet-600" />
                       <span class="min-w-0 flex-1">
                         <span class="block text-sm font-medium text-zinc-900">专家模式</span>
-                        <span class="block text-xs leading-5 text-zinc-400">适合拆解任务并生成产物</span>
+                        <span class="block text-xs leading-5 text-zinc-400">处理复杂的专项类任务</span>
                       </span>
                       <CheckCircle2 v-if="runMode === 'task'" class="mt-0.5 h-4 w-4 text-blue-600" />
                     </button>
+                    <button type="button" data-testid="mode-option-schedule" class="flex w-full items-start gap-2 rounded-xl px-3 py-2.5 text-left hover:bg-zinc-50" @click.stop="selectMode('schedule')">
+                      <CalendarDays class="mt-0.5 h-4 w-4 text-blue-600" />
+                      <span class="min-w-0 flex-1">
+                        <span class="block text-sm font-medium text-zinc-900">定时任务</span>
+                        <span class="block text-xs leading-5 text-zinc-400">设置周期性自动化任务</span>
+                      </span>
+                      <CheckCircle2 v-if="runMode === 'schedule'" class="mt-0.5 h-4 w-4 text-blue-600" />
+                    </button>
                   </div>
                 </div>
-                <div class="relative ml-auto">
+                <div v-if="runMode === 'task' && selectedExpert" class="relative ml-auto">
                   <button
                     type="button"
-                    class="inline-flex h-8 min-w-32 items-center justify-between gap-2 rounded-full border px-3 text-xs font-medium"
-                    :class="runMode === 'quick' ? 'border-orange-200 bg-orange-50 text-orange-700' : 'border-violet-200 bg-violet-50 text-violet-700'"
+                    class="inline-flex h-8 min-w-28 items-center justify-between gap-2 px-2 text-xs font-medium text-violet-700"
                     :aria-label="`选择${agentSelectLabel}`"
                     @click.stop="agentMenuOpen = !agentMenuOpen; modeMenuOpen = false"
                   >
@@ -1872,7 +2295,7 @@ onBeforeUnmount(() => {
                       :class="agent.value.startsWith('soon') ? 'cursor-not-allowed text-zinc-300' : 'text-zinc-700 hover:bg-zinc-50'"
                       @click.stop="selectAgent(agent.value)"
                     >
-                      <Sparkles class="h-4 w-4 shrink-0" :class="runMode === 'quick' ? 'text-orange-500' : 'text-violet-500'" />
+                      <Sparkles class="h-4 w-4 shrink-0 text-violet-500" />
                       <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ agent.label }}</span>
                       <CheckCircle2 v-if="selectedAgent === agent.value" class="h-4 w-4 shrink-0 text-blue-600" />
                     </button>
@@ -1882,10 +2305,92 @@ onBeforeUnmount(() => {
                   <span class="h-3.5 w-3.5 rounded-full bg-white" />
                 </span>
               </div>
+              <div v-if="runMode === 'schedule'" class="schedule-panel mt-3">
+                <div class="schedule-row">
+                  <span class="schedule-title">周期</span>
+                  <select :value="scheduleCycle" class="schedule-field schedule-field-main" aria-label="选择定时周期" @change="updateScheduleCycle(($event.target as HTMLSelectElement).value as ScheduleCycle)">
+                    <option v-for="cycle in scheduleCycles" :key="cycle.value" :value="cycle.value">{{ cycle.label }}</option>
+                  </select>
+                  <input v-if="scheduleCycle === 'once'" v-model="scheduleDate" type="date" class="schedule-field schedule-field-main" aria-label="选择执行日期" />
+                  <select v-else-if="scheduleCycle === 'weekly'" v-model="scheduleWeekday" class="schedule-field schedule-field-main" aria-label="选择星期">
+                    <option v-for="day in weekdayOptions" :key="day" :value="day">{{ day }}</option>
+                  </select>
+                  <select v-else-if="scheduleCycle === 'monthly'" v-model="scheduleMonthDay" class="schedule-field schedule-field-main" aria-label="选择日期">
+                    <option v-for="day in monthDayOptions" :key="day" :value="day">{{ day }}</option>
+                  </select>
+                  <span v-else-if="scheduleCycle !== 'cron'" class="schedule-field schedule-field-main schedule-field-muted">{{ scheduleCycle === 'daily' ? '每天' : '周一至周五' }}</span>
+                  <input v-if="scheduleCycle === 'cron'" v-model="scheduleCron" class="schedule-field schedule-field-cron font-mono" placeholder="0 9 * * *" aria-label="输入 Cron 表达式" />
+                  <input v-else v-model="scheduleTime" type="time" class="schedule-field schedule-field-main" aria-label="输入执行时间" />
+                  <span class="schedule-summary">{{ scheduleCycle === 'cron' ? '例：0 9 * * *' : scheduleSummary }}</span>
+                </div>
+              </div>
             </div>
           </div>
         </section>
       </main>
+
+      <aside
+        v-if="activeArtifactPreview"
+        data-testid="artifact-preview-panel"
+        class="fixed bottom-0 right-0 top-14 z-40 hidden w-[clamp(360px,30vw,520px)] border-l border-zinc-200 bg-white lg:top-16 lg:block"
+      >
+        <div class="flex h-full flex-col">
+          <header class="flex h-14 shrink-0 items-center justify-between border-b border-zinc-100 px-4">
+            <div class="min-w-0">
+              <div class="truncate text-sm font-semibold text-zinc-950">{{ activeArtifactPreview.name }}</div>
+              <div class="mt-0.5 text-xs text-zinc-400">{{ activeArtifactPreview.type }} · {{ activeArtifactPreview.size }}</div>
+            </div>
+            <button
+              type="button"
+              class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900"
+              aria-label="关闭预览"
+              @click="closeArtifactPreview"
+            >
+              <X class="h-4 w-4" />
+            </button>
+          </header>
+          <div class="min-h-0 flex-1 overflow-y-auto p-4">
+            <div class="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+              <div class="flex items-start gap-3">
+                <div class="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600">
+                  <component :is="activeArtifactPreview.icon" class="h-5 w-5" />
+                </div>
+                <div class="min-w-0">
+                  <div class="text-sm font-semibold text-zinc-950">文件预览</div>
+                  <p class="mt-1 text-xs leading-5 text-zinc-500">{{ activeArtifactPreview.summary }}</p>
+                </div>
+              </div>
+            </div>
+            <div class="mt-4 overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+              <div class="border-b border-zinc-100 bg-zinc-50 px-4 py-2 text-xs font-medium text-zinc-500">预览内容</div>
+              <div class="overflow-x-auto">
+                <table class="w-full min-w-[420px] text-left text-xs">
+                  <tbody>
+                    <tr
+                      v-for="(row, rowIndex) in activeArtifactPreview.rows"
+                      :key="`${activeArtifactPreview.name}-${rowIndex}`"
+                      class="border-b border-zinc-100 last:border-b-0"
+                      :class="rowIndex === 0 ? 'bg-zinc-50 font-semibold text-zinc-700' : 'text-zinc-600'"
+                    >
+                      <td v-for="cell in row" :key="cell" class="px-3 py-2.5">{{ cell }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <footer class="shrink-0 border-t border-zinc-100 p-4">
+            <button
+              type="button"
+              class="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-zinc-950 text-sm font-medium text-white transition hover:bg-zinc-800"
+              @click="downloadArtifact(activeArtifactPreview)"
+            >
+              <Download class="h-4 w-4" />
+              {{ copiedMessageId === `download:${activeArtifactPreview.name}` ? '已加入下载' : '下载文件' }}
+            </button>
+          </footer>
+        </div>
+      </aside>
 
       <aside v-if="rightPanelVisible" data-testid="right-asset-panel" class="fixed bottom-0 right-0 top-14 z-30 hidden w-[clamp(286px,21vw,400px)] border-l border-zinc-200 bg-white lg:top-16 lg:block">
         <div class="flex h-full flex-col">
@@ -2232,6 +2737,119 @@ onBeforeUnmount(() => {
   animation: process-flow 1.9s linear infinite;
 }
 
+.composer-shell {
+  position: relative;
+  isolation: isolate;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  --composer-x: 50%;
+  --composer-y: 50%;
+}
+
+.composer-shell::before {
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: -22px;
+  height: 74px;
+  z-index: -1;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at var(--composer-x) 55%, rgba(59, 130, 246, 0.14), transparent 34%),
+    radial-gradient(circle at calc(var(--composer-x) + 18%) 70%, rgba(249, 115, 22, 0.1), transparent 38%),
+    linear-gradient(100deg, rgba(59, 130, 246, 0.05), rgba(139, 92, 246, 0.07), rgba(249, 115, 22, 0.05));
+  filter: blur(18px);
+  opacity: 0.22;
+  transition: opacity 220ms ease, transform 220ms ease;
+  animation: composer-ambient 8s ease-in-out infinite alternate;
+}
+
+.composer-shell:hover,
+.composer-shell:focus-within {
+  transform: translateY(-3px);
+  border-color: rgba(212, 212, 216, 0.95);
+  box-shadow: 0 26px 76px rgba(15, 23, 42, 0.13);
+}
+
+.composer-shell:hover::before,
+.composer-shell:focus-within::before {
+  opacity: 0.38;
+  transform: translateY(3px) scale(1.01);
+}
+
+.schedule-panel {
+  border-radius: 20px;
+  background: #f4f4f5;
+  padding: 12px 14px;
+}
+
+.schedule-row {
+  display: grid;
+  grid-template-columns: auto minmax(118px, 148px) minmax(118px, 148px) minmax(118px, 148px) minmax(120px, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.schedule-title {
+  color: #52525b;
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.schedule-field {
+  width: 100%;
+  height: 38px;
+  border-radius: 12px;
+  border: 1px solid #e4e4e7;
+  background: #fff;
+  padding: 0 11px;
+  color: #27272a;
+  font-size: 0.875rem;
+  outline: none;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+.schedule-field-main {
+  max-width: 148px;
+}
+
+.schedule-field-cron {
+  width: 184px;
+  max-width: 184px;
+}
+
+.schedule-field-muted {
+  display: inline-flex;
+  align-items: center;
+  color: #71717a;
+  background: #fafafa;
+}
+
+.schedule-field:focus {
+  border-color: #bfdbfe;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.08);
+}
+
+.schedule-summary {
+  min-width: 0;
+  color: #a1a1aa;
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .schedule-row {
+    grid-template-columns: auto minmax(110px, 1fr) minmax(110px, 1fr);
+  }
+
+  .schedule-summary {
+    grid-column: 2 / -1;
+  }
+}
+
 @keyframes process-flow {
   from {
     background-position: 120% 0;
@@ -2239,6 +2857,16 @@ onBeforeUnmount(() => {
 
   to {
     background-position: -120% 0;
+  }
+}
+
+@keyframes composer-ambient {
+  from {
+    transform: translate3d(-4px, 0, 0) scale(1);
+  }
+
+  to {
+    transform: translate3d(4px, 2px, 0) scale(1.015);
   }
 }
 </style>

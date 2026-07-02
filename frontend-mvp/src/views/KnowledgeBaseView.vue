@@ -390,6 +390,9 @@ function confirmUpload() {
   uploadModalOpen.value = false
   uploadFileNames.value = []
 }
+function dismissUploadTask(id: string) {
+  uploadTasks.value = uploadTasks.value.filter(task => task.id !== id)
+}
 function getFileIcon(f: string) { if (f === 'XLSX') return FileSpreadsheet; if (f === 'DOCX' || f === 'MD' || f === 'PDF') return FileText; return File }
 function getIconColor(f: string) { if (f === 'XLSX') return 'text-emerald-500 bg-emerald-50'; if (f === 'DOCX') return 'text-blue-500 bg-blue-50'; if (f === 'PDF') return 'text-red-500 bg-red-50'; if (f === 'MD') return 'text-violet-500 bg-violet-50'; return 'text-zinc-500 bg-zinc-50' }
 function openPreview(doc: DocItem) { previewDoc.value = doc }
@@ -509,8 +512,21 @@ const contextTreeNode = computed(() => contextMenu.value?.type === 'tree' && con
 const contextTreeDepth = computed(() => contextMenu.value?.type === 'tree' && contextMenu.value.id !== '__root__'
   ? findTreeNodeDepth(currentFileTree.value, contextMenu.value.id)
   : -1)
+const contextTreeDoc = computed(() => {
+  const node = contextTreeNode.value
+  if (!node || node.type !== 'file' || !node.kbId || !node.docName) return undefined
+  return (allDocs[node.kbId] ?? []).find(doc => doc.name === node.docName)
+})
 const canContextCreateKb = computed(() => Boolean(contextTreeNode.value && !contextTreeNode.value.kbId && contextTreeDepth.value === 0))
 const canContextCreateFolder = computed(() => contextMenu.value?.type === 'tree' && (!contextTreeNode.value || contextTreeNode.value.type === 'folder'))
+function deleteTreeDoc(node: TreeNode) {
+  if (!node.kbId || !node.docName) return
+  allDocs[node.kbId] = (allDocs[node.kbId] ?? []).filter(doc => doc.name !== node.docName)
+  if (previewDoc.value?.name === node.docName) previewDoc.value = null
+  selectedFileIds.value = selectedFileIds.value.filter(name => name !== node.docName)
+  showFileActionToast(`已删除 ${node.docName}`)
+  contextMenu.value = null
+}
 function beginRenameFolder(node: TreeNode) {
   renamingFolderId.value = node.id
   draftFolderTitle.value = node.label
@@ -589,7 +605,11 @@ onBeforeUnmount(() => {
       class="fixed inset-y-0 left-0 z-50 flex w-[clamp(286px,21vw,400px)] flex-col overflow-hidden border-r border-zinc-200 bg-white transition-transform duration-300 lg:top-16 lg:h-[calc(100vh-4rem)]"
       :class="sidebarVisible ? 'translate-x-0' : '-translate-x-full'"
     >
-      <div data-testid="knowledge-sidebar-subheader" class="flex h-12 items-center justify-end border-b border-zinc-100 px-3">
+      <div data-testid="knowledge-sidebar-subheader" class="flex items-center justify-between gap-2 border-b border-zinc-100 px-3 py-3">
+        <div class="min-w-0">
+          <div class="text-sm font-semibold text-zinc-900">知识中心</div>
+          <div class="mt-0.5 text-[11px] text-zinc-400">按空间和文件树浏览</div>
+        </div>
         <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-500 shadow-sm hover:bg-zinc-50" aria-label="折叠侧边栏" @click="sidebarVisible = false">
           <ChevronLeft class="h-4 w-4" />
         </button>
@@ -600,10 +620,6 @@ onBeforeUnmount(() => {
             {{ space.label }}
           </button>
         </div>
-        <label class="flex h-9 items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-xs text-zinc-400">
-          <Search class="h-3.5 w-3.5" />
-          <input v-model="kbSearch" class="min-w-0 flex-1 bg-transparent outline-none" placeholder="搜索知识库" />
-        </label>
       </div>
       <div class="flex-1 overflow-y-auto p-2" data-testid="knowledge-tree-panel" @contextmenu.prevent.self="openTreeBlankContextMenu">
         <div>
@@ -816,21 +832,8 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <div v-if="uploadTasks.length" class="mb-3 rounded-xl border border-zinc-200 bg-white p-3 shadow-sm">
-          <div class="mb-2 text-sm font-semibold text-zinc-900">上传任务</div>
-          <div class="space-y-2">
-            <div v-for="task in uploadTasks" :key="task.id" class="flex items-center gap-3 rounded-lg bg-zinc-50 px-3 py-2 text-xs">
-              <FileText class="h-4 w-4 text-blue-500" />
-              <span class="min-w-0 flex-1 truncate font-medium text-zinc-800">{{ task.name }}</span>
-              <span class="text-zinc-400">{{ task.progress }}%</span>
-              <span class="rounded-full px-2 py-0.5 font-medium" :class="task.status === 'success' ? 'bg-emerald-50 text-emerald-600' : task.status === 'reviewing' ? 'bg-amber-50 text-amber-600' : 'bg-red-50 text-red-600'">{{ task.status === 'success' ? '上传成功' : task.status === 'reviewing' ? '上传成功 · 待人工审核' : '上传失败' }}</span>
-              <button v-if="task.doc" type="button" class="rounded-md px-2 py-1 text-blue-600 hover:bg-blue-50" @click="openPreview(task.doc)">查看预览</button>
-            </div>
-          </div>
-        </div>
-
         <!-- Action bar -->
-        <div v-else-if="selectedFileIds.length > 0" class="mb-3 flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+        <div v-if="selectedFileIds.length > 0" class="mb-3 flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
           <span class="text-xs font-medium text-blue-700">已选 {{ selectedFileIds.length }} 项</span>
           <div class="ml-auto flex items-center gap-1">
             <button class="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-red-600 hover:bg-red-50" @click="deleteSelectedDocs"><Trash2 class="h-3 w-3" />删除</button>
@@ -991,6 +994,12 @@ onBeforeUnmount(() => {
             <button v-if="selectedKb?.canEdit" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteDoc(contextDoc); contextMenu = null"><Trash2 class="h-4 w-4" />删除</button>
           </template>
           <template v-else-if="contextMenu.type === 'tree'">
+            <template v-if="contextTreeNode?.type === 'file' && contextTreeDoc">
+              <div class="px-3 py-2 text-xs font-semibold text-zinc-400">文件操作</div>
+              <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openPreview(contextTreeDoc); contextMenu = null"><Eye class="h-4 w-4" />预览</button>
+              <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteTreeDoc(contextTreeNode)"><Trash2 class="h-4 w-4" />删除</button>
+            </template>
+            <template v-else>
             <div class="px-3 py-2 text-xs font-semibold text-zinc-400">目录操作</div>
             <button v-if="canContextCreateFolder" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openCreateFolderModalAt(contextMenu.id)">
               <Folder class="h-4 w-4" />新建文件夹
@@ -998,6 +1007,7 @@ onBeforeUnmount(() => {
             <button v-if="canContextCreateKb" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openCreateModalAt(contextMenu.id)">
               <BookOpen class="h-4 w-4 text-orange-500" />新建知识库
             </button>
+            </template>
           </template>
         </div>
       </div>
@@ -1154,6 +1164,42 @@ onBeforeUnmount(() => {
               <button type="button" class="mt-2 w-full rounded-xl bg-blue-600 py-2 text-sm font-medium text-white" @click="askKnowledgeBase">发送</button>
             </div>
           </aside>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Floating upload tasks -->
+    <Teleport to="body">
+      <div v-if="uploadTasks.length" class="fixed bottom-5 right-5 z-[60] w-[min(420px,calc(100vw-2rem))] rounded-2xl border border-zinc-200 bg-white p-4 shadow-2xl shadow-zinc-300/50">
+        <div class="mb-3 flex items-center justify-between gap-3">
+          <div class="flex items-center gap-2 text-sm font-semibold text-zinc-900">
+            <Upload class="h-4 w-4 text-blue-600" />
+            任务运行中
+          </div>
+          <button type="button" class="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700" aria-label="关闭上传任务" @click="uploadTasks = []">
+            <X class="h-4 w-4" />
+          </button>
+        </div>
+        <div class="space-y-2">
+          <div v-for="task in uploadTasks" :key="task.id" class="rounded-xl bg-zinc-50 px-3 py-2">
+            <div class="flex items-center gap-2 text-xs">
+              <FileText class="h-4 w-4 shrink-0 text-blue-500" />
+              <span class="min-w-0 flex-1 truncate font-medium text-zinc-800">{{ task.name }}</span>
+              <span class="text-zinc-400">{{ task.progress }}%</span>
+              <button type="button" class="rounded-md p-0.5 text-zinc-400 hover:bg-white hover:text-zinc-700" :aria-label="`关闭任务 ${task.name}`" @click="dismissUploadTask(task.id)">
+                <X class="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-white">
+              <div class="h-full rounded-full" :class="task.status === 'failed' ? 'bg-rose-500' : task.status === 'reviewing' ? 'bg-amber-500' : 'bg-blue-500'" :style="{ width: `${task.progress}%` }" />
+            </div>
+            <div class="mt-2 flex items-center justify-between gap-2 text-[11px]">
+              <span class="font-medium" :class="task.status === 'success' ? 'text-emerald-600' : task.status === 'reviewing' ? 'text-amber-600' : task.status === 'failed' ? 'text-rose-600' : 'text-blue-600'">
+                {{ task.status === 'success' ? '上传成功' : task.status === 'reviewing' ? '上传成功 · 待人工审核' : task.status === 'failed' ? '上传失败' : '上传中' }}
+              </span>
+              <button v-if="task.doc" type="button" class="rounded-md px-2 py-1 text-blue-600 hover:bg-white" @click="openPreview(task.doc)">查看</button>
+            </div>
+          </div>
         </div>
       </div>
     </Teleport>

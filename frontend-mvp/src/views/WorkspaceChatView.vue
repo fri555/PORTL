@@ -42,10 +42,8 @@ import {
   Paperclip,
   Pencil,
   PieChart,
-  Pin,
   Play,
   Plus,
-  Search,
   SendHorizontal,
   Settings,
   Sparkles,
@@ -81,7 +79,6 @@ const {
   deleteConversation,
   updateConversationTitle,
   toggleConversationFavorite,
-  toggleConversationPinned,
   sendMessage,
   stopStreaming,
   isApiConfigured,
@@ -92,6 +89,8 @@ const router = useRouter()
 const store = useAppStore()
 const chatInput = ref('')
 const memoryEnabled = ref(true)
+const sidebarSearch = ref('')
+const sidebarModeFilter = ref<'all' | RunMode>('all')
 function handleLogout() {
   store.logout()
   router.push({ name: 'login' })
@@ -173,11 +172,11 @@ const knowledgeBases = [
 ]
 
 // ---- automation mock data ----
-const automations = [
+const automations = ref([
   { name: '周一竞品动态汇总', trigger: '每周一 09:00', agent: '竞品分析助手', status: 'active' },
   { name: '知识缺口周报', trigger: '每周五 17:00', agent: '知识库管理员', status: 'active' },
   { name: '方案模板更新检查', trigger: '每天 08:00', agent: '方案中心主管', status: 'paused' },
-]
+])
 
 // ---- expert mock data ----
 const experts = [
@@ -221,6 +220,18 @@ function openSubPanel(panel: string) {
 }
 function closeSubPanel() { activeSubPanel.value = null }
 
+function toggleAutomation(name: string) {
+  automations.value = automations.value.map((item) =>
+    item.name === name ? { ...item, status: item.status === 'active' ? 'paused' : 'active' } : item,
+  )
+}
+
+function runAutomationNow(name: string) {
+  automations.value = automations.value.map((item) =>
+    item.name === name ? { ...item, status: 'active' } : item,
+  )
+}
+
 const subPanelTitle = computed(() => {
   const key = activeSubPanel.value
   if (!key) return ''
@@ -233,10 +244,20 @@ const subPanelTitle = computed(() => {
 
 const sortedConversations = computed(() =>
   [...conversations.value].sort((a, b) => {
-    if (!!a.isPinned !== !!b.isPinned) return a.isPinned ? -1 : 1
     return b.updatedAt - a.updatedAt
   }),
 )
+function inferConversationMode(conv: Conversation): RunMode {
+  return /方案|组货|导出|客户|预算/.test(conv.title) ? 'task' : 'quick'
+}
+const filteredSidebarConversations = computed(() => {
+  const keyword = sidebarSearch.value.trim().toLowerCase()
+  return sortedConversations.value.filter((conv) => {
+    const matchKeyword = !keyword || conv.title.toLowerCase().includes(keyword)
+    const matchMode = sidebarModeFilter.value === 'all' || inferConversationMode(conv) === sidebarModeFilter.value
+    return matchKeyword && matchMode
+  })
+})
 
 const displayConversationTitle = computed(() => {
   const title = activeConversation.value?.title || '工作会话'
@@ -495,10 +516,6 @@ function handleToggleFavorite(id: string) {
   toggleConversationFavorite(id)
 }
 
-function handleTogglePinned(id: string) {
-  toggleConversationPinned(id)
-}
-
 // ---- knowledge upload ----
 function triggerKnowledgeUpload() { knowledgeUploadInput.value?.click() }
 function handleKnowledgeUpload(event: Event) {
@@ -560,7 +577,9 @@ function formatTime(ts: number): string {
 }
 
 const workspaceActions: { key: string; label: string; icon: unknown; desc: string }[] = [
-  { key: 'knowledge', label: '知识库', icon: Database, desc: '组货方案·组货逻辑知识库' },
+  { key: 'new', label: '新对话', icon: Plus, desc: '开启一轮新的工作任务' },
+  { key: 'automation', label: '自动化', icon: Timer, desc: '查看定时任务状态' },
+  { key: 'knowledge', label: '知识库', icon: Database, desc: '引用方案与制度资料' },
   { key: 'more', label: '更多', icon: MoreHorizontal, desc: '连接器·权限·设置' },
 ]
 
@@ -618,13 +637,14 @@ function renderMarkdown(text: string): string {
         </div>
 
         <div v-else class="flex h-full flex-col">
-          <div class="flex items-center justify-end px-2.5 pt-2.5 pb-2">
-            <button type="button" class="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 text-xs font-medium text-white hover:bg-blue-700" @click="handleNewConversation"><Plus class="h-3.5 w-3.5" />新建会话</button>
+          <div class="border-b border-zinc-100 px-3 py-3">
+            <div class="text-sm font-semibold text-zinc-900">任务导航</div>
+            <div class="mt-0.5 text-[11px] text-zinc-400">完整搜索和筛选进入历史会话页</div>
           </div>
 
           <!-- Sidebar actions -->
           <div class="mx-2.5 mb-2.5 grid grid-cols-1 gap-0.5">
-            <button v-for="item in workspaceActions" :key="item.key" type="button" class="flex min-h-[38px] items-center gap-2 rounded-lg px-2.5 text-left text-xs font-medium transition" :class="activeSubPanel === item.key ? 'bg-blue-50 text-blue-700' : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900'" @click="item.key === 'more' ? showMoreMenu = !showMoreMenu : openSubPanel(item.key)">
+            <button v-for="item in workspaceActions" :key="item.key" type="button" class="flex min-h-[38px] items-center gap-2 rounded-lg px-2.5 text-left text-xs font-medium transition" :class="activeSubPanel === item.key ? 'bg-blue-50 text-blue-700' : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900'" @click="item.key === 'new' ? handleNewConversation() : item.key === 'more' ? showMoreMenu = !showMoreMenu : openSubPanel(item.key)">
               <component :is="item.icon" class="h-3.5 w-3.5 shrink-0" />
               <div class="min-w-0 flex-1">
                 <div>{{ item.label }}</div>
@@ -646,22 +666,16 @@ function renderMarkdown(text: string): string {
 
           <input ref="knowledgeUploadInput" class="hidden" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg" @change="handleKnowledgeUpload" />
 
-          <!-- Search -->
-          <label class="mx-2.5 mb-2.5 flex h-7 items-center gap-1.5 rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 text-zinc-400">
-            <Search class="h-3.5 w-3.5" />
-            <input class="min-w-0 flex-1 bg-transparent text-[11px] outline-none" placeholder="搜索会话" />
-          </label>
-
           <!-- Session list -->
           <div class="no-scrollbar mx-2 mb-2 flex-1 space-y-1 overflow-y-auto">
-            <button v-for="conv in sortedConversations" :key="conv.id" type="button" class="group relative w-full rounded-lg border p-2 text-left transition" :class="conv.id === activeConversationId ? 'border-blue-200 bg-blue-50' : 'border-transparent hover:border-blue-100 hover:bg-blue-50/50'" @click="handleSwitchSession(conv.id)">
+            <div class="px-2 pb-1 pt-2 text-[11px] font-medium text-zinc-300">历史对话</div>
+            <button v-for="conv in filteredSidebarConversations" :key="conv.id" type="button" class="group relative w-full rounded-lg border p-2 text-left transition" :class="conv.id === activeConversationId ? 'border-blue-200 bg-blue-50' : 'border-transparent text-zinc-500 hover:border-blue-100 hover:bg-blue-50/50 hover:text-zinc-800'" @click="handleSwitchSession(conv.id)">
               <div class="flex items-center justify-between gap-1.5">
                 <div v-if="renamingConversationId === conv.id" class="flex min-w-0 flex-1 items-center gap-1" @click.stop>
                   <input v-model="renameDraft" class="h-6 min-w-0 flex-1 rounded-md border border-blue-200 bg-white px-2 text-[11px] font-medium text-zinc-900 outline-none ring-2 ring-blue-100" @keydown.enter.prevent.stop="commitRenameConversation" @keydown.esc.prevent.stop="cancelRenameConversation" />
                   <button type="button" class="shrink-0 rounded-md bg-blue-600 px-1.5 py-1 text-[10px] font-medium text-white hover:bg-blue-700" @click.stop="commitRenameConversation">保存</button>
                 </div>
                 <span v-else class="line-clamp-1 min-w-0 flex-1 text-[11px] font-medium text-zinc-900">
-                  <Pin v-if="conv.isPinned" class="mr-1 inline h-3 w-3 text-blue-600" />
                   <Star v-if="conv.isFavorite" class="mr-1 inline h-3 w-3 fill-amber-400 text-amber-400" />
                   {{ formatConversationTitle(conv.title) }}
                 </span>
@@ -669,15 +683,14 @@ function renderMarkdown(text: string): string {
               </div>
               <div class="mt-0.5 flex items-center justify-between text-[10px] text-zinc-400">
                 <div class="flex items-center gap-1"><History class="h-3 w-3" />{{ formatTime(conv.updatedAt) }}</div>
-                <div class="flex items-center gap-0.5 transition-opacity group-hover:opacity-100" :class="(conv.isPinned || conv.isFavorite) ? 'opacity-100' : 'opacity-0'">
-                  <button type="button" class="rounded p-0.5 hover:bg-blue-100 hover:text-blue-600" :class="conv.isPinned ? 'bg-blue-100 text-blue-600 opacity-100' : ''" title="置顶" @click.stop="handleTogglePinned(conv.id)"><Pin class="h-3 w-3" /></button>
+                <div class="flex items-center gap-0.5 transition-opacity group-hover:opacity-100" :class="conv.isFavorite ? 'opacity-100' : 'opacity-0'">
                   <button type="button" class="rounded p-0.5 hover:bg-amber-100 hover:text-amber-600" :class="conv.isFavorite ? 'bg-amber-100 text-amber-600 opacity-100' : ''" title="收藏" @click.stop="handleToggleFavorite(conv.id)"><Star class="h-3 w-3" /></button>
                   <button type="button" class="rounded p-0.5 hover:bg-zinc-100 hover:text-zinc-700" title="重命名" @click.stop="beginRenameConversation(conv)"><Pencil class="h-3 w-3" /></button>
                   <button type="button" class="rounded p-0.5 hover:bg-red-100 hover:text-red-600" title="删除" @click.stop="handleDeleteSession(conv.id)"><Trash2 class="h-3 w-3" /></button>
                 </div>
               </div>
             </button>
-            <div v-if="conversations.length === 0" class="py-8 text-center text-[10px] text-zinc-400"><History class="mx-auto h-7 w-7 text-zinc-200 mb-1.5" />暂无会话</div>
+            <div v-if="filteredSidebarConversations.length === 0" class="py-8 text-center text-[10px] text-zinc-400"><History class="mx-auto h-7 w-7 text-zinc-200 mb-1.5" />暂无会话</div>
           </div>
 
         </div>
@@ -915,8 +928,11 @@ function renderMarkdown(text: string): string {
                     <div class="flex items-center gap-2"><span class="text-sm font-semibold text-zinc-900">{{ auto.name }}</span><span class="rounded-full px-1.5 py-0.5 text-[9px] font-medium" :class="auto.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-zinc-100 text-zinc-500'">{{ auto.status === 'active' ? '运行中' : '暂停' }}</span></div>
                     <p class="mt-1 text-xs text-zinc-500">触发：{{ auto.trigger }} · 执行：{{ auto.agent }}</p>
                   </div>
-                  <button v-if="auto.status === 'active'" class="rounded-lg border border-zinc-200 px-2 py-1 text-[10px] text-zinc-500 hover:bg-zinc-50">暂停</button>
-                  <button v-else class="rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] text-blue-600 hover:bg-blue-100">启动</button>
+                  <div class="flex shrink-0 items-center gap-1.5">
+                    <button class="rounded-lg border border-zinc-200 px-2 py-1 text-[10px] text-zinc-500 hover:bg-zinc-50" @click="runAutomationNow(auto.name)">立即启动</button>
+                    <button v-if="auto.status === 'active'" class="rounded-lg border border-zinc-200 px-2 py-1 text-[10px] text-zinc-500 hover:bg-zinc-50" @click="toggleAutomation(auto.name)">暂停</button>
+                    <button v-else class="rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] text-blue-600 hover:bg-blue-100" @click="toggleAutomation(auto.name)">启动</button>
+                  </div>
                 </div>
               </div>
               <button class="w-full rounded-xl border border-dashed border-zinc-300 p-4 text-center hover:border-blue-300 transition">
