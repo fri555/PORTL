@@ -1,6 +1,7 @@
 name: 部署前端到 GitHub Pages
 
 on:
+  # 代码推送时触发
   push:
     branches:
       - main
@@ -8,6 +9,9 @@ on:
     paths:
       - 'frontend-mvp/**'
       - '.github/workflows/deploy-frontend.yml'
+  # 定时触发：每天中午 12:00 构建一次
+  schedule:
+    - cron: '0 12 * * *'
   workflow_dispatch: # 支持手动触发
 
 # 注意: 需要在 GitHub 仓库 Settings > Pages > Source 选择 "GitHub Actions"
