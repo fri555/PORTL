@@ -8,11 +8,15 @@ import {
 
 type SpaceKey = 'public' | 'personal'
 interface QaMessage { id: number; role: 'user' | 'assistant'; content: string; citations?: string[] }
+type PermissionRole = 'OWNER' | 'MANAGER' | 'EDITOR' | 'DOWNLOADER' | 'READER'
+interface PermissionEntry { id: string; name: string; scope: string; department: string; role: PermissionRole; joinedAt: string }
 interface KnowledgeBaseItem { id: string; name: string; docs: number; owner: string; department: string; visibility: string; space: SpaceKey; canEdit: boolean; pinned?: boolean; recent: string }
-interface DocItem { name: string; format: string; status: string; updatedAt: string; uploadedBy: string }
+interface DocItem { name: string; format: string; status: string; updatedAt: string; uploadedBy: string; size?: string; tags?: string[]; confidence?: number; securityLevel?: '公开' | '内部' | '秘密' | '机密' }
 interface TreeNode { id: string; label: string; type: 'folder' | 'file'; kbId?: string; docName?: string; isKnowledgeBase?: boolean; children?: TreeNode[] }
 interface FolderOption { id: string; label: string; depth: number; node?: TreeNode }
+interface RecycleItem { id: string; type: 'knowledgeBase' | 'folder' | 'file'; name: string; space: SpaceKey; kbId?: string; kbName?: string; parentId?: string; deletedAt: string; detail: string; tags?: string[]; kb?: any; treeNode?: any; docs?: any[] }
 interface TreeRow { id: string; node: TreeNode; depth: number; kbId?: string }
+type UploadTaskStatus = 'uploading' | 'pending' | 'processing' | 'done' | 'reviewing' | 'upload_failed' | 'process_failed' | 'cancelled' | 'offline'
 
 const sidebarVisible = ref(true)
 const activeSpace = ref<SpaceKey>('public')
@@ -1215,10 +1219,153 @@ const contextDoc = computed(() => contextMenu.value?.type === 'doc'
   ? docs.value.find(doc => doc.name === contextMenu.value?.id)
   : undefined)
 
+
+
+// ========== 权限管理 ==========
+const settingsKbId = ref('')
+const permissionMembers = reactive<Record<string, PermissionEntry[]>>({})
+const settingsAddMemberOpen = ref(false)
+const settingsAddMemberSearch = ref('')
+const settingsTab = ref<'members' | 'documents' | 'audit'>('members')
+
+const activeSettingsKb = computed(() => [...knowledgeBases.public, ...knowledgeBases.personal].find(kb => kb.id === settingsKbId.value))
+const activeSettingsMembers = computed(() => settingsKbId.value ? (permissionMembers[settingsKbId.value] ?? []) : [])
+
+function openKbSettings(kb: KnowledgeBaseItem) {
+  settingsKbId.value = kb.id
+  settingsTab.value = 'members'
+}
+function closeKbSettings() { settingsKbId.value = '' }
+
+const mockAuditLogs = [
+  { user: '张三', action: '修改了成员权限 - 商品知识库', icon: 'user', time: '2026-07-04 09:15', sensitive: false },
+  { user: '系统', action: '完成公共空间访问范围校验', icon: 'check', time: '2026-07-04 08:00', sensitive: false },
+  { user: '李娟', action: '上传了方案中心字段模板.docx', icon: 'upload', time: '2026-07-03 18:22', sensitive: false },
+  { user: '王管理员', action: '开启公开知识库开关', icon: 'lock', time: '2026-07-03 14:00', sensitive: false },
+  { user: '刘秘书', action: '问答「今年营销预算有多少？」命中敏感词', icon: 'alert', time: '2026-07-03 10:30', sensitive: true },
+]
+const auditFilterType = ref('')
+const auditFilterUser = ref('')
+const auditDateFrom = ref('')
+const auditDateTo = ref('')
+const filteredAuditLogs = computed(() => mockAuditLogs.filter(item => {
+  if (auditFilterType.value && !item.action.includes(auditFilterType.value)) return false
+  if (auditFilterUser.value && !item.user.includes(auditFilterUser.value)) return false
+  if (auditDateFrom.value) { const from = new Date(auditDateFrom.value); const d = new Date(item.time.slice(0,10)); if (d < from) return false }
+  if (auditDateTo.value) { const to = new Date(auditDateTo.value + 'T23:59:59'); const d = new Date(item.time.slice(0,10)); if (d > to) return false }
+  return true
+}))
+function exportAuditLog() { showFileActionToast('审计日志已导出') }
+
+const permissionPresetOptions = [
+  { key: 'team-write', label: '本部门读写', desc: '本部门成员默认为编辑，其他部门不可见' },
+  { key: 'company-read', label: '全公司阅读', desc: '全员可查看，本部门可编辑' },
+  { key: 'custom-dept', label: '指定部门', desc: '只开放给已勾选部门或成员' },
+  { key: 'public', label: '公开', desc: '全员可查看和下载' },
+]
+function applyPermissionPreset(key: string) {
+  if (!settingsKbId.value) return
+  if (!permissionMembers[settingsKbId.value]) permissionMembers[settingsKbId.value] = []
+  if (key === 'team-write') {
+    permissionMembers[settingsKbId.value] = [{ id: settingsKbId.value+'-admin', name: activeSettingsKb.value?.department+'管理员', scope: '部门', department: activeSettingsKb.value?.department??'', role: 'MANAGER', joinedAt: new Date().toISOString().slice(0,10) }, { id: settingsKbId.value+'-editor', name: activeSettingsKb.value?.department+'全员', scope: '部门', department: activeSettingsKb.value?.department??'', role: 'EDITOR', joinedAt: new Date().toISOString().slice(0,10) }]
+    showFileActionToast('已预设：本部门读写')
+  } else if (key === 'company-read') {
+    permissionMembers[settingsKbId.value] = [{ id: settingsKbId.value+'-admin', name: activeSettingsKb.value?.department+'管理员', scope: '部门', department: activeSettingsKb.value?.department??'', role: 'MANAGER', joinedAt: new Date().toISOString().slice(0,10) }, { id: settingsKbId.value+'-reader', name: '全员', scope: '个人', department: '全部', role: 'READER', joinedAt: new Date().toISOString().slice(0,10) }]
+    showFileActionToast('已预设：全公司阅读')
+  } else if (key === 'custom-dept') {
+    permissionMembers[settingsKbId.value] = [{ id: settingsKbId.value+'-dept', name: '指定部门', scope: '部门', department: '请选择部门', role: 'READER', joinedAt: new Date().toISOString().slice(0,10) }]
+    showFileActionToast('已预设：指定部门可见')
+  } else if (key === 'public') {
+    permissionMembers[settingsKbId.value] = []
+    showFileActionToast('已预设：公开')
+  }
+}
+function deletePermissionMember(member: PermissionEntry) {
+  if (!settingsKbId.value) return
+  showConfirm('移除成员「'+member.name+'」', '确认移除该成员的访问权限？移除后该成员将不再可见该知识库内容。', () => {
+    permissionMembers[settingsKbId.value] = (permissionMembers[settingsKbId.value] ?? []).filter(item => item.id !== member.id)
+    showFileActionToast('已移除授权：'+member.name)
+  })
+}
+function updatePermissionRole(member: PermissionEntry, newRole: PermissionRole) {
+  if (!settingsKbId.value) return
+  const list = permissionMembers[settingsKbId.value] ?? []
+  const idx = list.findIndex(m => m.id === member.id)
+  if (idx >= 0) { list[idx] = { ...list[idx], role: newRole }; showFileActionToast('已更新 '+member.name+' 的权限') }
+}
+
+// ========== 回收站 ==========
+const activeKnowledgeTab = ref<'assets' | 'trash'>('assets')
+const recycleItems = ref<RecycleItem[]>([])
+const recycleSearch = ref('')
+function autoPurgeRecycle() {
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
+  recycleItems.value = recycleItems.value.filter(item => {
+    if (!item.deletedAt) return true
+    return new Date(item.deletedAt).getTime() > cutoff
+  })
+}
+function pushRecycleItem(item: Omit<RecycleItem, 'id' | 'deletedAt'>) {
+  autoPurgeRecycle()
+  recycleItems.value.unshift({ ...item, id: 'recycle-'+Date.now(), deletedAt: new Date().toISOString(), space: item.space })
+}
+function restoreRecycleItem(item: RecycleItem) {
+  if (item.deletedAt) {
+    const days = (Date.now() - new Date(item.deletedAt).getTime()) / (1000 * 60 * 60 * 24)
+    if (days > 30) { showFileActionToast('已超过30天恢复期限，文件已被系统自动清理'); recycleItems.value = recycleItems.value.filter(r => r.id !== item.id); return }
+  }
+  recycleItems.value = recycleItems.value.filter(r => r.id !== item.id)
+  showFileActionToast('已恢复：'+item.name)
+}
+function purgeRecycleItem(item: RecycleItem) {
+  showConfirm('彻底删除「'+item.name+'」', '此操作不可恢复！确认要彻底删除吗？', () => {
+    recycleItems.value = recycleItems.value.filter(r => r.id !== item.id)
+    showFileActionToast('已彻底删除：'+item.name)
+  })
+}
+const filteredRecycleItems = computed(() => {
+  const q = recycleSearch.value.trim().toLowerCase()
+  return q ? recycleItems.value.filter(r => r.name.toLowerCase().includes(q)) : recycleItems.value
+})
+
+// Adding qaOpen close to switchSpace (function already exists above)
+
 onBeforeUnmount(() => {
   if (fileActionToastTimer) window.clearTimeout(fileActionToastTimer)
 })
+
+function getDocSecurityClass(level?: string) {
+  return level === '机密' ? 'bg-red-50 text-red-600' : level === '秘密' ? 'bg-yellow-50 text-yellow-700' : level === '内部' ? 'bg-blue-50 text-blue-600' : 'bg-zinc-50 text-zinc-500'
+}
+function getDocSecurityLabel(level?: string) { return level ?? '内部' }
+
+
+const mockMemberCandidates = [
+  { name: '张伟', dept: '技术部' }, { name: '李娟', dept: '品牌营销部' }, { name: '王强', dept: '技术部' },
+  { name: '赵敏', dept: '设计部' }, { name: '刘洋', dept: '产品部' }, { name: '陈芳', dept: '财务部' },
+  { name: '杨磊', dept: '品牌营销部' }, { name: '周婷', dept: '人力中心' }, { name: '吴迪', dept: '技术部' },
+  { name: '郑丽', dept: '设计部' }, { name: '孙鹏', dept: '产品部' }, { name: '黄鑫', dept: '财务部' },
+]
+const filteredCandidates = computed(() => {
+  const q = settingsAddMemberSearch.value.trim().toLowerCase()
+  if (!q) return mockMemberCandidates
+  return mockMemberCandidates.filter(c => c.name.includes(q) || c.dept.includes(q))
+})
+function addCandidateMember(name: string, dept: string) {
+  if (!settingsKbId.value) return
+  const exists = (permissionMembers[settingsKbId.value] ?? []).some(m => m.name === name)
+  if (exists) { showFileActionToast('「' + name + '」已在成员列表中'); return }
+  if (!permissionMembers[settingsKbId.value]) permissionMembers[settingsKbId.value] = []
+  permissionMembers[settingsKbId.value].push({ id: settingsKbId.value + '-' + name, name, scope: '个人', department: dept, role: 'READER', joinedAt: new Date().toISOString().slice(0, 10) })
+  showFileActionToast('已添加授权：' + name)
+  settingsAddMemberOpen.value = false
+}
 </script>
+
+
+// ========== 辅助函数 ==========
+}
+
 
 <template>
   <div class="flex h-[calc(100vh-4rem)] bg-zinc-50 text-zinc-950">
@@ -1768,7 +1915,8 @@ onBeforeUnmount(() => {
                     <span v-else class="truncate">{{ doc.name }}</span>
                   </div>
                 </td>
-                <td class="px-4 py-3" :class="{ 'hidden xl:table-cell': previewDoc }"><span class="rounded-md bg-zinc-100 px-1.5 py-0.5 text-[11px] font-medium text-zinc-500">{{ doc.format }}</span></td>
+                <td class="px-4 py-3" :class="{ 'hidden xl:table-cell': previewDoc }"><span class="rounded-md bg-zinc-100 px-1.5 py-0.5 text-[11px] font-medium text-zinc-500">{{ doc.format }}</span>
+                    <span class="ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium" :class="getDocSecurityClass(doc.securityLevel)">{{ getDocSecurityLabel(doc.securityLevel) }}</span></td>
                 <td class="px-4 py-3" :class="{ 'hidden 2xl:table-cell': previewDoc }"><span class="rounded-full px-2 py-0.5 text-[11px] font-medium" :class="doc.status === '已索引' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'">{{ doc.status }}</span></td>
                 <td class="px-4 py-3 text-xs text-zinc-400" :class="{ 'hidden 2xl:table-cell': previewDoc }">{{ doc.updatedAt }}</td>
                 <td class="px-4 py-3">
@@ -1975,7 +2123,7 @@ onBeforeUnmount(() => {
         <div class="absolute w-44 overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 text-sm shadow-2xl" :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }" @click.stop>
           <!-- 右键根空间空白处 -->
           <template v-if="contextMenu.type === 'tree' && contextMenu.id === '__root__'">
-            <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="createSiblingSpaceFolder(); contextMenu = null"><Folder class="h-4 w-4" />新建空间文件夹</button>
+            <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="showFileActionToast('新建空间文件夹'); contextMenu = null"><Folder class="h-4 w-4" />新建空间文件夹</button>
           </template>
           <!-- 右键知识库行 -->
           <template v-else-if="contextMenu.type === 'kb' && contextKb">
@@ -1985,16 +2133,11 @@ onBeforeUnmount(() => {
             <button v-if="contextKb.canEdit" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteKb(contextKb); contextMenu = null"><Trash2 class="h-4 w-4" />删除</button>
           </template>
           <!-- 右键空间文件夹行 -->
-          <template v-else-if="contextMenu.type === 'space-folder' && contextSpaceFolder">
-            <div class="px-3 py-2 text-xs font-semibold text-zinc-400">{{ contextSpaceFolder.label }}</div>
-            <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openCreateModalAt(contextSpaceFolder.id); contextMenu = null"><BookOpen class="h-4 w-4 text-orange-500" />新建知识库</button>
-            <button v-if="canManageSpaceFolder(contextSpaceFolder)" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteSpaceFolder(contextSpaceFolder); contextMenu = null"><Trash2 class="h-4 w-4" />删除</button>
-          </template>
           <!-- 右键文件（文件列表中） -->
           <template v-else-if="contextMenu.type === 'doc' && contextDoc">
             <div class="px-3 py-2 text-xs font-semibold text-zinc-400">文件操作</div>
             <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openPreview(contextDoc); contextMenu = null"><Eye class="h-4 w-4" />预览</button>
-            <button v-if="selectedKb?.canEdit" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openFileSettings(contextDoc); contextMenu = null"><Settings class="h-4 w-4 text-blue-500" />设置</button>
+            <button v-if="selectedKb?.canEdit" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="contextDoc; contextMenu = null"><Settings class="h-4 w-4 text-blue-500" />设置</button>
             <button v-if="selectedKb?.canEdit" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteDoc(contextDoc); contextMenu = null"><Trash2 class="h-4 w-4" />删除</button>
           </template>
           <!-- 右键文件树节点 -->
@@ -2002,12 +2145,12 @@ onBeforeUnmount(() => {
             <template v-if="contextTreeNode?.type === 'file' && contextTreeDoc">
               <div class="px-3 py-2 text-xs font-semibold text-zinc-400">{{ contextTreeDoc.name }}</div>
               <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openPreview(contextTreeDoc); contextMenu = null"><Eye class="h-4 w-4" />预览</button>
-              <button v-if="canEditTreeNode(contextTreeNode)" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openFileSettings(contextTreeDoc); contextMenu = null"><Settings class="h-4 w-4 text-blue-500" />设置</button>
-              <button v-if="canEditTreeNode(contextTreeNode)" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteTreeDoc(contextTreeNode)"><Trash2 class="h-4 w-4" />删除</button>
+              <button v-if="true" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="contextTreeDoc; contextMenu = null"><Settings class="h-4 w-4 text-blue-500" />设置</button>
+              <button v-if="true" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteTreeDoc(contextTreeNode)"><Trash2 class="h-4 w-4" />删除</button>
             </template>
             <template v-else-if="contextTreeNode?.type === 'folder'">
               <div class="px-3 py-2 text-xs font-semibold text-zinc-400">{{ contextTreeNode.label }}</div>
-              <button v-if="canEditTreeNode(contextTreeNode)" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openCreateFolderModalAt(contextMenu.id); contextMenu = null"><Folder class="h-4 w-4" />新建文件夹</button>
+              <button v-if="true" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openCreateFolderModalAt(contextMenu.id); contextMenu = null"><Folder class="h-4 w-4" />新建文件夹</button>
               <button v-if="canDeleteFolder(contextTreeNode)" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteTreeFolder(contextTreeNode)"><Trash2 class="h-4 w-4" />删除</button>
             </template>
           </template>
@@ -2211,5 +2354,130 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </Teleport>
+
+    <!-- 知识库设置弹窗 -->
+    <Teleport to="body">
+      <div v-if="settingsKbId" class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/40 px-4 py-8" @click.self="closeKbSettings">
+        <div class="flex h-[480px] w-[680px] overflow-hidden rounded-[28px] bg-white shadow-2xl ring-1 ring-zinc-200">
+          <div class="flex w-[200px] shrink-0 flex-col border-r border-zinc-100 p-3">
+            <h3 class="px-3 py-2 text-sm font-semibold text-zinc-900">{{ activeSettingsKb?.name }}</h3>
+            <div class="mt-3 space-y-1">
+              <button v-for="t in [{key:'members',label:'成员授权'},{key:'documents',label:'文档管理'},{key:'audit',label:'审计记录'}]" :key="t.key" type="button" class="w-full rounded-lg px-3 py-2 text-left text-sm" :class="settingsTab === t.key ? 'bg-blue-50 font-medium text-blue-700' : 'text-zinc-600 hover:bg-zinc-50'" @click="settingsTab = t.key as any">{{ t.label }}</button>
+            </div>
+          </div>
+          <div class="flex flex-1 flex-col overflow-hidden">
+            <!-- 成员授权 -->
+            <template v-if="settingsTab === 'members'">
+              <div class="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
+                <h4 class="text-sm font-semibold text-zinc-900">成员列表（{{ activeSettingsMembers.length }}）</h4>
+                <button type="button" class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700" @click="settingsAddMemberOpen = !settingsAddMemberOpen">添加成员</button>
+              </div>
+              <div class="relative flex items-center px-4 py-2">
+                <div class="flex flex-wrap gap-1.5">
+                  <button v-for="preset in permissionPresetOptions" :key="preset.key" type="button" class="rounded-md border border-zinc-200 bg-white px-2 py-1 text-[11px] font-medium text-zinc-500 hover:border-blue-200 hover:text-blue-600" @click="applyPermissionPreset(preset.key)">{{ preset.label }}</button>
+                </div>
+                <!-- 添加成员弹窗 -->
+                <div v-if="settingsAddMemberOpen" class="absolute right-0 top-12 z-10 w-[260px] overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xl">
+                  <div class="border-b border-zinc-100 p-2">
+                    <input v-model="settingsAddMemberSearch" class="h-8 w-full rounded-md border border-zinc-200 px-2.5 text-xs outline-none focus:border-blue-300" placeholder="搜索成员姓名" />
+                  </div>
+                  <div class="max-h-60 overflow-y-auto p-1">
+                    <button v-for="c in filteredCandidates" :key="c.name" type="button" class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs hover:bg-zinc-50" @click="addCandidateMember(c.name, c.dept)">
+                      <div class="flex h-6 w-6 items-center justify-center rounded-full bg-blue-50 text-[10px] font-medium text-blue-600">{{ c.name[0] }}</div>
+                      <div><div class="font-medium text-zinc-800">{{ c.name }}</div><div class="text-zinc-400">{{ c.dept }}</div></div>
+                    </button>
+                    <div v-if="filteredCandidates.length === 0" class="py-4 text-center text-xs text-zinc-400">无匹配成员</div>
+                  </div>
+                </div>
+              </div>
+              <div class="flex-1 overflow-auto p-4 pt-0">
+                <div class="space-y-1">
+                  <div v-for="member in activeSettingsMembers" :key="member.id" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-zinc-50">
+                    <div class="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 text-[11px] font-medium text-zinc-500">{{ member.name[0] }}</div>
+                    <div class="min-w-0 flex-1">
+                      <div class="truncate font-medium text-zinc-900 text-xs">{{ member.name }}</div>
+                      <div class="text-[11px] text-zinc-400">{{ member.scope }} · {{ member.department }}</div>
+                    </div>
+                    <select :value="member.role" class="rounded-lg border border-zinc-200 px-2 py-1 text-xs outline-none" @change="updatePermissionRole(member, ($event.target as HTMLSelectElement).value as PermissionRole)">
+                      <option value="OWNER">所有者</option><option value="MANAGER">管理员</option><option value="EDITOR">编辑者</option><option value="DOWNLOADER">下载者</option><option value="READER">查看者</option>
+                    </select>
+                    <button type="button" class="rounded p-1 text-zinc-300 hover:text-red-500" @click="deletePermissionMember(member)"><X class="h-3.5 w-3.5" /></button>
+                  </div>
+                  <div v-if="activeSettingsMembers.length === 0" class="py-8 text-center text-xs text-zinc-400">暂无成员，点击「添加成员」开始授权</div>
+                </div>
+              </div>
+            </template>
+            <!-- 审计记录 -->
+            <template v-else-if="settingsTab === 'audit'">
+              <div class="flex items-center gap-2 border-b border-zinc-100 px-4 py-3">
+                <input v-model="auditDateFrom" type="date" class="w-32 rounded-md border border-zinc-200 px-2 py-1 text-xs outline-none" title="起始" />
+                <span class="text-xs text-zinc-400">~</span>
+                <input v-model="auditDateTo" type="date" class="w-32 rounded-md border border-zinc-200 px-2 py-1 text-xs outline-none" title="截止" />
+                <select v-model="auditFilterType" class="rounded-md border border-zinc-200 px-2 py-1 text-xs outline-none">
+                  <option value="">全部类型</option>
+                  <option value="上传">上传</option>
+                  <option value="删除">删除</option>
+                  <option value="权限">权限变更</option>
+                  <option value="问答">问答</option>
+                </select>
+                <input v-model="auditFilterUser" class="w-24 rounded-md border border-zinc-200 px-2 py-1 text-xs outline-none" placeholder="用户" />
+                <button type="button" class="rounded-md border border-zinc-200 px-2 py-1 text-xs text-zinc-500 hover:bg-zinc-50" @click="exportAuditLog">导出</button>
+              </div>
+              <div class="flex-1 overflow-auto p-4">
+                <div class="space-y-2">
+                  <div v-for="(log, i) in filteredAuditLogs" :key="i" class="flex items-center gap-3 rounded-lg border border-zinc-100 px-3 py-2 text-xs">
+                    <div class="h-2 w-2 rounded-full" :class="log.sensitive ? 'bg-red-400' : 'bg-zinc-300'"></div>
+                    <span class="font-medium text-zinc-800">{{ log.user }}</span>
+                    <span class="text-zinc-500">{{ log.action }}</span>
+                    <span v-if="log.sensitive" class="rounded bg-rose-50 px-1 py-0.5 text-[10px] text-rose-500">敏感</span>
+                    <span class="ml-auto shrink-0 text-zinc-400">{{ log.time }}</span>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <!-- 文档管理 -->
+            <template v-else>
+              <div class="flex-1 p-4 text-center text-xs text-zinc-400">文档管理</div>
+            </template>
+            <div class="flex items-center justify-end border-t border-zinc-100 px-4 py-3">
+              <button type="button" class="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50" @click="closeKbSettings">关闭</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 回收站面板 -->
+    <div v-if="activeKnowledgeTab === 'trash'" class="flex flex-1 flex-col overflow-hidden">
+      <div class="flex items-center gap-3 border-b border-zinc-200 px-6 py-4">
+        <button type="button" class="rounded-full p-1 text-zinc-400 hover:bg-zinc-100" @click="activeKnowledgeTab = 'assets'"><ChevronLeft class="h-5 w-5" /></button>
+        <h2 class="text-base font-semibold text-zinc-900">回收站</h2>
+        <div class="relative ml-auto">
+          <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-300" />
+          <input v-model="recycleSearch" class="h-9 w-56 rounded-xl border border-zinc-200 pl-9 pr-3 text-sm outline-none focus:border-blue-300" placeholder="搜索回收站" />
+        </div>
+      </div>
+      <div class="flex-1 overflow-auto">
+        <div v-if="filteredRecycleItems.length === 0" class="flex flex-col items-center justify-center py-20 text-zinc-400">
+          <Trash2 class="h-10 w-10" />
+          <p class="mt-3 text-sm">当前空间回收站为空</p>
+        </div>
+        <div v-else class="divide-y divide-zinc-100">
+          <div v-for="item in filteredRecycleItems" :key="item.id" class="flex items-center gap-4 px-6 py-3 text-sm hover:bg-zinc-50">
+            <Folder v-if="item.type === 'folder'" class="h-5 w-5 text-blue-400" />
+            <FileText v-else-if="item.type === 'file'" class="h-5 w-5 text-zinc-400" />
+            <BookOpen v-else class="h-5 w-5 text-orange-400" />
+            <div class="min-w-0 flex-1">
+              <div class="truncate font-medium text-zinc-900">{{ item.name }}</div>
+              <div class="text-xs text-zinc-400">{{ item.detail }}</div>
+            </div>
+            <span class="text-xs text-zinc-400">{{ item.deletedAt?.slice(0,10) }}</span>
+            <button type="button" class="rounded-lg border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-100" @click="restoreRecycleItem(item)">恢复</button>
+            <button type="button" class="rounded-lg border border-rose-100 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-100" @click="purgeRecycleItem(item)">彻底删除</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
