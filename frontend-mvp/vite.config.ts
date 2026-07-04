@@ -2,10 +2,14 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import path from 'node:path'
+import { codeInspectorPlugin } from 'code-inspector-plugin'
 
 export default defineConfig({
   base: '/PORTL/',
-  plugins: [vue()],
+  plugins: [
+    vue(),
+    codeInspectorPlugin({ bundler: 'vite' }),
+  ],
   resolve: {
     alias: { '@': path.resolve(__dirname, './src') },
   },

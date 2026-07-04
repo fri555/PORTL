@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Text, DateTime, Integer, ForeignKey
+from sqlalchemy import Column, String, Text, DateTime, Integer, ForeignKey, Float
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -20,7 +20,12 @@ class KnowledgeAsset(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
 
-    ingestion_jobs = relationship("KnowledgeIngestionJob", back_populates="asset")
+    ingestion_jobs = relationship(
+        "KnowledgeIngestionJob",
+        back_populates="asset",
+        cascade="all, delete-orphan",
+    )
+    chunks = relationship("KnowledgeChunk", back_populates="asset", cascade="all, delete-orphan")
 
 
 class KnowledgeIngestionJob(Base):
@@ -49,3 +54,20 @@ class KnowledgeGap(Base):
     status = Column(String(20), default="open")  # open / in_progress / resolved / closed
     created_at = Column(DateTime, default=datetime.utcnow)
     resolved_at = Column(DateTime, nullable=True)
+
+
+class KnowledgeChunk(Base):
+    __tablename__ = "knowledge_chunks"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    asset_id = Column(String(36), ForeignKey("knowledge_assets.id"), nullable=False, index=True)
+    kb_id = Column(String(100), index=True, default="default")
+    source_path = Column(String(1000), index=True, nullable=False)
+    chunk_index = Column(Integer, nullable=False)
+    content = Column(Text, nullable=False)
+    embedding = Column(Text, nullable=False)
+    score_hint = Column(Float, default=0.0)
+    token_count = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    asset = relationship("KnowledgeAsset", back_populates="chunks")

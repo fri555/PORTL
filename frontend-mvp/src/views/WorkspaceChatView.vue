@@ -44,6 +44,7 @@ import {
   PieChart,
   Play,
   Plus,
+  Quote,
   SendHorizontal,
   Settings,
   Sparkles,
@@ -88,6 +89,8 @@ const route = useRoute()
 const router = useRouter()
 const store = useAppStore()
 const chatInput = ref('')
+const quotedChatMessage = ref<{ id: string; content: string } | null>(null)
+const messageReplyRefs = ref<Record<string, string>>({})
 const memoryEnabled = ref(true)
 const sidebarSearch = ref('')
 const sidebarModeFilter = ref<'all' | RunMode>('all')
@@ -126,7 +129,7 @@ const knowledgeUploadInput = ref<HTMLInputElement | null>(null)
 const uploadedFiles = ref<string[]>([])
 const chatUploadInput = ref<HTMLInputElement | null>(null)
 const showChatUploadTip = ref(false)
-const uploadHintText = '支持 PDF、Word、Excel、PPT、TXT、PNG、JPG，单个文件 20MB 内'
+const uploadHintText = '支持 PDF、DOC/DOCX、Markdown、TXT，单个文件 20MB 内'
 const selectedAgent = ref(String(route.query.agentLabel || (runMode.value === 'task' ? '组货专家' : '调研帮手')))
 const selectedKnowledgeRefs = ref([
   { title: String(route.query.caseTitle || '首页案例'), kb: String(route.query.kb || '方案中心案例库'), desc: '从首页推荐案例带入，保留当前智能体与知识库引用', agent: selectedAgent.value },
@@ -151,9 +154,9 @@ const agentSelectLabel = computed(() => runMode.value === 'task' ? '专家' : '�
 
 // ---- mock data for panels ----
 const referenceFiles = ref([
-  { name: '团购通用预算池.xlsx', desc: '预算段、价格带、组合策略', status: 'ready' },
+  { name: '团购通用预算池.md', desc: '预算段、价格带、组合策略', status: 'ready' },
   { name: '运动鞋团购成功案例.md', desc: 'B2B线下成交案例库', status: 'ready' },
-  { name: '方案中心字段模板.xlsx', desc: '客户类型、数量、预算、场景字段', status: 'ready' },
+  { name: '方案中心字段模板.docx', desc: '客户类型、数量、预算、场景字段', status: 'ready' },
 ])
 
 const outputArtifacts = ref([
@@ -353,6 +356,7 @@ watch(runMode, (mode) => {
 async function handleSend(text?: string) {
   const content = (text ?? chatInput.value).trim()
   if (!content || isStreaming.value) return
+  const quoted = quotedChatMessage.value
   chatInput.value = ''
   isAutoScroll.value = true
   showBackToLatest.value = false
@@ -381,6 +385,17 @@ async function handleSend(text?: string) {
   } else {
     await sendMessage(messageContent, { onThinkingStart: () => scrollToBottom(), onThinkingUpdate: () => scrollToBottom() })
   }
+
+  if (quoted && activeConversation.value) {
+    const sentUserMessage = [...activeConversation.value.messages].reverse().find(msg => msg.role === 'user' && msg.content === messageContent)
+    if (sentUserMessage) {
+      messageReplyRefs.value = {
+        ...messageReplyRefs.value,
+        [sentUserMessage.id]: quoted.content.slice(0, 100),
+      }
+    }
+  }
+  quotedChatMessage.value = null
 
   const msgs = activeConversation.value?.messages
   const lastMsg = msgs ? msgs[msgs.length - 1] : undefined
@@ -455,6 +470,10 @@ function copyMessage(content: string) {
   navigator.clipboard.writeText(content).then(() => {
     // brief toast handled by browser or just silent
   })
+}
+
+function quoteMessage(id: string, content: string) {
+  quotedChatMessage.value = { id, content }
 }
 
 // Regenerate message
@@ -539,7 +558,7 @@ function handleChatUpload(event: Event) {
 }
 function isSupportedUpload(file: File) {
   const ext = file.name.split('.').pop()?.toLowerCase()
-  return ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'png', 'jpg', 'jpeg'].includes(ext || '')
+  return ['pdf', 'doc', 'docx', 'md', 'txt'].includes(ext || '')
 }
 
 // ---- keyboard ----
@@ -664,7 +683,7 @@ function renderMarkdown(text: string): string {
             </button>
           </div>
 
-          <input ref="knowledgeUploadInput" class="hidden" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg" @change="handleKnowledgeUpload" />
+          <input ref="knowledgeUploadInput" class="hidden" type="file" multiple accept=".pdf,.doc,.docx,.md,.txt" @change="handleKnowledgeUpload" />
 
           <!-- Session list -->
           <div class="no-scrollbar mx-2 mb-2 flex-1 space-y-1 overflow-y-auto">
@@ -761,6 +780,10 @@ function renderMarkdown(text: string): string {
 
                   <!-- Message content: user bubble, assistant markdown body -->
                   <div class="max-w-full overflow-x-auto break-words text-[15px] leading-7" :class="message.role === 'user' ? 'rounded-2xl rounded-tr-md bg-blue-600 px-3.5 py-2.5 text-white shadow-sm' : 'px-0 py-0 text-zinc-800'">
+                    <div v-if="message.role === 'user' && messageReplyRefs[message.id]" class="mb-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs leading-5 text-blue-50">
+                      <div class="mb-0.5 font-semibold">引用</div>
+                      <div class="line-clamp-2">{{ messageReplyRefs[message.id] }}</div>
+                    </div>
                     <div v-if="message.role === 'assistant'" class="min-w-0 max-w-full" v-html="renderMarkdown(message.content)" />
                     <div v-else class="whitespace-pre-wrap">{{ stripModePrefix(message.content) }}</div>
                   </div>
@@ -771,6 +794,7 @@ function renderMarkdown(text: string): string {
                     <button class="rounded p-0.5 text-zinc-300 hover:text-red-500 hover:bg-red-50" :class="{ 'text-red-500': messageFeedback[message.id] === 'down' }" @click="openDislikeModal(message.id)" title="不合适"><ThumbsDown class="h-3 w-3" /></button>
                     <span class="mx-0.5 text-zinc-200">|</span>
                     <button class="rounded p-0.5 text-zinc-300 hover:text-blue-500 hover:bg-blue-50" @click="copyMessage(message.content)" title="复制"><Copy class="h-3 w-3" /></button>
+                    <button class="rounded p-0.5 text-zinc-300 hover:text-violet-500 hover:bg-violet-50" @click="quoteMessage(message.id, stripModePrefix(message.content))" title="引用"><Quote class="h-3 w-3" /></button>
                     <button class="rounded p-0.5 text-zinc-300 hover:text-sky-500 hover:bg-sky-50" @click="regenerateMessage(message.id)" title="重新生成"><RefreshCw class="h-3 w-3" /></button>
                   </div>
                   <div v-if="message.role === 'assistant' && message.id !== 'welcome'" class="mt-2 rounded-xl border border-zinc-200 bg-zinc-50 p-2">
@@ -827,7 +851,17 @@ function renderMarkdown(text: string): string {
           </button>
           <div class="mx-auto w-full max-w-6xl">
             <div class="rounded-3xl border border-zinc-300 bg-white/95 shadow-[0_18px_60px_rgba(15,23,42,0.12)] ring-1 ring-zinc-100 backdrop-blur-2xl transition focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100">
-              <input ref="chatUploadInput" class="hidden" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg" @change="handleChatUpload" />
+              <input ref="chatUploadInput" class="hidden" type="file" multiple accept=".pdf,.doc,.docx,.md,.txt" @change="handleChatUpload" />
+              <div v-if="quotedChatMessage" class="mx-3 mt-3 flex items-start gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                <Quote class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <div class="min-w-0 flex-1">
+                  <div class="font-semibold">正在引用上一条回答</div>
+                  <div class="mt-0.5 line-clamp-2 text-blue-600/80">{{ quotedChatMessage.content }}</div>
+                </div>
+                <button type="button" class="rounded-md p-1 text-blue-500 hover:bg-blue-100" aria-label="取消引用" @click="quotedChatMessage = null">
+                  <X class="h-3.5 w-3.5" />
+                </button>
+              </div>
               <div v-if="selectedKnowledgeRefs.length || uploadedFiles.length" class="grid gap-2 px-3 pt-3 sm:grid-cols-2">
                 <div v-for="refItem in selectedKnowledgeRefs" :key="refItem.kb" class="flex min-w-0 items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs">
                   <Database class="h-4 w-4 shrink-0 text-emerald-600" />

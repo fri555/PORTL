@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref } from 'vue'
 import {
-  ArrowUp, BookOpen, CheckCircle2, CheckSquare, ChevronDown, ChevronLeft, ChevronRight, ChevronsRight, Copy, Database, Download, Eye, File,
+  AlertTriangle, ArrowUp, BookOpen, CheckCircle2, CheckSquare, ChevronDown, ChevronLeft, ChevronRight, ChevronsRight, Copy, Database, Download, Eye, File,
   FileSpreadsheet, FileText, Folder, FolderKanban, GripVertical, LayoutGrid, List, MessageSquareText, MoreVertical, Pencil, Quote, RotateCw,
   Move, Plus, Search, Square, Star, Trash2, Upload, X,
 } from 'lucide-vue-next'
@@ -65,6 +65,7 @@ const qaCopiedId = ref<number | null>(null)
 const qaTextarea = ref<HTMLTextAreaElement | null>(null)
 const highlightedSection = ref<string | null>(null)
 let highlightTimer: ReturnType<typeof setTimeout> | null = null
+const confirmModal = ref<{ show: boolean; title: string; message: string; confirmText?: string; danger?: boolean; onConfirm: () => void }>({ show: false, title: '', message: '', onConfirm: () => {} })
 
 function getDocSection(docName: string): string {
   const map: Record<string, string> = {
@@ -321,7 +322,12 @@ const displayedKnowledgeBases = computed(() => {
 const pinnedKnowledgeBases = computed(() => displayedKnowledgeBases.value.filter(kb => kb.pinned))
 const filteredDocs = computed(() => {
   const q = fileSearch.value.trim().toLowerCase()
-  return q ? docs.value.filter(d => d.name.toLowerCase().includes(q)) : docs.value
+  if (!q) return docs.value
+  return docs.value.filter(d => {
+    if (d.name.toLowerCase().includes(q)) return true
+    if (d.tags?.some(t => t.toLowerCase().includes(q))) return true
+    return false
+  })
 })
 const currentFileTree = computed(() => fileTrees[activeSpace.value])
 const activeNode = computed(() => findTreeNode(currentFileTree.value, activeTreeId.value))
@@ -959,6 +965,9 @@ function showFileActionToast(message: string) {
     fileActionFeedback.value = ''
     fileActionToastTimer = undefined
   }, 3000)
+}
+function showConfirm(title: string, message: string, onConfirm: () => void, danger = true) {
+  confirmModal.value = { show: true, title, message, confirmText: '确认', danger, onConfirm }
 }
 function findKbTreeNode(nodes: TreeNode[], kbId: string): TreeNode | undefined {
   for (const node of nodes) {
@@ -1964,45 +1973,42 @@ onBeforeUnmount(() => {
     <Teleport to="body">
       <div v-if="contextMenu" class="fixed inset-0 z-[55]" @click="contextMenu = null">
         <div class="absolute w-44 overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 text-sm shadow-2xl" :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }" @click.stop>
-          <template v-if="contextMenu.type === 'kb' && contextKb">
-            <div class="px-3 py-2 text-xs font-semibold text-zinc-400">知识库操作</div>
-            <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openKnowledgeQaFromKb(contextKb); contextMenu = null"><MessageSquareText class="h-4 w-4 text-blue-500" />知识库问答</button>
-            <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="toggleKbPinned(contextKb); contextMenu = null"><Star class="h-4 w-4 text-amber-500" />{{ contextKb.pinned ? '取消收藏' : '收藏' }}</button>
-            <button v-if="contextKb.canEdit" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="beginRenameKb(contextKb); contextMenu = null"><Pencil class="h-4 w-4" />重命名</button>
+          <!-- 右键根空间空白处 -->
+          <template v-if="contextMenu.type === 'tree' && contextMenu.id === '__root__'">
+            <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="createSiblingSpaceFolder(); contextMenu = null"><Folder class="h-4 w-4" />新建空间文件夹</button>
+          </template>
+          <!-- 右键知识库行 -->
+          <template v-else-if="contextMenu.type === 'kb' && contextKb">
+            <div class="px-3 py-2 text-xs font-semibold text-zinc-400">{{ contextKb.name }}</div>
+            <button v-if="contextKb.canEdit" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openCreateFolderModalAt(contextKb.id); contextMenu = null"><Folder class="h-4 w-4" />新建文件夹</button>
+            <button v-if="contextKb.canEdit" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openKbSettings(contextKb); contextMenu = null"><Settings class="h-4 w-4 text-blue-500" />设置</button>
             <button v-if="contextKb.canEdit" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteKb(contextKb); contextMenu = null"><Trash2 class="h-4 w-4" />删除</button>
           </template>
+          <!-- 右键空间文件夹行 -->
+          <template v-else-if="contextMenu.type === 'space-folder' && contextSpaceFolder">
+            <div class="px-3 py-2 text-xs font-semibold text-zinc-400">{{ contextSpaceFolder.label }}</div>
+            <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openCreateModalAt(contextSpaceFolder.id); contextMenu = null"><BookOpen class="h-4 w-4 text-orange-500" />新建知识库</button>
+            <button v-if="canManageSpaceFolder(contextSpaceFolder)" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteSpaceFolder(contextSpaceFolder); contextMenu = null"><Trash2 class="h-4 w-4" />删除</button>
+          </template>
+          <!-- 右键文件（文件列表中） -->
           <template v-else-if="contextMenu.type === 'doc' && contextDoc">
             <div class="px-3 py-2 text-xs font-semibold text-zinc-400">文件操作</div>
             <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openPreview(contextDoc); contextMenu = null"><Eye class="h-4 w-4" />预览</button>
-            <button v-if="selectedKb?.canEdit" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="beginRenameDoc(contextDoc); contextMenu = null"><Pencil class="h-4 w-4" />重命名</button>
-            <button v-if="selectedKb?.canEdit" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="moveDoc(contextDoc); contextMenu = null"><Move class="h-4 w-4" />移动到</button>
+            <button v-if="selectedKb?.canEdit" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openFileSettings(contextDoc); contextMenu = null"><Settings class="h-4 w-4 text-blue-500" />设置</button>
             <button v-if="selectedKb?.canEdit" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteDoc(contextDoc); contextMenu = null"><Trash2 class="h-4 w-4" />删除</button>
           </template>
-          <template v-else-if="contextMenu.type === 'tree'">
+          <!-- 右键文件树节点 -->
+          <template v-else-if="contextMenu.type === 'tree' && contextTreeNode && contextMenu.id !== '__root__'">
             <template v-if="contextTreeNode?.type === 'file' && contextTreeDoc">
-              <div class="px-3 py-2 text-xs font-semibold text-zinc-400">文件操作</div>
+              <div class="px-3 py-2 text-xs font-semibold text-zinc-400">{{ contextTreeDoc.name }}</div>
               <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openPreview(contextTreeDoc); contextMenu = null"><Eye class="h-4 w-4" />预览</button>
-              <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="contextTreeDoc && moveDoc(contextTreeDoc); contextMenu = null"><Move class="h-4 w-4" />移动到</button>
-              <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="beginRenameDoc({ name: contextTreeDoc.name, format: contextTreeDoc.format, status: contextTreeDoc.status, updatedAt: contextTreeDoc.updatedAt, uploadedBy: contextTreeDoc.uploadedBy }); contextMenu = null"><Pencil class="h-4 w-4" />重命名</button>
-              <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteTreeDoc(contextTreeNode)"><Trash2 class="h-4 w-4" />删除</button>
+              <button v-if="canEditTreeNode(contextTreeNode)" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openFileSettings(contextTreeDoc); contextMenu = null"><Settings class="h-4 w-4 text-blue-500" />设置</button>
+              <button v-if="canEditTreeNode(contextTreeNode)" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteTreeDoc(contextTreeNode)"><Trash2 class="h-4 w-4" />删除</button>
             </template>
-            <template v-else>
-            <div class="px-3 py-2 text-xs font-semibold text-zinc-400">目录操作</div>
-            <button v-if="canContextCreateFolder" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openCreateFolderModalAt(contextMenu.id)">
-              <Folder class="h-4 w-4" />新建文件夹
-            </button>
-            <button v-if="contextTreeNode?.type === 'folder' && contextTreeNode.kbId" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="selectedKbId = contextTreeNode.kbId; openUploadModal(); contextMenu = null">
-              <Upload class="h-4 w-4" />上传文件
-            </button>
-            <button v-if="canContextCreateKb" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openCreateModalAt(contextMenu.id)">
-              <BookOpen class="h-4 w-4 text-orange-500" />新建知识库
-            </button>
-            <button v-if="contextTreeNode?.type === 'folder'" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="beginRenameFolder(contextTreeNode); contextMenu = null">
-              <Pencil class="h-4 w-4" />重命名
-            </button>
-            <button v-if="canDeleteFolder(contextTreeNode)" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="contextTreeNode && deleteTreeFolder(contextTreeNode)">
-              <Trash2 class="h-4 w-4" />删除文件夹
-            </button>
+            <template v-else-if="contextTreeNode?.type === 'folder'">
+              <div class="px-3 py-2 text-xs font-semibold text-zinc-400">{{ contextTreeNode.label }}</div>
+              <button v-if="canEditTreeNode(contextTreeNode)" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openCreateFolderModalAt(contextMenu.id); contextMenu = null"><Folder class="h-4 w-4" />新建文件夹</button>
+              <button v-if="canDeleteFolder(contextTreeNode)" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteTreeFolder(contextTreeNode)"><Trash2 class="h-4 w-4" />删除</button>
             </template>
           </template>
         </div>
@@ -2182,6 +2188,25 @@ onBeforeUnmount(() => {
           <div class="flex items-center justify-end gap-2 border-t border-zinc-200 px-6 py-4">
             <button type="button" class="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50" @click="cancelFileAction">取消</button>
             <button type="button" class="rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-50" :disabled="!targetKbId" @click="confirmFileAction">确认</button>
+          </div>
+        </div>
+      </div>
+        </Teleport>
+
+    <!-- 二次确认弹窗 -->
+    <Teleport to="body">
+      <div v-if="confirmModal.show" class="fixed inset-0 z-[100] flex items-center justify-center bg-zinc-950/40 px-4 py-8" @click.self="confirmModal.show = false">
+        <div class="w-full max-w-sm rounded-2xl bg-white shadow-xl">
+          <div class="px-6 pt-6">
+            <div class="mb-1 flex items-center gap-2">
+              <AlertTriangle v-if="confirmModal.danger" class="h-5 w-5 text-red-500" />
+              <h3 class="text-base font-semibold text-zinc-900">{{ confirmModal.title }}</h3>
+            </div>
+            <p class="mt-2 text-sm leading-relaxed text-zinc-600">{{ confirmModal.message }}</p>
+          </div>
+          <div class="flex items-center justify-end gap-2 border-t border-zinc-100 px-6 py-4 mt-5">
+            <button type="button" class="rounded-xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50" @click="confirmModal.show = false">取消</button>
+            <button type="button" :class="confirmModal.danger ? 'rounded-xl bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600' : 'rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600'" @click="confirmModal.onConfirm(); confirmModal.show = false">{{ confirmModal.confirmText ?? '确认' }}</button>
           </div>
         </div>
       </div>

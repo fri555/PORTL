@@ -1,0 +1,46 @@
+{
+  "watchers": [
+    {
+      "id": "session_tier",
+      "startup": "low",
+      "buckets": [
+        {
+          "id": "low",
+          "match": { "metric": "session.percent", "range": [0, 55] },
+          "action": { "message": "✅ Session 已用 {session.consumed}% — 充裕" }
+        },
+        {
+          "id": "mid",
+          "match": { "metric": "session.percent", "range": [55, 80] },
+          "action": { "message": "⚠️ Session 已用 {session.consumed}% — 注意用量" }
+        },
+        {
+          "id": "panic",
+          "match": { "metric": "session.percent", "range": [80, 100] },
+          "action": { "stop": "🛑 Session 已用 {session.consumed}% — 超出预算，停止循环" }
+        }
+      ]
+    },
+    {
+      "id": "weekly_tier",
+      "startup": "low",
+      "buckets": [
+        {
+          "id": "low",
+          "match": { "metric": "week.percent", "range": [0, 60] },
+          "action": { "message": "📊 本周预算已用 {week.consumed}%" }
+        },
+        {
+          "id": "mid",
+          "match": { "metric": "week.percent", "range": [60, 85] },
+          "action": { "message": "⚠️ 本周预算已用 {week.consumed}% — 注意控制" }
+        },
+        {
+          "id": "panic",
+          "match": { "metric": "week.percent", "range": [85, 100] },
+          "action": { "message": "🚨 本周预算已用 {week.consumed}% — 接近上限" }
+        }
+      ]
+    }
+  ]
+}

@@ -69,7 +69,7 @@ const planCases: CaseItem[] = [
   },
 ]
 
-const uploadHint = '支持 PDF、Word、Excel、PPT、TXT、PNG、JPG，单个文件 20MB 内'
+const uploadHint = '支持 PDF、DOC/DOCX、Markdown、TXT，单个文件 20MB 内'
 const attachmentTooltip = computed(() =>
   selectedFiles.value.length
     ? `已添加 ${selectedFiles.value.length} 个附件`
@@ -106,7 +106,7 @@ function handleFiles(event: Event) {
   const files = Array.from((event.target as HTMLInputElement).files || [])
   selectedFiles.value = files.filter((file) => {
     const ext = file.name.split('.').pop()?.toLowerCase()
-    return ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'png', 'jpg', 'jpeg'].includes(ext || '')
+    return ['pdf', 'doc', 'docx', 'md', 'txt'].includes(ext || '')
   })
 }
 
@@ -121,15 +121,7 @@ function handlePaste(event: ClipboardEvent) {
   if (!items) return
   for (let i = 0; i < items.length; i++) {
     const item = items[i]
-    if (item.type === 'image/png' || item.type === 'image/jpeg') {
-      // Image from clipboard → create File object
-      event.preventDefault()
-      const blob = item.getAsFile()
-      if (!blob) continue
-      const ext = item.type.split('/')[1] || 'png'
-      const file = new File([blob], `paste-image-${Date.now()}.${ext}`, { type: item.type })
-      selectedFiles.value = [...selectedFiles.value, file]
-    }
+    if (item.kind === 'file') continue
     // text/plain is handled by default textarea behavior (no preventDefault needed)
   }
 }
@@ -151,8 +143,8 @@ const quickCases = [
   },
   {
     title: '📊 数据分析',
-    desc: '上传Excel，获取分析洞察',
-    hint: '上传 [Excel文件] 分析数据趋势和异常',
+    desc: '上传文档，获取分析洞察',
+    hint: '上传 [文档文件] 分析资料趋势和异常',
     prompt: '请分析上传的数据文件，提取关键趋势、异常点和优化建议',
   },
 ]
@@ -213,7 +205,7 @@ function submit() {
             class="hidden"
             type="file"
             multiple
-            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg"
+            accept=".pdf,.doc,.docx,.md,.txt"
             @change="handleFiles"
           />
           <textarea
