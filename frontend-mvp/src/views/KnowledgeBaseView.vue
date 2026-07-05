@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import SidebarTreeNode from '@/components/knowledge/SidebarTreeNode.vue'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,13 +13,12 @@ import {
   MoreVertical, Pencil, Quote, RotateCw,
   Calendar, History, Move, Plus, Search, Settings, ShieldCheck, Square, Star, ThumbsDown, ThumbsUp, Trash2, Upload, X,
 } from 'lucide-vue-next'
-import type { PermissionRole, PermissionEntry, SecurityLevel } from '@/types/knowledge'
+import type { PermissionRole, PermissionEntry, SecurityLevel, TreeNode } from '@/types/knowledge'
 
 interface QaMessage { id: number; role: 'user' | 'assistant'; content: string; citations?: string[]; thinking?: ThinkingStep[] }
 interface ThinkingStep { id: string; label: string; detail: string; status: 'pending' | 'running' | 'completed' | 'error'; icon: string; elapsed?: number; errorMsg?: string }
 interface KnowledgeBaseItem { id: string; name: string; docs: number; owner: string; department: string; visibility: string; space: 'public' | 'personal'; canEdit: boolean; isBuiltIn?: boolean; pinned?: boolean; recent: string; createdAt?: string; updatedAt?: string; permissionMode: 'independent'; permissions: PermissionEntry[] }
 interface DocItem { name: string; format: string; status: string; updatedAt: string; uploadedBy: string; size?: string; tags?: string[]; confidence?: number; securityLevel?: SecurityLevel; allowedDepts?: { id: string; name: string }[]; summary?: string }
-interface TreeNode { id: string; label: string; type: 'folder' | 'file'; kbId?: string; docName?: string; isKnowledgeBase?: boolean; isBuiltIn?: boolean; children?: TreeNode[]; permissionMode?: 'inherit' | 'independent'; permissions?: PermissionEntry[] }
 interface FolderOption { id: string; label: string; depth: number; node?: TreeNode }
 interface RecycleItem { id: string; type: 'knowledgeBase' | 'folder' | 'file'; name: string; space: 'public' | 'personal'; kbId?: string; kbName?: string; parentId?: string; deletedAt: string; detail: string }
 type UploadTaskStatus = 'pending' | 'uploading' | 'processing' | 'done' | 'reviewing' | 'failed' | 'upload_failed' | 'process_failed' | 'process_failed_permanent' | 'cancelled' | 'offline'
@@ -154,6 +154,7 @@ const filteredFileTree = computed(() =>
       return 0
     })
 )
+const treeSearch = ref('')
 
 const settingsKbId = ref('')
 const kbVisibilityOpen = ref(true)
@@ -168,6 +169,32 @@ const hoveredNodeId = ref('')               // 当前 hover 的节点 ID
 const treeMenuTargetId = ref('')            // ⋮ 菜单打开的目标节点 ID
 const treeMenuPos = ref({ x: 0, y: 0 })     // ⋮ 菜单弹出位置
 const activeTreeItemId = ref('')
+
+// ===== Phase 2: 树节点信息查询函数 =====
+function getKbVisibilityIcon(kbId: string, space?: string): 'public' | 'dept' | 'personal' | 'custom' | null {
+  if (space === 'personal') return null /* 个人空间不显示可见性图标 */
+  const kb = knowledgeBases.find(k => k.id === kbId)
+  if (!kb) return 'VIEWER'
+  if (kb.visibility.includes('全员')) return 'public'
+  if (kb.visibility.includes('部门')) return 'dept'
+  if (kb.visibility.includes('仅自己')) return 'personal'
+  if (kb.visibility.includes('指定') || kb.visibility.includes('可编辑')) return 'custom'
+  return null
+}
+function getTreeNodeDocStatus(docName: string, kbId: string): string {
+  return (allDocs[kbId] ?? []).find(d => d.name === docName)?.status ?? ''
+}
+function getKbDocCount(kbId: string): number {
+  return knowledgeBases.find(k => k.id === kbId)?.docs ?? 0
+}
+function getUserRole(kbId: string, space?: string): string {
+  if (space === 'personal') return 'OWNER'
+  const kb = knowledgeBases.find(k => k.id === kbId)
+  if (!kb) return 'VIEWER'
+  if (kb.canEdit) return 'EDITOR'
+  return 'VIEWER'
+}
+
 const previewDoc = ref<DocItem | null>(null)
 const previewTabs = ref<DocItem[]>([])
 const activeRightTab = ref('')
@@ -1239,6 +1266,7 @@ function openPreview(doc: DocItem) {
   previewDoc.value = doc
   previewTabs.value = [doc, ...previewTabs.value.filter(item => item.name !== doc.name)].slice(0, 5)
   activeRightTab.value = doc.name
+  qaOpen.value = true
 }
 function openQaPanel() {
   qaOpen.value = true
@@ -1439,6 +1467,56 @@ function openTreeContextMenu(targetId: string, event: MouseEvent) {
 function openTreeBlankContextMenu(event: MouseEvent) {
   contextMenu.value = { type: 'tree', id: '__root__', x: event.clientX, y: event.clientY }
 }
+
+// ===== SidebarTreeNode 事件桥接函数 =====
+function handleTreeToggle(node: TreeNode) {
+  toggleTreeNode(node)
+}
+function handleTreeSelect(node: TreeNode) {
+  if (node.type === 'folder' && node.kbId) {
+    selectKb(node.kbId)
+    if (node.children?.length && !expandedTreeIds.value.includes(node.id)) {
+      expandedTreeIds.value = [...expandedTreeIds.value, node.id]
+    }
+  }
+}
+function handleTreePreview(node: TreeNode) {
+  if (!node.kbId || !node.docName) return
+  const doc = (allDocs[node.kbId] ?? []).find(item => item.name === node.docName)
+  if (doc) {
+    if (node.kbId) selectKb(node.kbId)
+    openPreview(doc)
+  }
+}
+function handleTreeSettings(node: TreeNode) {
+  if (node.kbId) {
+    const kb = knowledgeBases.find(k => k.id === node.kbId)
+    if (kb) openKbSettings(kb)
+  } else if (node.type === 'folder') {
+    openFolderPermission(node.id)
+  }
+}
+function handleTreeDelete(node: TreeNode) {
+  if (node.type === 'file') {
+    deleteTreeDoc(node)
+  } else if (node.type === 'folder') {
+    if (node.kbId && node.isKnowledgeBase) {
+      const kb = knowledgeBases.find(k => k.id === node.kbId)
+      if (kb) deleteKb(kb)
+    } else {
+      deleteTreeFolder(node)
+    }
+  }
+}
+function handleTreeCreateFolder(parentId: string) {
+  openCreateFolderModalAt(parentId)
+}
+function handleTreeRename(node: TreeNode) {
+  beginRenameFolder(node)
+}
+function handleTreeContextMenu(event: MouseEvent, nodeId: string) {
+  openTreeContextMenu(nodeId, event)
+}
 const contextTreeNode = computed(() => contextMenu.value?.type === 'tree' && contextMenu.value.id !== '__root__'
   ? findTreeNode(currentFileTree.value, contextMenu.value.id)
   : undefined)
@@ -1629,6 +1707,35 @@ function openCitationRef(index: number, citations?: string[]) {
   }
 }
 
+const recommendedQuestions = computed(() => {
+  if (!selectedKb.value) return [
+    '先选择一个知识库，我能帮你解答相关问题',
+    '支持上传 PDF、Word、Excel 等格式的文件',
+    '问答结果会标注原文引用，方便追溯',
+  ]
+  const kbId = selectedKb.value.id
+  if (kbId === 'kb-public-3') return [
+    '方案中心有哪些可复用的团购案例？',
+    'B2B和B2C方案的预算分档有什么区别？',
+    '帮我汇总需要客户签字的材料清单',
+  ]
+  if (kbId === 'kb-public-1') return [
+    '考勤管理制度中加班审批流程是怎样的？',
+    '员工手册里关于休假有哪些规定？',
+    '制度文件最近一次更新是什么时候？',
+  ]
+  if (kbId === 'kb-public-2') return [
+    '商品基础资料库包含哪些核心品类？',
+    '商品数据字典的关键字段有哪些？',
+    '最近新增了哪些商品资料？',
+  ]
+  return [
+    `${selectedKb.value.name} 里有哪些核心文档？`,
+    `${selectedKb.value.name} 的主要内容是什么？`,
+    `帮我总结 ${selectedKb.value.name} 的关键信息`,
+  ]
+})
+
 function sendQuickQuestion(question: string) {
   qaQuestion.value = question
   askKnowledgeBase()
@@ -1705,14 +1812,14 @@ function findKbById(kbId: string): KnowledgeBaseItem | undefined {
   return knowledgeBases.find(kb => kb.id === kbId)
 }
 function getPermissionBadge(kb?: KnowledgeBaseItem): { text: string; cls: string } | null {
-  if (!kb) return null
+  if (!kb) return 'VIEWER'
   const my = (nodePermissions[kb.id] ?? []).find(m => m.name === '当前用户' || m.name === '我')
   if (my) {
     const map: Record<string, { text: string; cls: string }> = {
       OWNER: { text: '所有者', cls: 'border-indigo-200 bg-indigo-50 text-indigo-700' },
       MANAGER: { text: '管理员', cls: 'border-blue-200 bg-blue-50 text-blue-700' },
       EDITOR: { text: '可编辑', cls: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
-      VIEWER: { text: '可查看', cls: 'border-zinc-200 bg-zinc-50 text-zinc-500' },
+      VIEWER: '部门',
     }
     return map[my.role] ?? null
   }
@@ -2105,7 +2212,7 @@ function canAccessFile(user: { departments: string[] }, file: DocItem): boolean 
 // ─── 成员的安全许可（从角色派生） ───
 function getDefaultClearance(role: PermissionRole): SecurityLevel {
   const map: Record<PermissionRole, SecurityLevel> = {
-    OWNER: '机密', MANAGER: '机密', EDITOR: '秘密', VIEWER: '全员',
+    OWNER: '机密', MANAGER: '机密', EDITOR: '秘密', VIEWER: '部门',
   }
   return map[role]
 }
@@ -2347,175 +2454,29 @@ onBeforeUnmount(() => {
         </Button>
       </div>
       <div class="flex-1 overflow-y-auto p-2" data-testid="knowledge-tree-panel" @contextmenu.prevent="openTreeBlankContextMenu($event)">
-        <!-- KB列表 - 平铺显示 -->
         <div class="space-y-0.5">
-          <div v-for="kbNode in filteredFileTree" :key="kbNode.id" class="space-y-0.5">
-            <!-- KB 节点行 -->
-            <div
-              class="group relative flex items-center rounded-lg"
-              :class="selectedKbId === kbNode.kbId ? 'bg-blue-50 text-blue-700' : 'hover:bg-zinc-50'"
-              @mouseenter="hoveredNodeId = kbNode.id"
-              @mouseleave="hoveredNodeId = ''"
-            >
-              <button
-                v-if="kbNodeHasFolderChildren(kbNode.kbId ?? '')"
-                type="button"
-                class="grid h-7 w-7 shrink-0 place-items-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
-                @click="toggleTreeNode(kbNode)"
-              >
-                <ChevronDown v-if="expandedTreeIds.includes(kbNode.id)" class="h-3.5 w-3.5" />
-                <ChevronRight v-else class="h-3.5 w-3.5" />
-              </button>
-              <span v-else class="inline-block w-7 shrink-0" />
-              <button
-                type="button"
-                class="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-left text-xs transition"
-                :class="selectedKbId === kbNode.kbId ? 'font-medium' : 'text-zinc-600 hover:bg-zinc-50'"
-                @click="selectKb(kbNode.kbId ?? '')"
-                @contextmenu.prevent="openKbContextMenu(knowledgeBases.find(kb => kb.id === kbNode.kbId), $event)"
-              >
-                <BookOpen class="h-3.5 w-3.5 shrink-0 text-orange-500" />
-                <span class="truncate">{{ kbNode.label }}</span>
-                <span v-if="kbNode.isBuiltIn" class="shrink-0 rounded bg-blue-50 px-1 py-0.5 text-[9px] font-medium text-blue-600 border border-blue-100">系统内置</span>
-              </button>
-              <!-- KB 悬停操作按钮 -->
-              <div class="absolute right-1 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-0.5 bg-white pl-1.5 shadow-sm rounded-lg" :class="selectedKbId === kbNode.kbId ? 'bg-blue-50' : ''" @click.stop>
-                <button type="button" class="inline-flex h-6 w-6 items-center justify-center rounded text-zinc-400 hover:text-blue-600 hover:bg-blue-50" aria-label="权限配置" title="权限配置" @click="openKbSettings(knowledgeBases.find(kb => kb.id === kbNode.kbId) ?? null as any); treeMenuTargetId = ''">
-                  <Settings class="h-3.5 w-3.5" />
-                </button>
-                <button type="button" class="inline-flex h-6 w-6 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100" aria-label="更多操作" title="更多操作" @click="openTreeMenu($event, kbNode.id)">
-                  <MoreVertical class="h-3.5 w-3.5" />
-                </button>
-              </div>
-              <!-- KB ⋮ 下拉菜单 -->
-              <Teleport to="body">
-                <div v-if="treeMenuTargetId === kbNode.id" class="fixed inset-0 z-[70]" @click="treeMenuTargetId = ''">
-                  <div class="absolute w-44 overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 text-sm shadow-2xl" :style="{ left: `${treeMenuPos.x}px`, top: `${treeMenuPos.y}px` }" @click.stop>
-                    <div class="px-3 py-2 text-xs font-semibold text-zinc-400">{{ kbNode.label }}</div>
-                    <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="selectKb(kbNode.kbId ?? ''); treeMenuTargetId = ''"><BookOpen class="h-4 w-4 text-orange-500" />打开</button>
-                    <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openCreateFolderModalAt(kbNode.kbId ?? ''); treeMenuTargetId = ''"><Folder class="h-4 w-4" />新建文件夹</button>
-                    <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openKbSettings(knowledgeBases.find(kb => kb.id === kbNode.kbId) ?? null as any); treeMenuTargetId = ''"><Settings class="h-4 w-4 text-blue-500" />权限配置</button>
-                    <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteKb(knowledgeBases.find(kb => kb.id === kbNode.kbId) ?? null as any); treeMenuTargetId = ''"><Trash2 class="h-4 w-4" />删除</button>
-                  </div>
-                </div>
-              </Teleport>
-            </div>
-            <!-- KB 下的子节点 -->
-            <div v-if="expandedTreeIds.includes(kbNode.id)" class="ml-6 border-l border-zinc-100 text-xs">
-              <div v-for="child in (findKbTreeNode(fileTree, kbNode.kbId ?? '')?.children ?? [])" :key="child.id" class="flex items-center gap-0.5 ml-1">
-                <button
-                  v-if="child.type === 'folder' && child.children?.length"
-                  type="button"
-                  class="grid h-6 w-5 shrink-0 place-items-center rounded text-zinc-400 hover:text-zinc-700"
-                  @click.stop="toggleTreeNode(child)"
-                >
-                  <ChevronDown v-if="expandedTreeIds.includes(child.id)" class="h-3 w-3" />
-                  <ChevronRight v-else class="h-3 w-3" />
-                </button>
-                <span v-else class="inline-block w-5 shrink-0" />
-                <div class="group relative flex min-w-0 flex-1 items-center" @mouseenter="hoveredNodeId = child.id" @mouseleave="hoveredNodeId = ''">
-                  <button
-                    v-if="child.type === 'file'"
-                    type="button"
-                    class="flex min-w-0 flex-1 items-center gap-1.5 rounded-md py-1 cursor-pointer hover:bg-zinc-100"
-                    @click="toggleTreeNode(child)"
-                    @contextmenu.prevent="openTreeContextMenu(child.id, $event)"
-                  >
-                    <FileText class="h-3 w-3 shrink-0 text-zinc-300" />
-                    <span class="truncate text-zinc-500">{{ child.label }}</span>
-                  </button>
-                  <button
-                    v-else
-                    type="button"
-                    class="flex min-w-0 flex-1 items-center gap-1.5 rounded-md py-1 cursor-pointer hover:bg-zinc-100"
-                    @click="toggleTreeNode(child)"
-                    @contextmenu.prevent="openTreeContextMenu(child.id, $event)"
-                  >
-                    <Folder class="h-3 w-3 shrink-0 text-zinc-400" />
-                    <span class="truncate text-zinc-600">{{ child.label }}</span>
-                  </button>
-                  <!-- 子节点悬停操作按钮 -->
-                  <div class="shrink-0 hidden group-hover:flex items-center gap-0.5 bg-white pl-1 shadow-sm rounded-md absolute right-0" @click.stop>
-                    <!-- 文件夹特有操作 -->
-                    <template v-if="child.type === 'folder'">
-                      <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded text-zinc-400 hover:text-blue-600 hover:bg-blue-50" aria-label="权限配置" title="权限配置" @click="openFolderPermission(child.id); treeMenuTargetId = ''">
-                        <Settings class="h-3 w-3" />
-                      </button>
-                    </template>
-                    <!-- 文件特有操作 -->
-                    <template v-else>
-                      <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded text-zinc-400 hover:text-blue-600 hover:bg-blue-50" aria-label="预览" title="预览" @click="previewFileFromTree({ id: child.id, node: child, depth: 1, kbId: kbNode.kbId })">
-                        <Eye class="h-3 w-3" />
-                      </button>
-                      <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded text-zinc-400 hover:text-red-500 hover:bg-red-50" aria-label="删除文件" title="删除" @click="deleteTreeDoc(child)">
-                        <Trash2 class="h-3 w-3" />
-                      </button>
-                    </template>
-                    <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100" aria-label="更多操作" title="更多操作" @click="openTreeMenu($event, `${kbNode.id}-${child.id}`)">
-                      <MoreVertical class="h-3 w-3" />
-                    </button>
-                  </div>
-                  <!-- 子节点 ⋮ 下拉菜单 -->
-                  <Teleport to="body">
-                    <div v-if="treeMenuTargetId === `${kbNode.id}-${child.id}`" class="fixed inset-0 z-[70]" @click="treeMenuTargetId = ''">
-                      <div class="absolute w-44 overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 text-sm shadow-2xl" :style="{ left: `${treeMenuPos.x}px`, top: `${treeMenuPos.y}px` }" @click.stop>
-                        <div class="px-3 py-2 text-xs font-semibold text-zinc-400">{{ child.label }}</div>
-                        <template v-if="child.type === 'folder'">
-                          <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="toggleTreeNode(child); treeMenuTargetId = ''"><Folder class="h-4 w-4" />打开</button>
-                          <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openCreateFolderModalAt(child.id); treeMenuTargetId = ''"><Folder class="h-4 w-4" />新建文件夹</button>
-                          <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openFolderPermission(child.id); treeMenuTargetId = ''"><Settings class="h-4 w-4 text-blue-500" />权限配置</button>
-                          <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteTreeFolder(child); treeMenuTargetId = ''"><Trash2 class="h-4 w-4" />删除</button>
-                        </template>
-                        <template v-else>
-                          <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="previewFileFromTree({ id: child.id, node: child, depth: 1, kbId: kbNode.kbId }); treeMenuTargetId = ''"><Eye class="h-4 w-4" />预览</button>
-                          <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteTreeDoc(child); treeMenuTargetId = ''"><Trash2 class="h-4 w-4" />删除</button>
-                        </template>
-                      </div>
-                    </div>
-                  </Teleport>
-                </div>
-              </div>
-              <!-- 嵌套的子文件夹 -->
-              <div v-for="child in (findKbTreeNode(fileTree, kbNode.kbId ?? '')?.children ?? []).filter(c => c.type === 'folder' && expandedTreeIds.includes(c.id))" :key="child.id" class="ml-6">
-                <div v-for="grandchild in child.children ?? []" :key="grandchild.id" class="flex items-center gap-0.5 ml-1">
-                  <span class="inline-block w-5 shrink-0" />
-                  <div class="group relative flex min-w-0 flex-1 items-center" @mouseenter="hoveredNodeId = grandchild.id" @mouseleave="hoveredNodeId = ''">
-                    <button
-                      v-if="grandchild.type === 'file'"
-                      type="button"
-                      class="flex min-w-0 flex-1 items-center gap-1.5 rounded-md py-1 cursor-pointer hover:bg-zinc-100"
-                      @click="toggleTreeNode(grandchild)"
-                    >
-                      <FileText class="h-3 w-3 shrink-0 text-zinc-300" />
-                      <span class="truncate text-zinc-500">{{ grandchild.label }}</span>
-                    </button>
-                    <!-- 嵌套子节点悬停操作按钮 -->
-                    <div class="shrink-0 hidden group-hover:flex items-center gap-0.5 bg-white pl-1 shadow-sm rounded-md absolute right-0" @click.stop>
-                      <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded text-zinc-400 hover:text-blue-600 hover:bg-blue-50" aria-label="预览" title="预览" @click="previewFileFromTree({ id: grandchild.id, node: grandchild, depth: 2, kbId: kbNode.kbId })">
-                        <Eye class="h-3 w-3" />
-                      </button>
-                      <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded text-zinc-400 hover:text-red-500 hover:bg-red-50" aria-label="删除文件" title="删除" @click="deleteTreeDoc(grandchild)">
-                        <Trash2 class="h-3 w-3" />
-                      </button>
-                      <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100" aria-label="更多操作" title="更多操作" @click="openTreeMenu($event, `${kbNode.id}-${grandchild.id}`)">
-                        <MoreVertical class="h-3 w-3" />
-                      </button>
-                    </div>
-                    <!-- 嵌套子节点 ⋮ 菜单 -->
-                    <Teleport to="body">
-                      <div v-if="treeMenuTargetId === `${kbNode.id}-${grandchild.id}`" class="fixed inset-0 z-[70]" @click="treeMenuTargetId = ''">
-                        <div class="absolute w-44 overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 text-sm shadow-2xl" :style="{ left: `${treeMenuPos.x}px`, top: `${treeMenuPos.y}px` }" @click.stop>
-                          <div class="px-3 py-2 text-xs font-semibold text-zinc-400">{{ grandchild.label }}</div>
-                          <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="previewFileFromTree({ id: grandchild.id, node: grandchild, depth: 2, kbId: kbNode.kbId }); treeMenuTargetId = ''"><Eye class="h-4 w-4" />预览</button>
-                          <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteTreeDoc(grandchild); treeMenuTargetId = ''"><Trash2 class="h-4 w-4" />删除</button>
-                        </div>
-                      </div>
-                    </Teleport>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <SidebarTreeNode
+            v-for="kbNode in filteredFileTree"
+            :key="kbNode.id"
+            :node="kbNode"
+            :depth="0"
+            :expanded-ids="expandedTreeIds"
+            :selected-kb-id="selectedKbId"
+            :hovered-node-id="hoveredNodeId"
+            :user-role="getUserRole(kbNode.kbId ?? '', activeSpace)"
+            :get-kb-visibility="(id: string) => getKbVisibilityIcon(id, activeSpace)"
+            :get-doc-status="getTreeNodeDocStatus"
+            :get-kb-doc-count="getKbDocCount"
+            @toggle="handleTreeToggle"
+            @select="handleTreeSelect"
+            @preview="handleTreePreview"
+            @settings="handleTreeSettings"
+            @delete="handleTreeDelete"
+            @create-folder="handleTreeCreateFolder"
+            @rename="handleTreeRename"
+            @context-menu="handleTreeContextMenu"
+            @update:hovered="hoveredNodeId = $event"
+          />
         </div>
       </div>
       <!-- 回收站入口 -->

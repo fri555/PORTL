@@ -36,8 +36,6 @@ import {
   SendHorizontal,
   Sparkles,
   Square,
-  ThumbsDown,
-  ThumbsUp,
   Trash2,
   X,
   Zap,
@@ -2194,13 +2192,6 @@ onBeforeUnmount(() => {
                     <button type="button" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800" :aria-label="copiedMessageId === message.id ? '已复制回答' : '复制回答'" :title="copiedMessageId === message.id ? '已复制回答' : '复制回答'" @click="copyAnswer(message)">
                       <CheckCircle2 v-if="copiedMessageId === message.id" class="h-4 w-4 text-emerald-600" />
                       <Copy v-else class="h-4 w-4" />
-                    </button>
-                    <span class="h-4 w-px bg-zinc-200" />
-                    <button type="button" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 hover:bg-green-50 hover:text-green-600" aria-label="有用" title="答案有帮助" @click="setFeedback(message.id, 'up')">
-                      <ThumbsUp class="h-4 w-4" :class="feedbackByMessage[message.id] === 'up' ? 'fill-green-600 text-green-600' : ''" />
-                    </button>
-                    <button type="button" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 hover:bg-red-50 hover:text-red-500" aria-label="没用" title="答案无帮助" @click="feedbackByMessage[message.id] === 'down' ? setFeedback(message.id, 'down') : openDislikeModal(message.id)">
-                      <ThumbsDown class="h-4 w-4" :class="feedbackByMessage[message.id] === 'down' ? 'fill-red-500 text-red-500' : ''" />
                     </button>
                     <span class="h-4 w-px bg-zinc-200" />
                     <button type="button" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800" aria-label="引用回答" title="引用回答" @click="quoteAnswer(message)">
