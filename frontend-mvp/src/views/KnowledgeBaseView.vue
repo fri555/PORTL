@@ -650,7 +650,7 @@ function getKbTreeChildren(kbId: string): TreeNode[] {
 
 function kbNodeHasFolderChildren(kbId: string): boolean {
   const root = findKbTreeNode(fileTrees[activeSpace.value], kbId)
-  return (root?.children ?? []).some(c => c.type === 'folder')
+  return (root?.children ?? []).some(c => c.type === 'folder' || c.type === 'file')
 }
 
 function toggleKbTreeExpand(kbId: string, event: MouseEvent) {
@@ -1564,58 +1564,48 @@ function addCandidateMember(name: string, dept: string) {
               </button>
             </div>
             <div v-if="isSpaceFolderExpanded(folder)" class="ml-8 space-y-0.5">
-              <div
-                v-for="kb in getSpaceFolderKbs(folder)"
-                :key="kb.id"
-              >
-                <div class="flex items-center" :class="selectedKbId === kb.id ? 'bg-blue-50 text-blue-700 rounded-lg' : ''">
+              <div v-for="row in getSpaceFolderTree(folder)" :key="row.id" :style="{ marginLeft: (row.depth * 12) + 'px' }">
+                <div class="flex items-center" :class="row.node.isKnowledgeBase && selectedKbId === row.kbId ? 'bg-blue-50 text-blue-700 rounded-lg' : ''">
                   <button
-                    v-if="kbNodeHasFolderChildren(kb.id)"
+                    v-if="row.node.type === 'folder'"
                     type="button"
-                    class="grid h-7 w-7 shrink-0 place-items-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
-                    @click="toggleKbTreeExpand(kb.id, $event)"
+                    class="grid h-7 w-7 shrink-0 place-items-center rounded text-zinc-400 hover:text-zinc-700"
+                    @click.stop="toggleTreeNode(row.node)"
                   >
-                    <ChevronDown v-if="expandedTreeIds.includes(getKbTreeRootId(kb.id))" class="h-3.5 w-3.5" />
+                    <ChevronDown v-if="expandedTreeIds.includes(row.node.id)" class="h-3.5 w-3.5" />
                     <ChevronRight v-else class="h-3.5 w-3.5" />
                   </button>
                   <span v-else class="inline-block w-7 shrink-0" />
                   <button
+                    v-if="row.node.isKnowledgeBase"
                     type="button"
                     class="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-left text-xs transition"
-                    :class="selectedKbId === kb.id ? '' : 'text-zinc-600 hover:bg-zinc-50'"
-                    @click="selectKb(kb.id)"
+                    :class="selectedKbId === row.kbId ? '' : 'text-zinc-600 hover:bg-zinc-50'"
+                    @click="selectKb(row.kbId)"
                   >
                     <BookOpen class="h-3.5 w-3.5 shrink-0 text-orange-500" />
-                    <span class="truncate">{{ kb.name }}</span>
+                    <span class="truncate">{{ row.node.label }}</span>
                   </button>
-                </div>
-                <div v-if="expandedTreeIds.includes(getKbTreeRootId(kb.id))" class="ml-6 border-l border-zinc-100 text-xs">
-                  <div v-for="row in getKbTreeRows(kb.id)" :key="row.id" class="flex items-center gap-0.5 ml-1">
-                    <button
-                      v-if="treeRowHasChildren(row)"
-                      type="button"
-                      class="grid h-6 w-5 shrink-0 place-items-center rounded text-zinc-400 hover:text-zinc-700"
-                      @click.stop="toggleTreeNode(row.node)"
-                    >
-                      <ChevronDown v-if="expandedTreeIds.includes(row.node.id)" class="h-3 w-3" />
-                      <ChevronRight v-else class="h-3 w-3" />
-                    </button>
-                    <span v-else class="inline-block w-5 shrink-0" />
-                    <button
-                      v-if="row.node.type === 'file'"
-                      type="button"
-                      class="flex min-w-0 flex-1 items-center gap-1.5 rounded-md py-1 cursor-pointer hover:bg-zinc-100"
-                      @click="previewFileFromTree(row)"
-                      @contextmenu.prevent="openTreeContextMenu(row.node.id, $event)"
-                    >
-                      <FileText class="h-3 w-3 shrink-0 text-zinc-300" />
-                      <span class="truncate text-zinc-500">{{ row.node.label }}</span>
-                    </button>
-                    <div v-else class="flex min-w-0 flex-1 items-center gap-1.5 rounded-md py-1" @contextmenu.prevent="openTreeContextMenu(row.node.id, $event)">
-                      <Folder class="h-3 w-3 shrink-0 text-zinc-400" />
-                      <span class="truncate text-zinc-600">{{ row.node.label }}</span>
-                    </div>
-                  </div>
+                  <button
+                    v-else-if="row.node.type === 'file'"
+                    type="button"
+                    class="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1.5 text-left text-xs cursor-pointer hover:bg-zinc-100"
+                    @click="previewFileFromTree(row)"
+                    @contextmenu.prevent="openTreeContextMenu(row.node.id, $event)"
+                  >
+                    <FileText class="h-3.5 w-3.5 shrink-0 text-zinc-300" />
+                    <span class="truncate text-zinc-500">{{ row.node.label }}</span>
+                  </button>
+                  <button
+                    v-else
+                    type="button"
+                    class="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1.5 text-left text-xs text-zinc-600 hover:bg-zinc-50"
+                    @click="selectTreeNode(row.node)"
+                    @contextmenu.prevent="openTreeContextMenu(row.node.id, $event)"
+                  >
+                    <Folder class="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                    <span class="truncate">{{ row.node.label }}</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -1658,58 +1648,48 @@ function addCandidateMember(name: string, dept: string) {
               </button>
             </div>
             <div v-if="isSpaceFolderExpanded(folder)" class="ml-8 space-y-0.5">
-              <div
-                v-for="kb in getSpaceFolderKbs(folder)"
-                :key="kb.id"
-              >
-                <div class="flex items-center" :class="selectedKbId === kb.id ? 'bg-blue-50 text-blue-700 rounded-lg' : ''">
+              <div v-for="row in getSpaceFolderTree(folder)" :key="row.id" :style="{ marginLeft: (row.depth * 12) + 'px' }">
+                <div class="flex items-center" :class="row.node.isKnowledgeBase && selectedKbId === row.kbId ? 'bg-blue-50 text-blue-700 rounded-lg' : ''">
                   <button
-                    v-if="kbNodeHasFolderChildren(kb.id)"
+                    v-if="row.node.type === 'folder'"
                     type="button"
-                    class="grid h-7 w-7 shrink-0 place-items-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
-                    @click="toggleKbTreeExpand(kb.id, $event)"
+                    class="grid h-7 w-7 shrink-0 place-items-center rounded text-zinc-400 hover:text-zinc-700"
+                    @click.stop="toggleTreeNode(row.node)"
                   >
-                    <ChevronDown v-if="expandedTreeIds.includes(getKbTreeRootId(kb.id))" class="h-3.5 w-3.5" />
+                    <ChevronDown v-if="expandedTreeIds.includes(row.node.id)" class="h-3.5 w-3.5" />
                     <ChevronRight v-else class="h-3.5 w-3.5" />
                   </button>
                   <span v-else class="inline-block w-7 shrink-0" />
                   <button
+                    v-if="row.node.isKnowledgeBase"
                     type="button"
                     class="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-left text-xs transition"
-                    :class="selectedKbId === kb.id ? '' : 'text-zinc-600 hover:bg-zinc-50'"
-                    @click="selectKb(kb.id)"
+                    :class="selectedKbId === row.kbId ? '' : 'text-zinc-600 hover:bg-zinc-50'"
+                    @click="selectKb(row.kbId)"
                   >
                     <BookOpen class="h-3.5 w-3.5 shrink-0 text-orange-500" />
-                    <span class="truncate">{{ kb.name }}</span>
+                    <span class="truncate">{{ row.node.label }}</span>
                   </button>
-                </div>
-                <div v-if="expandedTreeIds.includes(getKbTreeRootId(kb.id))" class="ml-6 border-l border-zinc-100 text-xs">
-                  <div v-for="row in getKbTreeRows(kb.id)" :key="row.id" class="flex items-center gap-0.5 ml-1">
-                    <button
-                      v-if="treeRowHasChildren(row)"
-                      type="button"
-                      class="grid h-6 w-5 shrink-0 place-items-center rounded text-zinc-400 hover:text-zinc-700"
-                      @click.stop="toggleTreeNode(row.node)"
-                    >
-                      <ChevronDown v-if="expandedTreeIds.includes(row.node.id)" class="h-3 w-3" />
-                      <ChevronRight v-else class="h-3 w-3" />
-                    </button>
-                    <span v-else class="inline-block w-5 shrink-0" />
-                    <button
-                      v-if="row.node.type === 'file'"
-                      type="button"
-                      class="flex min-w-0 flex-1 items-center gap-1.5 rounded-md py-1 cursor-pointer hover:bg-zinc-100"
-                      @click="previewFileFromTree(row)"
-                      @contextmenu.prevent="openTreeContextMenu(row.node.id, $event)"
-                    >
-                      <FileText class="h-3 w-3 shrink-0 text-zinc-300" />
-                      <span class="truncate text-zinc-500">{{ row.node.label }}</span>
-                    </button>
-                    <div v-else class="flex min-w-0 flex-1 items-center gap-1.5 rounded-md py-1" @contextmenu.prevent="openTreeContextMenu(row.node.id, $event)">
-                      <Folder class="h-3 w-3 shrink-0 text-zinc-400" />
-                      <span class="truncate text-zinc-600">{{ row.node.label }}</span>
-                    </div>
-                  </div>
+                  <button
+                    v-else-if="row.node.type === 'file'"
+                    type="button"
+                    class="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1.5 text-left text-xs cursor-pointer hover:bg-zinc-100"
+                    @click="previewFileFromTree(row)"
+                    @contextmenu.prevent="openTreeContextMenu(row.node.id, $event)"
+                  >
+                    <FileText class="h-3.5 w-3.5 shrink-0 text-zinc-300" />
+                    <span class="truncate text-zinc-500">{{ row.node.label }}</span>
+                  </button>
+                  <button
+                    v-else
+                    type="button"
+                    class="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1.5 text-left text-xs text-zinc-600 hover:bg-zinc-50"
+                    @click="selectTreeNode(row.node)"
+                    @contextmenu.prevent="openTreeContextMenu(row.node.id, $event)"
+                  >
+                    <Folder class="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                    <span class="truncate">{{ row.node.label }}</span>
+                  </button>
                 </div>
               </div>
             </div>
