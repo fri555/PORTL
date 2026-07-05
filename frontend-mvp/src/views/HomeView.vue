@@ -2250,6 +2250,13 @@ onBeforeUnmount(() => {
               </div>
             </div>
 
+            <div v-if="isThinking" class="flex items-center justify-center gap-2 py-3">
+              <div class="flex items-center gap-2 rounded-full bg-zinc-100 px-4 py-1.5">
+                <Loader2 class="h-3.5 w-3.5 animate-spin text-blue-600" />
+                <span class="text-xs text-zinc-500">小马正在生成回答...</span>
+              </div>
+            </div>
+
           </div>
 
           <div class="sticky bottom-0 -mx-1 border-t border-transparent bg-gradient-to-t from-[#f6f7f9] via-[#f6f7f9]/95 to-transparent px-1 pb-3 pt-5">
