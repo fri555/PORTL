@@ -59,6 +59,19 @@ export interface PermissionEntry {
 
 export type PermissionMode = 'inherit' | 'independent'
 
+export interface TreeNode {
+  id: string
+  label: string
+  type: 'folder' | 'file'
+  kbId?: string
+  docName?: string
+  isKnowledgeBase?: boolean
+  isBuiltIn?: boolean
+  children?: TreeNode[]
+  permissionMode?: PermissionMode
+  permissions?: PermissionEntry[]
+}
+
 /** 获取权限条目的中文 label */
 export function getPermissionLabel(role: PermissionRole): string {
   const map: Record<PermissionRole, string> = {

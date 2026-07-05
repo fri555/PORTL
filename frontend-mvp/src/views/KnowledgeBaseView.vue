@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import SidebarTreeNode from '@/components/knowledge/SidebarTreeNode.vue'
+import KbFileGridItem from '@/components/knowledge/KbFileGridItem.vue'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,7 +12,7 @@ import {
   ChevronsRight, Copy, Database, Download, Eye, File,
   FileSpreadsheet, FileText, Folder, FolderKanban, GripVertical, LayoutGrid, List, Globe, Lock, MessageSquareText,
   MoreVertical, Pencil, Quote, RotateCw,
-  Calendar, History, Move, Plus, Search, Settings, ShieldCheck, Square, Star, ThumbsDown, ThumbsUp, Trash2, Upload, X,
+  Calendar, History, Move, Plus, Search, Settings, ShieldCheck, Square, Star, Trash2, Upload, X,
 } from 'lucide-vue-next'
 import type { PermissionRole, PermissionEntry, SecurityLevel, TreeNode } from '@/types/knowledge'
 
@@ -37,6 +38,7 @@ const createFolderName = ref('')
 const createFolderParentId = ref('__root__')
 const expandedFolderSelectorIds = ref<string[]>([])
 const fileView = ref<'list' | 'grid'>('grid')
+const kbView = ref<'list' | 'grid'>('grid')
 const fileSearch = ref('')
 const fileSearchDebounced = ref('')
 let fileSearchTimer: ReturnType<typeof setTimeout> | null = null
@@ -180,9 +182,6 @@ function getKbVisibilityIcon(kbId: string, space?: string): 'public' | 'dept' | 
   if (kb.visibility.includes('仅自己')) return 'personal'
   if (kb.visibility.includes('指定') || kb.visibility.includes('可编辑')) return 'custom'
   return null
-}
-function getTreeNodeDocStatus(docName: string, kbId: string): string {
-  return (allDocs[kbId] ?? []).find(d => d.name === docName)?.status ?? ''
 }
 function getKbDocCount(kbId: string): number {
   return knowledgeBases.find(k => k.id === kbId)?.docs ?? 0
@@ -629,16 +628,13 @@ const targetKbs = computed(() => {
 })
 const qaPanelWidth = 'clamp(360px,28vw,460px)'
 const previewPanelWidth = 'clamp(390px,32vw,520px)'
-const rightPanelOpen = computed(() => qaOpen.value || previewTabs.value.length > 0)
 const isThreeColumn = computed(() => qaOpen.value && previewTabs.value.length > 0)
 const shouldPreviewTakeOver = computed(() => previewTabs.value.length > 0 && !qaOpen.value)
 const activePreviewDoc = computed(() => previewTabs.value.find(doc => doc.name === activeRightTab.value) ?? previewDoc.value)
-const mainRightMargin = computed(() => {
-  const parts = [
-    ...(qaOpen.value ? [qaPanelWidth] : []),
-    ...(previewTabs.value.length && !isThreeColumn.value ? [previewPanelWidth] : []),
-  ]
-  return parts.length ? `calc(${parts.join(' + ')})` : '0px'
+const currentMainView = computed(() => {
+  if (isThreeColumn.value && activePreviewDoc.value) return 'three-column'
+  if (selectedKbId.value) return 'file-list'
+  return 'kb-list'
 })
 
 function getKbTreeRows(kbId: string): TreeRow[] {
@@ -873,6 +869,7 @@ function deleteSelectedDocs() {
   if (selectedSet.has(activeRightTab.value)) activeRightTab.value = previewTabs.value[0]?.name ?? ''
   const deletedCount = selectedFileIds.value.length
   selectedFileIds.value = []
+  selectedFileIds.value.forEach(name => removeTreeNodesByPredicate(fileTree, n => n.docName === name))
   showFileActionToast(`已删除 ${deletedCount} 个文件，可在回收站找回`)
 }
 function confirmFileAction() {
@@ -1340,6 +1337,7 @@ function deleteDoc(doc: DocItem) {
   previewTabs.value = previewTabs.value.filter(item => item.name !== doc.name)
   if (activeRightTab.value === doc.name) activeRightTab.value = previewTabs.value[0]?.name ?? ''
   showFileActionToast(`已删除：${doc.name}，可在回收站找回`)
+  removeTreeNodesByPredicate(fileTree, n => n.docName === doc.name)
 }
 function toggleKbPinned(kb: KnowledgeBaseItem) {
   kb.pinned = !kb.pinned
@@ -1534,7 +1532,8 @@ function deleteTreeDoc(node: TreeNode) {
   allDocs[node.kbId] = (allDocs[node.kbId] ?? []).filter(doc => doc.name !== node.docName)
   if (previewDoc.value?.name === node.docName) previewDoc.value = null
   selectedFileIds.value = selectedFileIds.value.filter(name => name !== node.docName)
-  showFileActionToast(`已删除 ${node.docName}`)
+  showFileActionToast(`已删除 ${node.docName}，可在回收站找回`)
+  removeTreeNodesByPredicate(fileTree, n => n.id === node.id)
   contextMenu.value = null
 }
 function collectDocsByKb(nodes: TreeNode[], result: Record<string, string[]> = {}) {
@@ -2465,7 +2464,6 @@ onBeforeUnmount(() => {
             :hovered-node-id="hoveredNodeId"
             :user-role="getUserRole(kbNode.kbId ?? '', activeSpace)"
             :get-kb-visibility="(id: string) => getKbVisibilityIcon(id, activeSpace)"
-            :get-doc-status="getTreeNodeDocStatus"
             :get-kb-doc-count="getKbDocCount"
             @toggle="handleTreeToggle"
             @select="handleTreeSelect"
@@ -2493,11 +2491,9 @@ onBeforeUnmount(() => {
     <main
       v-if="activeKnowledgeTab !== 'trash' && !shouldPreviewTakeOver"
       data-testid="knowledge-main-pane"
-      class="flex min-w-0 flex-1 flex-col overflow-hidden transition-[margin] duration-300"
-      :class="{ 'knowledge-main-pane--compact': rightPanelOpen }"
+      class="flex min-w-0 flex-1 flex-col overflow-hidden duration-300"
       :style="{
         marginLeft: sidebarVisible ? 'clamp(286px,21vw,400px)' : '0px',
-        marginRight: mainRightMargin,
       }"
     >
       <div data-testid="knowledge-main-header" class="flex min-h-14 items-center border-b border-zinc-200 bg-white px-4" :class="isThreeColumn ? 'justify-between' : ''">
@@ -2539,9 +2535,9 @@ onBeforeUnmount(() => {
             </template>
             <input v-else v-model="kbSearch" type="text" placeholder="搜索知识库..." class="w-[clamp(180px,18vw,320px)] rounded-lg border border-zinc-200 py-2 pl-8 pr-3 text-xs text-zinc-600 placeholder:text-zinc-300 focus:border-blue-200 focus:outline-none" />
           </div>
-          <div class="inline-flex h-9 overflow-hidden rounded-lg border border-zinc-200 bg-white">
-            <button class="px-2.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600" :class="{ 'bg-zinc-100 text-zinc-600': fileView === 'list' }" aria-label="列表视图" @click="fileView = 'list'"><List class="h-4 w-4" /></button>
-            <button class="px-2.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600" :class="{ 'bg-zinc-100 text-zinc-600': fileView === 'grid' }" aria-label="宫格视图" @click="fileView = 'grid'"><LayoutGrid class="h-4 w-4" /></button>
+          <div v-if="selectedKb || !kbSearch.trim()" class="inline-flex h-9 overflow-hidden rounded-lg border border-zinc-200 bg-white">
+            <button class="px-2.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600" :class="{ 'bg-zinc-100 text-zinc-600': selectedKb ? fileView === 'list' : kbView === 'list' }" aria-label="列表视图" @click="selectedKb ? fileView = 'list' : kbView = 'list'"><List class="h-4 w-4" /></button>
+            <button class="px-2.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600" :class="{ 'bg-zinc-100 text-zinc-600': selectedKb ? fileView === 'grid' : kbView === 'grid' }" aria-label="宫格视图" @click="selectedKb ? fileView = 'grid' : kbView = 'grid'"><LayoutGrid class="h-4 w-4" /></button>
           </div>
         </div>
         </template>
@@ -2555,7 +2551,9 @@ onBeforeUnmount(() => {
             <X class="h-3.5 w-3.5 rounded hover:bg-zinc-100" @click.stop="closeRightTab(tab.name)" />
           </button>
         </div>
-        <div v-if="isThreeColumn && activePreviewDoc" class="grid min-h-0 flex-1 grid-cols-[132px_1fr] overflow-hidden">
+        <!-- ===== 视图：三栏预览 ===== -->
+        <template v-if="currentMainView === 'three-column' && activePreviewDoc">
+        <div class="grid min-h-0 flex-1 grid-cols-[132px_1fr] overflow-hidden">
           <nav class="border-r border-zinc-100 bg-zinc-50 px-4 py-5 text-sm">
             <div class="mb-3 truncate font-semibold text-blue-600">{{ activePreviewDoc.name }}</div>
             <div class="space-y-3 text-zinc-500">
@@ -2577,7 +2575,10 @@ onBeforeUnmount(() => {
             </section>
           </article>
         </div>
-        <div v-if="!selectedKbId" class="space-y-8">
+        </template>
+        <!-- ===== 视图：知识库列表 ===== -->
+        <template v-if="currentMainView === 'kb-list'">
+        <div class="space-y-8">
           <section>
             <div class="mb-3 flex items-center justify-between gap-3">
               <div>
@@ -2626,7 +2627,8 @@ onBeforeUnmount(() => {
                 <Plus class="h-4 w-4" />新建知识库
               </button>
             </div>
-            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <!-- 卡片视图 -->
+            <div v-if="kbView === 'grid'" class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               <div
                 v-for="kb in displayedKnowledgeBases"
                 :key="kb.id"
@@ -2649,16 +2651,49 @@ onBeforeUnmount(() => {
                     <button type="button" class="rounded-md p-1.5 text-zinc-400 hover:bg-amber-50 hover:text-amber-600" :aria-label="`收藏知识库 ${kb.name}`" @click.stop="toggleKbPinned(kb)">
                       <Star class="h-4 w-4" :class="kb.pinned ? 'fill-amber-500 text-amber-500' : ''" />
                     </button>
-                    <button v-if="kb.canEdit" type="button" class="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-800" :aria-label="`重命名知识库 ${kb.name}`" @click.stop="beginRenameKb(kb)"><Pencil class="h-4 w-4" /></button>
-                    <button v-if="kb.canEdit" type="button" class="rounded-md p-1.5 text-zinc-400 hover:bg-blue-50 hover:text-blue-600" :aria-label="`移动知识库 ${kb.name}`" @click.stop="moveKb(kb)"><Move class="h-4 w-4" /></button>
-                    <button v-if="kb.canEdit" type="button" class="rounded-md p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600" :aria-label="`删除知识库 ${kb.name}`" @click.stop="deleteKb(kb)"><Trash2 class="h-4 w-4" /></button>
                   </div>
+                </div>
+              </div>
+            </div>
+            <!-- 列表视图 -->
+            <div v-else class="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+              <div class="grid grid-cols-[minmax(200px,1fr)_120px_100px_120px_100px] border-b border-zinc-100 bg-zinc-50 px-4 py-3 text-xs font-medium text-zinc-500">
+                <span>名称</span>
+                <span>归属小组</span>
+                <span class="text-center">文档数</span>
+                <span>最近访问</span>
+                <span class="text-right">操作</span>
+              </div>
+              <div
+                v-for="kb in displayedKnowledgeBases"
+                :key="kb.id"
+                class="grid grid-cols-[minmax(200px,1fr)_120px_100px_120px_100px] items-center border-b border-zinc-100 px-4 py-3 last:border-0 hover:bg-zinc-50"
+                @contextmenu.prevent="openKbContextMenu(kb, $event)"
+              >
+                <button type="button" class="flex min-w-0 items-center gap-3 text-left" @click="selectKb(kb.id)">
+                  <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-orange-50 text-orange-500">
+                    <BookOpen class="h-5 w-5" />
+                  </div>
+                  <div class="min-w-0">
+                    <div class="truncate text-sm font-semibold text-zinc-900">{{ kb.name }}</div>
+                    <div class="mt-0.5 truncate text-xs text-zinc-400">{{ kb.visibility }}</div>
+                  </div>
+                </button>
+                <span class="truncate text-xs text-zinc-500">{{ kb.department }}</span>
+                <span class="text-center text-xs text-zinc-500">{{ kb.docs }}</span>
+                <span class="truncate text-xs text-zinc-500">{{ kb.recent }}</span>
+                <div class="flex justify-end gap-1">
+                  <button type="button" class="rounded-md p-1.5 text-zinc-400 hover:bg-amber-50 hover:text-amber-600" :aria-label="`收藏知识库 ${kb.name}`" @click="toggleKbPinned(kb)">
+                    <Star class="h-4 w-4" :class="kb.pinned ? 'fill-amber-500 text-amber-500' : ''" />
+                  </button>
                 </div>
               </div>
             </div>
             </section>
         </div>
-
+        </template>
+        <!-- ===== 视图：文件列表 ===== -->
+        <template v-if="currentMainView === 'file-list'">
         <div v-if="selectedKb && !isThreeColumn" data-testid="knowledge-action-row" class="mb-3 flex flex-wrap items-center gap-2">
           <button type="button" class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-600 hover:bg-zinc-50" aria-label="新建文件夹" @click="openCreateFolderModal">
             <Folder class="h-4 w-4" />
@@ -2775,36 +2810,47 @@ onBeforeUnmount(() => {
         </div>
 
         <div v-else-if="selectedKb" class="grid gap-3" :class="previewDoc ? 'grid-cols-[repeat(auto-fill,minmax(96px,1fr))]' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5'" v-show="!isThreeColumn">
-          <div v-for="folder in visibleFolderNodes" :key="folder.id" data-testid="knowledge-folder-card" class="relative cursor-pointer rounded-xl border border-zinc-200 bg-white p-4 transition hover:border-blue-300 hover:bg-blue-50/30" @click="toggleTreeNode(folder)">
-            <div class="mb-3 mt-3 flex h-14 w-14 items-center justify-center rounded-xl bg-zinc-50 text-zinc-600 shadow-sm">
-              <Folder class="h-7 w-7" />
-            </div>
-            <strong class="block truncate text-sm font-semibold text-zinc-900" :title="folder.label">{{ folder.label }}</strong>
-            <span v-if="!previewDoc" class="mt-1 text-[11px] text-zinc-400">文件夹 · {{ folder.children?.length ?? 0 }} 项</span>
-            <div v-if="!previewDoc" class="mt-3 flex gap-1">
-              <button type="button" class="rounded-md px-2 py-1 text-[11px] text-blue-600 hover:bg-blue-50" :aria-label="`打开文件夹 ${folder.label}`" @click.stop="toggleTreeNode(folder)">打开</button>
-              <button v-if="selectedKb?.canEdit && !folder.kbId" type="button" class="rounded-md px-2 py-1 text-[11px] text-zinc-600 hover:bg-zinc-100" :aria-label="`重命名文件夹 ${folder.label}`" @click.stop="beginRenameFolder(folder)">改名</button>
-              <button v-if="canDeleteFolder(folder)" type="button" class="rounded-md px-2 py-1 text-[11px] text-red-600 hover:bg-red-50" :aria-label="`删除文件夹 ${folder.label}`" @click.stop="deleteTreeFolder(folder)">删除</button>
-            </div>
-          </div>
-          <div v-for="doc in filteredDocs" :key="doc.name" data-testid="knowledge-file-card" class="relative rounded-xl border border-zinc-200 bg-white transition" :class="[isDocAccessible(doc) ? 'cursor-pointer hover:border-orange-300' : 'opacity-40 cursor-default', selectedFileIds.includes(doc.name) ? 'ring-2 ring-blue-300' : '', previewDoc ? 'p-3' : 'p-4']" @click="isDocAccessible(doc) && openPreview(doc)" @contextmenu.prevent="openDocContextMenu(doc, $event)">
-            <button class="absolute left-3 top-3 z-10 rounded p-0.5 bg-white/80 backdrop-blur" @click.stop="toggleFileSelect(doc.name)"><CheckSquare v-if="selectedFileIds.includes(doc.name)" class="h-4 w-4 text-blue-500" /><Square v-else class="h-4 w-4 text-zinc-300" /></button>
-            <div class="mb-3 mt-3 flex items-center justify-center rounded-xl shadow-sm" :class="[getIconColor(doc.format), previewDoc ? 'h-12 w-12' : 'h-14 w-14']"><component :is="getFileIcon(doc.format)" class="h-6 w-6" /></div>
-            <strong class="block truncate text-sm font-semibold text-zinc-900" :title="doc.name">{{ previewDoc ? doc.name.split('.')[0] : doc.name }}</strong>
-            <span v-if="!previewDoc" class="mt-1 text-[11px] text-zinc-400">{{ doc.format }} · {{ doc.updatedAt }}</span>
-            <div v-if="!previewDoc" class="mt-3 flex gap-1">
-              <button type="button" class="rounded-md px-2 py-1 text-[11px] text-blue-600 hover:bg-blue-50" :aria-label="`预览 ${doc.name}`" @click.stop="openPreview(doc)">预览</button>
-              <button v-if="selectedKb?.canEdit" type="button" class="rounded-md px-2 py-1 text-[11px] text-red-600 hover:bg-red-50" :aria-label="`删除 ${doc.name}`" @click.stop="deleteDoc(doc)">删除</button>
-            </div>
-          </div>
+          <KbFileGridItem
+            v-for="folder in visibleFolderNodes"
+            :key="folder.id"
+            :item="folder"
+            type="folder"
+            :compact="!!previewDoc"
+            :can-edit="selectedKb?.canEdit && !folder.kbId"
+            :folder-count="folder.children?.length ?? 0"
+            data-testid="knowledge-folder-card"
+            @click="toggleTreeNode(folder)"
+            @open="toggleTreeNode(folder)"
+            @rename="beginRenameFolder(folder)"
+            @delete="deleteTreeFolder(folder)"
+          />
+          <KbFileGridItem
+            v-for="doc in filteredDocs"
+            :key="doc.name"
+            :item="doc"
+            type="file"
+            :compact="!!previewDoc"
+            :selected="selectedFileIds.includes(doc.name)"
+            :can-edit="selectedKb?.canEdit"
+            :tags="doc.tags"
+            :doc-format="doc.format"
+            :class="isDocAccessible(doc) ? '' : 'opacity-40 cursor-default'"
+            data-testid="knowledge-file-card"
+            @click="isDocAccessible(doc) && openPreview(doc)"
+            @open="openPreview(doc)"
+            @toggle-select="toggleFileSelect(doc.name)"
+            @delete="deleteDoc(doc)"
+          />
         </div>
+        </template>
       </div>
     </main>
 
     <aside
       v-if="previewTabs.length && !isThreeColumn"
-      class="fixed bottom-0 top-16 z-40 hidden flex-col border-l border-zinc-200 bg-white lg:flex"
-      :style="shouldPreviewTakeOver ? { left: sidebarVisible ? 'clamp(286px,21vw,400px)' : '0px', right: '0px' } : { right: qaOpen ? qaPanelWidth : '0px', width: previewPanelWidth }"
+      class="hidden flex-col border-l border-zinc-200 bg-white lg:flex"
+      :class="shouldPreviewTakeOver ? 'flex-1 min-w-0' : 'shrink-0'"
+      :style="shouldPreviewTakeOver ? {} : { width: previewPanelWidth }"
     >
       <div class="flex h-14 items-center justify-between gap-3 border-b border-zinc-200 px-4">
         <div class="min-w-0">
@@ -2849,7 +2895,7 @@ onBeforeUnmount(() => {
 
     <aside
       v-if="qaOpen"
-      class="fixed bottom-0 right-0 top-16 z-50 hidden flex-col border-l border-zinc-200 bg-white lg:flex"
+      class="hidden shrink-0 flex-col border-l border-zinc-200 bg-white lg:flex"
       :style="{ width: qaPanelWidth }"
     >
       <div class="flex h-14 items-center justify-between border-b border-transparent px-4">
@@ -2894,16 +2940,28 @@ onBeforeUnmount(() => {
 
       <div class="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4 text-sm">
         <div v-if="qaMessages.length === 0" class="space-y-4">
-          <div class="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-4">
-            <div class="text-lg font-semibold text-zinc-950">你好，我是小智</div>
-            <div class="mt-2 text-sm leading-6 text-zinc-500">
-              我可以基于当前
-              <span class="font-medium text-blue-600">{{ selectedKb?.name ?? '知识库' }}</span>
-              和已打开文件回答问题，并在回答里保留可追溯引用。
-            </div>
+          <!-- 未选库时显示引导 -->
+          <div v-if="!selectedKb" class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700">
+            <p class="font-medium">💡 先选择一个知识库</p>
+            <p class="mt-1">在左侧文件树中点击任意知识库，即可开始提问</p>
           </div>
-          <div class="space-y-2">
-            <button v-for="question in ['这个知识库里有哪些可复用案例？', '预算分档应该怎么解释给客户？', '找出需要人工复核的风险点']" :key="question" type="button" class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-left text-xs text-zinc-600 hover:border-blue-200 hover:bg-blue-50" @click="sendQuickQuestion(question)">{{ question }}</button>
+          <div class="rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 px-4 py-4">
+            <div class="flex items-start gap-3">
+              <div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-blue-600 text-white shadow-sm">
+                <MessageSquareText class="h-5 w-5" />
+              </div>
+              <div>
+                <div class="text-base font-semibold text-zinc-950">你好，我是小智</div>
+                <div class="mt-1 text-sm leading-6 text-zinc-600">
+                  我可以基于当前
+                  <span class="font-medium text-blue-600">{{ selectedKb?.name ?? '知识库' }}</span>
+                  和已打开文件回答问题，并在回答里保留可追溯引用。
+                </div>
+              </div>
+            </div>
+            <div class="space-y-2">
+              <button v-for="question in recommendedQuestions" :key="question" type="button" class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-left text-xs text-zinc-600 hover:border-blue-200 hover:bg-blue-50" @click="sendQuickQuestion(question)">{{ question }}</button>
+            </div>
           </div>
         </div>
         <div v-for="(msg, index) in qaMessages" :key="msg.id || index" class="group/qa" :class="msg.role === 'user' ? 'ml-8' : 'mr-8'">
@@ -2960,14 +3018,6 @@ onBeforeUnmount(() => {
                 <CheckCircle2 v-if="qaCopiedId === msg.id" class="h-3.5 w-3.5 text-emerald-500" />
                 <Copy v-else class="h-3.5 w-3.5" />
               </button>
-              <span class="mx-1 h-4 w-px bg-zinc-200" />
-              <button type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition hover:bg-green-50 hover:text-green-600" aria-label="有用" title="答案有帮助">
-                <ThumbsUp class="h-3.5 w-3.5" />
-              </button>
-              <button type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition hover:bg-red-50 hover:text-red-500" aria-label="没用" title="答案无帮助">
-                <ThumbsDown class="h-3.5 w-3.5" />
-              </button>
-              <span class="mx-1 h-4 w-px bg-zinc-200" />
               <button type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700" aria-label="引用" @click="citeQaMessage(msg)">
                 <Quote class="h-3.5 w-3.5" />
               </button>
@@ -3405,7 +3455,7 @@ onBeforeUnmount(() => {
             <!-- 顶部 bar：知识库名称 + 关闭按钮 -->
             <div class="flex items-center justify-between border-b border-zinc-100 px-6 py-4">
               <h2 class="text-base font-semibold text-zinc-900">{{ activeSettingsKb?.name ?? '知识库' }} 设置</h2>
-              <button type="button" class="rounded-md p-1.5 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700" aria-label="关闭" @click="closeKbSettings"><X class="h-5 w-5" /></button>
+
             </div>
 
             <!-- 中间 tab 切换 -->
