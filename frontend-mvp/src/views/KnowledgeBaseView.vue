@@ -1,50 +1,42 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { toast } from 'vue-sonner'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import ThinkingChain from '@/components/workspace/ThinkingChain.vue'
 import {
-  AlertTriangle, ArrowUp, BookOpen, CheckCircle2, CheckSquare, ChevronDown, ChevronLeft, ChevronRight, ChevronsRight, Copy, Database, Download, Eye, File,
-  FileSpreadsheet, FileText, Folder, FolderKanban, GripVertical, LayoutGrid, List, MessageSquareText, MoreVertical, Pencil, Quote, RotateCw,
-  Calendar, History, Move, Plus, Search, Settings, Square, Star, ShieldCheck, Trash2, Upload, X,
+  AlertTriangle, ArrowUp, BookOpen, CheckCircle2, CheckSquare, ChevronDown, ChevronLeft, ChevronRight,
+  ChevronsRight, Copy, Database, Download, Eye, File,
+  FileSpreadsheet, FileText, Folder, FolderKanban, GripVertical, LayoutGrid, List, Globe, Lock, MessageSquareText,
+  MoreVertical, Pencil, Quote, RotateCw,
+  Calendar, History, Move, Plus, Search, Settings, ShieldCheck, Square, Star, ThumbsDown, ThumbsUp, Trash2, Upload, X,
 } from 'lucide-vue-next'
+import type { PermissionRole, PermissionEntry, SecurityLevel } from '@/types/knowledge'
 
-type SpaceKey = 'public' | 'personal'
 interface QaMessage { id: number; role: 'user' | 'assistant'; content: string; citations?: string[]; thinking?: ThinkingStep[] }
 interface ThinkingStep { id: string; label: string; detail: string; status: 'pending' | 'running' | 'completed' | 'error'; icon: string; elapsed?: number; errorMsg?: string }
-type PermissionRole = 'OWNER' | 'MANAGER' | 'EDITOR' | 'DOWNLOADER' | 'READER'
-interface PermissionEntry { id: string; name: string; scope: string; department: string; role: PermissionRole; joinedAt: string }
-interface KnowledgeBaseItem { id: string; name: string; docs: number; owner: string; department: string; visibility: string; space: SpaceKey; canEdit: boolean; pinned?: boolean; recent: string; createdAt?: string; updatedAt?: string }
-interface DocItem { name: string; format: string; status: string; updatedAt: string; uploadedBy: string; size?: string; tags?: string[]; confidence?: number; securityLevel?: '公开' | '内部' | '秘密' | '机密' }
-interface TreeNode { id: string; label: string; type: 'folder' | 'file'; kbId?: string; docName?: string; isKnowledgeBase?: boolean; children?: TreeNode[] }
+interface KnowledgeBaseItem { id: string; name: string; docs: number; owner: string; department: string; visibility: string; space: 'public' | 'personal'; canEdit: boolean; isBuiltIn?: boolean; pinned?: boolean; recent: string; createdAt?: string; updatedAt?: string; permissionMode: 'independent'; permissions: PermissionEntry[] }
+interface DocItem { name: string; format: string; status: string; updatedAt: string; uploadedBy: string; size?: string; tags?: string[]; confidence?: number; securityLevel?: SecurityLevel; allowedDepts?: { id: string; name: string }[] }
+interface TreeNode { id: string; label: string; type: 'folder' | 'file'; kbId?: string; docName?: string; isKnowledgeBase?: boolean; isBuiltIn?: boolean; children?: TreeNode[]; permissionMode?: 'inherit' | 'independent'; permissions?: PermissionEntry[] }
 interface FolderOption { id: string; label: string; depth: number; node?: TreeNode }
-interface RecycleItem { id: string; type: 'knowledgeBase' | 'folder' | 'file'; name: string; space: SpaceKey; kbId?: string; kbName?: string; parentId?: string; deletedAt: string; detail: string; tags?: string[]; kb?: any; treeNode?: any; docs?: any[] }
+interface RecycleItem { id: string; type: 'knowledgeBase' | 'folder' | 'file'; name: string; space: 'public' | 'personal'; kbId?: string; kbName?: string; parentId?: string; deletedAt: string; detail: string }
+type UploadTaskStatus = 'uploading' | 'pending' | 'processing' | 'done' | 'reviewing' | 'upload_failed' | 'process_failed' | 'process_failed_permanent' | 'cancelled' | 'offline'
 interface TreeRow { id: string; node: TreeNode; depth: number; kbId?: string }
-type UploadTaskStatus = 'uploading' | 'pending' | 'processing' | 'done' | 'reviewing' | 'upload_failed' | 'process_failed' | 'cancelled' | 'offline'
 
 const sidebarVisible = ref(true)
-const activeSpace = ref<SpaceKey>('public')
-const activeSpaceRoot = ref(false)
+const activeSpace = ref<'public' | 'personal'>('public')
 const selectedKbId = ref<string | null>(null)
-const publicSpaceGroupOpen = ref(true)
-const personalSpaceGroupOpen = ref(true)
-const draggingSpaceFolderId = ref('')
-const dragOverSpaceFolderId = ref('')
-const draggingFavoriteKbId = ref('')
-const dragOverFavoriteKbId = ref('')
-const draggingTreeNodeId = ref('')
-const dragOverTreeNodeId = ref('')
 const favoriteMenuKbId = ref('')
 const selectedFileIds = ref<string[]>([])
 const createMode = ref(false)
 const createKbName = ref('')
-const createKbSpace = ref<SpaceKey>('public')
-const createKbFolderId = ref('')
+const createKbType = ref<'public' | 'personal'>('public')
 const createFolderMode = ref(false)
 const createFolderName = ref('')
 const createFolderParentId = ref('__root__')
 const expandedFolderSelectorIds = ref<string[]>([])
-const expandedKbInTreeIds = ref<string[]>([])
 const fileView = ref<'list' | 'grid'>('grid')
-const kbView = ref<'list' | 'grid'>('list')
 const fileSearch = ref('')
 const fileActionModalOpen = ref(false)
 const fileActionType = ref<'move' | null>(null)
@@ -57,7 +49,13 @@ const uploadTags = ref<string[]>([])
 const uploadCustomTagName = ref('')
 const uploadCustomTagColor = ref('#6366f1')
 const uploadShowTagPicker = ref(false)
-const uploadSecurityLevel = ref<'公开' | '内部' | '秘密' | '机密'>('内部')
+const uploadSecurityLevel = ref<SecurityLevel>('部门')
+const uploadAllowedDepts = ref<{ id: string; name: string }[]>([])
+function toggleUploadDept(dept: OrgNode) {
+  const idx = uploadAllowedDepts.value.findIndex(d => d.id === dept.id)
+  if (idx >= 0) uploadAllowedDepts.value.splice(idx, 1)
+  else uploadAllowedDepts.value.push({ id: dept.id, name: dept.name })
+}
 const predefinedTags: { name: string; color: string }[] = [
   { name: '案例', color: 'bg-amber-100 text-amber-700' },
   { name: '模版', color: 'bg-blue-100 text-blue-700' },
@@ -87,15 +85,57 @@ function getTagStyle(tagName: string): string {
   const found = predefinedTags.find(t => t.name === tagName)
   return found?.color ?? 'bg-zinc-100 text-zinc-600'
 }
-const uploadTasks = ref<{ id: string; name: string; status: 'uploading' | 'success' | 'failed' | 'reviewing'; progress: number; doc?: DocItem }[]>([])
-const expandedTreeIds = ref<string[]>(['folder-shared', 'folder-solution-center'])
-const activeTreeId = ref('')
+interface UploadTaskItem { id: string; name: string; status: UploadTaskStatus; progress: number; message?: string; doc?: DocItem }
+const uploadTasks = ref<UploadTaskItem[]>([])
+const expandedTreeIds = ref<string[]>(['kb-node-public-1', 'kb-node-public-3', 'kb-node-public-3-folder-tuan'])
+
+// ========== 权限状态 ==========
+const nodePermissions = reactive<Record<string, PermissionEntry[]>>({})
+const nodeInheritMap = reactive<Record<string, boolean>>({})
+const spaceDropdownOpen = ref(false)
+function selectActiveSpace(space: 'public' | 'personal') {
+  activeSpace.value = space
+  selectedKbId.value = null
+  selectedFileIds.value = []
+  previewDoc.value = null
+  qaOpen.value = false
+}
+const filteredFileTree = computed(() =>
+  fileTree
+    .filter(node => {
+      const kbId = node.kbId
+      if (!kbId) return true
+      const kb = knowledgeBases.find(k => k.id === kbId)
+      return kb?.space === activeSpace.value
+    })
+    .sort((a, b) => {
+      const ka = a.kbId ? knowledgeBases.find(k => k.id === a.kbId) : null
+      const kb = b.kbId ? knowledgeBases.find(k => k.id === b.kbId) : null
+      if (ka?.isBuiltIn && !kb?.isBuiltIn) return -1
+      if (!ka?.isBuiltIn && kb?.isBuiltIn) return 1
+      return 0
+    })
+)
+
+const settingsKbId = ref('')
+const kbVisibilityOpen = ref(true)
+const settingsKbIdBool = computed({
+  get: () => !!settingsKbId.value,
+  set: (v) => { if (!v) settingsKbId.value = '' },
+})
+const settingsTab = ref<'members' | 'documents' | 'audit'>('members')
+
+// ========== 树节点操作菜单 ==========
+const hoveredNodeId = ref('')               // 当前 hover 的节点 ID
+const treeMenuTargetId = ref('')            // ⋮ 菜单打开的目标节点 ID
+const treeMenuPos = ref({ x: 0, y: 0 })     // ⋮ 菜单弹出位置
+const activeTreeItemId = ref('')
 const previewDoc = ref<DocItem | null>(null)
 const previewTabs = ref<DocItem[]>([])
 const activeRightTab = ref('')
 const renamingDocName = ref('')
 const draftDocTitle = ref('')
-const fileActionFeedback = ref('')
+// toast 使用 vue-sonner，详见 showFileActionToast() 实现
 const exportMenuDocName = ref('')
 const renamingKbId = ref('')
 const draftKbTitle = ref('')
@@ -122,64 +162,30 @@ function getDocSection(docName: string): string {
 }
 const qaMode = ref<'answer' | 'search' | 'graph' | 'insight'>('answer')
 const qaMessages = ref<QaMessage[]>([])
+const qaLoading = ref(false)
+const qaHistoryCount = ref(0)
 const renamingFolderId = ref('')
 const draftFolderTitle = ref('')
-let fileActionToastTimer: number | undefined
+// 见下方 showFileActionToast 使用 vue-sonner
 
-const spaces = [
-  { key: 'public' as const, label: '公共空间', desc: '全员可检索的集团知识' },
-  { key: 'personal' as const, label: '个人空间', desc: '个人上传与私有资料' },
-]
-
-interface SpaceFolder { id: string; label: string; space: SpaceKey; kbIds: string[]; children?: SpaceFolder[] }
-
-const defaultPublicFolders = reactive<SpaceFolder[]>([
-  { id: 'default-public-group', label: '集团整体', space: 'public', kbIds: ['kb-public-1', 'kb-public-5'] },
-  { id: 'default-public-product', label: '商品部', space: 'public', kbIds: ['kb-public-2'] },
-  { id: 'default-public-b2c-online', label: 'B2C线上', space: 'public', kbIds: ['kb-public-6'] },
-  { id: 'default-public-b2c-offline', label: 'B2C线下', space: 'public', kbIds: ['kb-public-3'] },
-  { id: 'default-public-b2b', label: 'B2B', space: 'public', kbIds: ['kb-public-4'] },
-  { id: 'default-public-vision', label: '视觉部', space: 'public', kbIds: ['kb-public-7'] },
-  { id: 'default-public-engineering', label: '技术部', space: 'public', kbIds: ['kb-public-8'] },
-  { id: 'default-public-finance', label: '财务部', space: 'public', kbIds: ['kb-public-9'] },
-  { id: 'default-public-warehouse', label: '仓储部', space: 'public', kbIds: ['kb-public-10'] },
-  { id: 'default-public-brand', label: '品牌部', space: 'public', kbIds: ['kb-public-11'] },
-  { id: 'default-public-hr', label: '人力中心', space: 'public', kbIds: ['kb-public-12'] },
+const knowledgeBases = reactive<KnowledgeBaseItem[]>([
+  { id: 'kb-public-1', name: '集团制度知识库', docs: 128, owner: '集团运营', department: '行政部', visibility: '全员可见', space: 'public', canEdit: false, isBuiltIn: true, pinned: true, recent: '刚刚', permissionMode: 'independent', permissions: [] },
+  { id: 'kb-public-2', name: '商品基础资料库', docs: 86, owner: '商品中心', department: '商品部', visibility: '全员可见', space: 'public', canEdit: false, recent: '14:22', permissionMode: 'independent', permissions: [] },
+  { id: 'kb-public-3', name: '方案中心案例库', docs: 42, owner: '方案中心', department: '方案中心', visibility: '方案中心可编辑', space: 'public', canEdit: true, pinned: true, recent: '昨天 14:22', permissionMode: 'independent', permissions: [] },
+  { id: 'kb-public-4', name: '团购预算池', docs: 24, owner: '方案中心', department: '方案中心', visibility: '方案中心可编辑', space: 'public', canEdit: true, recent: '周日 13:27', permissionMode: 'independent', permissions: [] },
+  { id: 'kb-public-5', name: 'AI项目知识库', docs: 36, owner: 'AI运营', department: '集团整体', visibility: '全员可见', space: 'public', canEdit: true, pinned: true, recent: '今天 10:21', permissionMode: 'independent', permissions: [] },
+  { id: 'kb-public-6', name: '线上运营素材库', docs: 58, owner: 'B2C运营', department: 'B2C线上', visibility: '部门可见', space: 'public', canEdit: true, recent: '昨天 17:40', permissionMode: 'independent', permissions: [] },
+  { id: 'kb-public-7', name: '视觉规范与模板库', docs: 31, owner: '视觉部', department: '视觉部', visibility: '全员可见', space: 'public', canEdit: true, recent: '周一 09:12', permissionMode: 'independent', permissions: [] },
+  { id: 'kb-public-8', name: '技术项目资料库', docs: 44, owner: '技术部', department: '技术部', visibility: '部门可见', space: 'public', canEdit: true, recent: '昨天 20:16', permissionMode: 'independent', permissions: [] },
+  { id: 'kb-public-9', name: '财务制度资料库', docs: 22, owner: '财务部', department: '财务部', visibility: '全员可见', space: 'public', canEdit: false, isBuiltIn: true, recent: '06-28', permissionMode: 'independent', permissions: [] },
+  { id: 'kb-public-10', name: '仓储作业SOP库', docs: 39, owner: '仓储部', department: '仓储部', visibility: '部门可见', space: 'public', canEdit: true, recent: '06-27', permissionMode: 'independent', permissions: [] },
+  { id: 'kb-public-11', name: '品牌活动资料库', docs: 27, owner: '品牌部', department: '品牌部', visibility: '部门可见', space: 'public', canEdit: true, recent: '06-25', permissionMode: 'independent', permissions: [] },
+  { id: 'kb-public-12', name: '人力培训知识库', docs: 18, owner: '人力中心', department: '人力中心', visibility: '全员可见', space: 'public', canEdit: false, isBuiltIn: true, recent: '06-24', permissionMode: 'independent', permissions: [] },
+  { id: 'kb-personal-1', name: '我的客户资料', docs: 9, owner: '当前用户', department: '个人', visibility: '仅自己可见', space: 'personal', canEdit: true, pinned: true, recent: '今天 09:18', permissionMode: 'independent', permissions: [] },
+  { id: 'kb-personal-2', name: '临时方案草稿', docs: 5, owner: '当前用户', department: '个人', visibility: '仅自己可见', space: 'personal', canEdit: true, recent: '昨天 18:02', permissionMode: 'independent', permissions: [] },
+  { id: 'kb-personal-3', name: 'AI学习笔记', docs: 16, owner: '当前用户', department: '个人', visibility: '仅自己可见', space: 'personal', canEdit: true, pinned: false, recent: '今天 11:03', permissionMode: 'independent', permissions: [] },
+  { id: 'kb-personal-4', name: '客户素材归档', docs: 12, owner: '当前用户', department: '个人', visibility: '仅自己可见', space: 'personal', canEdit: true, pinned: false, recent: '周一 16:45', permissionMode: 'independent', permissions: [] },
 ])
-
-const defaultPersonalFolders = reactive<SpaceFolder[]>([
-  { id: 'default-personal-daily', label: '日常工作', space: 'personal', kbIds: ['kb-personal-2'] },
-  { id: 'default-personal-basics', label: '基础知识', space: 'personal', kbIds: ['kb-personal-3'] },
-  { id: 'default-personal-profile', label: '个人资料', space: 'personal', kbIds: ['kb-personal-1', 'kb-personal-4'] },
-])
-
-const defaultSpaceFolders: Record<SpaceKey, SpaceFolder[]> = {
-  public: defaultPublicFolders,
-  personal: defaultPersonalFolders,
-}
-
-const knowledgeBases = reactive<Record<SpaceKey, KnowledgeBaseItem[]>>({
-  public: [
-    { id: 'kb-public-1', name: '集团制度知识库', docs: 128, owner: '集团运营', department: '行政部', visibility: '全员可见', space: 'public', canEdit: false, pinned: true, recent: '刚刚' },
-    { id: 'kb-public-2', name: '商品基础资料库', docs: 86, owner: '商品中心', department: '商品部', visibility: '全员可见', space: 'public', canEdit: false, recent: '14:22' },
-    { id: 'kb-public-3', name: '方案中心案例库', docs: 42, owner: '方案中心', department: '方案中心', visibility: '方案中心可编辑', space: 'public', canEdit: true, pinned: true, recent: '昨天 14:22' },
-    { id: 'kb-public-4', name: '团购预算池', docs: 24, owner: '方案中心', department: '方案中心', visibility: '方案中心可编辑', space: 'public', canEdit: true, recent: '周日 13:27' },
-    { id: 'kb-public-5', name: 'AI项目知识库', docs: 36, owner: 'AI运营', department: '集团整体', visibility: '全员可见', space: 'public', canEdit: true, pinned: true, recent: '今天 10:21' },
-    { id: 'kb-public-6', name: '线上运营素材库', docs: 58, owner: 'B2C运营', department: 'B2C线上', visibility: '部门可见', space: 'public', canEdit: true, recent: '昨天 17:40' },
-    { id: 'kb-public-7', name: '视觉规范与模板库', docs: 31, owner: '视觉部', department: '视觉部', visibility: '全员可见', space: 'public', canEdit: true, recent: '周一 09:12' },
-    { id: 'kb-public-8', name: '技术项目资料库', docs: 44, owner: '技术部', department: '技术部', visibility: '部门可见', space: 'public', canEdit: true, recent: '昨天 20:16' },
-    { id: 'kb-public-9', name: '财务制度资料库', docs: 22, owner: '财务部', department: '财务部', visibility: '全员可见', space: 'public', canEdit: false, recent: '06-28' },
-    { id: 'kb-public-10', name: '仓储作业SOP库', docs: 39, owner: '仓储部', department: '仓储部', visibility: '部门可见', space: 'public', canEdit: true, recent: '06-27' },
-    { id: 'kb-public-11', name: '品牌活动资料库', docs: 27, owner: '品牌部', department: '品牌部', visibility: '部门可见', space: 'public', canEdit: true, recent: '06-25' },
-    { id: 'kb-public-12', name: '人力培训知识库', docs: 18, owner: '人力中心', department: '人力中心', visibility: '全员可见', space: 'public', canEdit: false, recent: '06-24' },
-  ],
-  personal: [
-    { id: 'kb-personal-1', name: '我的客户资料', docs: 9, owner: '当前用户', department: '个人', visibility: '仅自己可见', space: 'personal', canEdit: true, pinned: true, recent: '今天 09:18' },
-    { id: 'kb-personal-2', name: '临时方案草稿', docs: 5, owner: '当前用户', department: '个人', visibility: '仅自己可见', space: 'personal', canEdit: true, recent: '昨天 18:02' },
-    { id: 'kb-personal-3', name: 'AI学习笔记', docs: 16, owner: '当前用户', department: '个人', visibility: '仅自己可见', space: 'personal', canEdit: true, pinned: false, recent: '今天 11:03' },
-    { id: 'kb-personal-4', name: '客户素材归档', docs: 12, owner: '当前用户', department: '个人', visibility: '仅自己可见', space: 'personal', canEdit: true, pinned: false, recent: '周一 16:45' },
-  ],
-})
 
 const allDocs = reactive<Record<string, DocItem[]>>({
   'kb-public-1': [
@@ -242,129 +248,189 @@ const allDocs = reactive<Record<string, DocItem[]>>({
   ],
 })
 
-const fileTrees = reactive<Record<SpaceKey, TreeNode[]>>({
-  public: [
-    {
-      id: 'folder-shared',
-      label: '集团共享',
-      type: 'folder',
-      children: [
-        {
-          id: 'folder-policy',
-          label: '集团制度知识库',
-          type: 'folder',
-          kbId: 'kb-public-1',
-          isKnowledgeBase: true,
-          children: [
-            { id: 'file-attendance-policy', label: '考勤管理制度_v3.pdf', type: 'file', kbId: 'kb-public-1', docName: '考勤管理制度_v3.pdf' },
-            { id: 'file-hr-handbook', label: '员工手册2026版.docx', type: 'file', kbId: 'kb-public-1', docName: '员工手册2026版.docx' },
-          ],
-        },
-        {
-          id: 'folder-ai-project',
-          label: 'AI项目知识库',
-          type: 'folder',
-          kbId: 'kb-public-5',
-          isKnowledgeBase: true,
-          children: [
-            { id: 'file-ai-roadmap', label: 'AI工作台落地路线.md', type: 'file', kbId: 'kb-public-5', docName: 'AI工作台落地路线.md' },
-            { id: 'file-ai-scenarios', label: '三大场景AI项目说明.pptx', type: 'file', kbId: 'kb-public-5', docName: '三大场景AI项目说明.pptx' },
-          ],
-        },
-      ],
-    },
-    {
-      id: 'folder-solution-center',
-      label: '方案中心',
-      type: 'folder',
-      children: [
-        {
-          id: 'folder-solution-cases',
-          label: '方案中心案例库',
-          type: 'folder',
-          kbId: 'kb-public-3',
-          isKnowledgeBase: true,
-          children: [
-            { id: 'file-sneaker-case', label: '运动鞋团购成功案例.md', type: 'file', kbId: 'kb-public-3', docName: '运动鞋团购成功案例.md' },
-            { id: 'file-common-budget', label: '团购通用预算池.xlsx', type: 'file', kbId: 'kb-public-3', docName: '团购通用预算池.xlsx' },
-            { id: 'folder-tuan-schemes', label: '团购方案', type: 'folder', kbId: 'kb-public-3', children: [
-              { id: 'file-tuan-b2b', label: 'B2B团购方案模板.docx', type: 'file', kbId: 'kb-public-3', docName: 'B2B团购方案模板.docx' },
-              { id: 'file-tuan-b2c', label: 'B2C团购方案模板.docx', type: 'file', kbId: 'kb-public-3', docName: 'B2C团购方案模板.docx' },
-            ]},
-          ],
-        },
-        {
-          id: 'folder-budget-pool',
-          label: '团购预算池',
-          type: 'folder',
-          kbId: 'kb-public-4',
-          isKnowledgeBase: true,
-          children: [
-            { id: 'file-q1-budget', label: '2026Q1预算执行表.xlsx', type: 'file', kbId: 'kb-public-4', docName: '2026Q1预算执行表.xlsx' },
-            { id: 'file-price-band', label: '价格带分析报告.docx', type: 'file', kbId: 'kb-public-4', docName: '价格带分析报告.docx' },
-          ],
-        },
-      ],
-    },
-    {
-      id: 'folder-product',
-      label: '商品资料',
-      type: 'folder',
-      children: [
-        {
-          id: 'folder-product-base',
-          label: '商品基础资料库',
-          type: 'folder',
-          kbId: 'kb-public-2',
-          isKnowledgeBase: true,
-          children: [
-            { id: 'file-product-dict', label: '商品数据字典.xlsx', type: 'file', kbId: 'kb-public-2', docName: '商品数据字典.xlsx' },
-          ],
-        },
-      ],
-    },
-  ],
-  personal: [
-    {
-      id: 'personal-customer',
-      label: '我的客户资料',
-      type: 'folder',
-      kbId: 'kb-personal-1',
-      isKnowledgeBase: true,
-      children: [
-        { id: 'personal-customer-a', label: '客户A需求记录.md', type: 'file', kbId: 'kb-personal-1', docName: '客户A需求记录.md' },
-      ],
-    },
-    {
-      id: 'personal-drafts',
-      label: '临时方案草稿',
-      type: 'folder',
-      kbId: 'kb-personal-2',
-      isKnowledgeBase: true,
-      children: [
-        { id: 'personal-temp-note', label: '临时方案笔记.md', type: 'file', kbId: 'kb-personal-2', docName: '临时方案笔记.md' },
-        { id: 'personal-chaomu', label: '朝暮5草稿', type: 'folder', kbId: 'kb-personal-2', children: [{ id: 'personal-monitor', label: '策略监测草稿', type: 'file', kbId: 'kb-personal-2', docName: '临时方案笔记.md' }] },
-      ],
-    },
-    {
-      id: 'personal-archive',
-      label: '客户素材归档',
-      type: 'folder',
-      kbId: 'kb-personal-4',
-      isKnowledgeBase: true,
-      children: [
-        { id: 'personal-archive-meeting', label: '客户会议纪要.md', type: 'file', kbId: 'kb-personal-4', docName: '客户会议纪要.md' },
-        { id: 'personal-archive-list', label: '客户素材清单.xlsx', type: 'file', kbId: 'kb-personal-4', docName: '客户素材清单.xlsx' },
-      ],
-    },
-  ],
-})
+const fileTree = reactive<TreeNode[]>([
+  {
+    id: 'kb-node-public-1',
+    label: '集团制度知识库',
+    type: 'folder',
+    kbId: 'kb-public-1',
+    isKnowledgeBase: true,
+    isBuiltIn: true,
+    children: [
+      { id: 'file-attendance-policy', label: '考勤管理制度_v3.pdf', type: 'file', kbId: 'kb-public-1', docName: '考勤管理制度_v3.pdf' },
+      { id: 'file-hr-handbook', label: '员工手册2026版.docx', type: 'file', kbId: 'kb-public-1', docName: '员工手册2026版.docx' },
+    ],
+  },
+  {
+    id: 'kb-node-public-2',
+    label: '商品基础资料库',
+    type: 'folder',
+    kbId: 'kb-public-2',
+    isKnowledgeBase: true,
+    children: [
+      { id: 'file-product-dict', label: '商品数据字典.xlsx', type: 'file', kbId: 'kb-public-2', docName: '商品数据字典.xlsx' },
+    ],
+  },
+  {
+    id: 'kb-node-public-3',
+    label: '方案中心案例库',
+    type: 'folder',
+    kbId: 'kb-public-3',
+    isKnowledgeBase: true,
+    children: [
+      { id: 'file-sneaker-case', label: '运动鞋团购成功案例.md', type: 'file', kbId: 'kb-public-3', docName: '运动鞋团购成功案例.md' },
+      { id: 'file-common-budget', label: '团购通用预算池.xlsx', type: 'file', kbId: 'kb-public-3', docName: '团购通用预算池.xlsx' },
+      { id: 'kb-node-public-3-folder-tuan', label: '团购方案', type: 'folder', kbId: 'kb-public-3', children: [
+        { id: 'file-tuan-b2b', label: 'B2B团购方案模板.docx', type: 'file', kbId: 'kb-public-3', docName: 'B2B团购方案模板.docx' },
+        { id: 'file-tuan-b2c', label: 'B2C团购方案模板.docx', type: 'file', kbId: 'kb-public-3', docName: 'B2C团购方案模板.docx' },
+      ]},
+    ],
+  },
+  {
+    id: 'kb-node-public-4',
+    label: '团购预算池',
+    type: 'folder',
+    kbId: 'kb-public-4',
+    isKnowledgeBase: true,
+    children: [
+      { id: 'file-q1-budget', label: '2026Q1预算执行表.xlsx', type: 'file', kbId: 'kb-public-4', docName: '2026Q1预算执行表.xlsx' },
+      { id: 'file-price-band', label: '价格带分析报告.docx', type: 'file', kbId: 'kb-public-4', docName: '价格带分析报告.docx' },
+    ],
+  },
+  {
+    id: 'kb-node-public-5',
+    label: 'AI项目知识库',
+    type: 'folder',
+    kbId: 'kb-public-5',
+    isKnowledgeBase: true,
+    children: [
+      { id: 'file-ai-roadmap', label: 'AI工作台落地路线.md', type: 'file', kbId: 'kb-public-5', docName: 'AI工作台落地路线.md' },
+      { id: 'file-ai-scenarios', label: '三大场景AI项目说明.pptx', type: 'file', kbId: 'kb-public-5', docName: '三大场景AI项目说明.pptx' },
+    ],
+  },
+  {
+    id: 'kb-node-public-6',
+    label: '线上运营素材库',
+    type: 'folder',
+    kbId: 'kb-public-6',
+    isKnowledgeBase: true,
+    children: [
+      { id: 'file-online-review', label: '线上活动复盘模板.docx', type: 'file', kbId: 'kb-public-6', docName: '线上活动复盘模板.docx' },
+      { id: 'file-online-rules', label: '会员触达规则.xlsx', type: 'file', kbId: 'kb-public-6', docName: '会员触达规则.xlsx' },
+    ],
+  },
+  {
+    id: 'kb-node-public-7',
+    label: '视觉规范与模板库',
+    type: 'folder',
+    kbId: 'kb-public-7',
+    isKnowledgeBase: true,
+    children: [
+      { id: 'file-ppt-spec', label: 'PPT母版规范.pptx', type: 'file', kbId: 'kb-public-7', docName: 'PPT母版规范.pptx' },
+      { id: 'file-brand-color', label: '品牌色彩规范.pdf', type: 'file', kbId: 'kb-public-7', docName: '品牌色彩规范.pdf' },
+    ],
+  },
+  {
+    id: 'kb-node-public-8',
+    label: '技术项目资料库',
+    type: 'folder',
+    kbId: 'kb-public-8',
+    isKnowledgeBase: true,
+    children: [
+      { id: 'file-mcp-guide', label: 'MCP接入说明.md', type: 'file', kbId: 'kb-public-8', docName: 'MCP接入说明.md' },
+      { id: 'file-tech-spec', label: 'AI工作门户技术方案.docx', type: 'file', kbId: 'kb-public-8', docName: 'AI工作门户技术方案.docx' },
+    ],
+  },
+  {
+    id: 'kb-node-public-9',
+    label: '财务制度资料库',
+    type: 'folder',
+    kbId: 'kb-public-9',
+    isKnowledgeBase: true,
+    isBuiltIn: true,
+    children: [
+      { id: 'file-expense-policy', label: '费用报销制度.pdf', type: 'file', kbId: 'kb-public-9', docName: '费用报销制度.pdf' },
+    ],
+  },
+  {
+    id: 'kb-node-public-10',
+    label: '仓储作业SOP库',
+    type: 'folder',
+    kbId: 'kb-public-10',
+    isKnowledgeBase: true,
+    children: [
+      { id: 'file-warehouse-sop', label: '出入库作业SOP.pdf', type: 'file', kbId: 'kb-public-10', docName: '出入库作业SOP.pdf' },
+    ],
+  },
+  {
+    id: 'kb-node-public-11',
+    label: '品牌活动资料库',
+    type: 'folder',
+    kbId: 'kb-public-11',
+    isKnowledgeBase: true,
+    children: [
+      { id: 'file-brand-cases', label: '品牌活动案例集.pptx', type: 'file', kbId: 'kb-public-11', docName: '品牌活动案例集.pptx' },
+    ],
+  },
+  {
+    id: 'kb-node-public-12',
+    label: '人力培训知识库',
+    type: 'folder',
+    kbId: 'kb-public-12',
+    isKnowledgeBase: true,
+    isBuiltIn: true,
+    children: [
+      { id: 'file-hr-training', label: '新员工培训手册.docx', type: 'file', kbId: 'kb-public-12', docName: '新员工培训手册.docx' },
+    ],
+  },
+  {
+    id: 'kb-node-personal-1',
+    label: '我的客户资料',
+    type: 'folder',
+    kbId: 'kb-personal-1',
+    isKnowledgeBase: true,
+    children: [
+      { id: 'personal-customer-a', label: '客户A需求记录.md', type: 'file', kbId: 'kb-personal-1', docName: '客户A需求记录.md' },
+    ],
+  },
+  {
+    id: 'kb-node-personal-2',
+    label: '临时方案草稿',
+    type: 'folder',
+    kbId: 'kb-personal-2',
+    isKnowledgeBase: true,
+    children: [
+      { id: 'personal-temp-note', label: '临时方案笔记.md', type: 'file', kbId: 'kb-personal-2', docName: '临时方案笔记.md' },
+      { id: 'personal-chaomu', label: '朝暮5草稿', type: 'folder', kbId: 'kb-personal-2', children: [
+        { id: 'personal-monitor', label: '策略监测草稿', type: 'file', kbId: 'kb-personal-2', docName: '临时方案笔记.md' },
+      ]},
+    ],
+  },
+  {
+    id: 'kb-node-personal-3',
+    label: 'AI学习笔记',
+    type: 'folder',
+    kbId: 'kb-personal-3',
+    isKnowledgeBase: true,
+    children: [
+      { id: 'file-personal-ai-prompts', label: 'AI提示词学习.md', type: 'file', kbId: 'kb-personal-3', docName: 'AI提示词学习.md' },
+      { id: 'file-personal-rag', label: 'RAG实践笔记.docx', type: 'file', kbId: 'kb-personal-3', docName: 'RAG实践笔记.docx' },
+    ],
+  },
+  {
+    id: 'kb-node-personal-4',
+    label: '客户素材归档',
+    type: 'folder',
+    kbId: 'kb-personal-4',
+    isKnowledgeBase: true,
+    children: [
+      { id: 'personal-archive-meeting', label: '客户会议纪要.md', type: 'file', kbId: 'kb-personal-4', docName: '客户会议纪要.md' },
+      { id: 'personal-archive-list', label: '客户素材清单.xlsx', type: 'file', kbId: 'kb-personal-4', docName: '客户素材清单.xlsx' },
+    ],
+  },
+])
 
-const currentSpaceItems = computed(() => knowledgeBases[activeSpace.value])
-const selectedKb = computed(() => currentSpaceItems.value.find(kb => kb.id === selectedKbId.value))
-const activeDefaultFolder = computed(() => defaultSpaceFolders[activeSpace.value].find(folder => folder.id === activeTreeId.value))
-const activeSpaceFolderLabel = computed(() => activeDefaultFolder.value?.label ?? activeSpaceLabel.value)
-const spaceNameMap = computed<Record<string, string>>(() => spaces.reduce((acc, s) => ({ ...acc, [s.key]: s.label }), {} as Record<string, string>))
+const selectedKb = computed(() => knowledgeBases.find(kb => kb.id === selectedKbId.value))
 const rawDocs = computed(() => selectedKbId.value ? (allDocs[selectedKbId.value] ?? []) : [])
 const docs = computed(() => {
   if (!selectedKbId.value) return []
@@ -374,18 +440,14 @@ const docs = computed(() => {
   }
   return rawDocs.value
 })
-const activeSpaceLabel = computed(() => spaces.find(space => space.key === activeSpace.value)?.label ?? '')
-const mainTitle = computed(() => selectedKb.value?.name ?? activeDefaultFolder.value?.label ?? activeNode.value?.label ?? activeSpaceLabel.value)
+const mainTitle = computed(() => selectedKb.value?.name ?? activeNode.value?.label ?? '知识中心')
 const breadcrumbTrail = computed(() => {
   const trail: { label: string; onClick?: () => void }[] = []
   const added = new Set<string>()
-  // 1. Root space (always first)
-  const rootLabel = activeSpaceLabel.value
-  trail.push({ label: rootLabel, onClick: () => { switchSpace(activeSpace.value); closeRecycleIfOpen() } })
-  added.add(rootLabel)
-  // 2. Walk file tree path from root to activeNode — show EVERY level — show EVERY level
+  trail.push({ label: '全部知识库', onClick: () => { deselectKb() } })
+  added.add('全部知识库')
   if (activeNode.value) {
-    const treePath = findTreeNodePath(currentFileTree.value, activeNode.value.id)
+    const treePath = findTreeNodePath(fileTree, activeNode.value.id)
     for (const node of treePath) {
       if (!added.has(node.label)) {
         trail.push({ label: node.label })
@@ -393,25 +455,48 @@ const breadcrumbTrail = computed(() => {
       }
     }
   }
-  // 3. Active file name (if previewing)
   if (activePreviewDoc.value && activeNode.value?.type !== 'file') {
     trail.push({ label: activePreviewDoc.value.name })
   }
   return trail
 })
-const activeDirectoryKbIds = computed(() => {
-  if (activeDefaultFolder.value) return activeDefaultFolder.value.kbIds
-  if (!activeNode.value?.children?.length) return []
-  return collectKbIds(activeNode.value.children)
-})
 const displayedKnowledgeBases = computed(() => {
-  const scoped = activeDirectoryKbIds.value.length
-    ? currentSpaceItems.value.filter(kb => activeDirectoryKbIds.value.includes(kb.id))
-    : currentSpaceItems.value
   const q = kbSearch.value.trim().toLowerCase()
-  return q ? scoped.filter(kb => `${kb.name}${kb.owner}${kb.department}`.toLowerCase().includes(q)) : scoped
+  return q ? knowledgeBases.filter(kb => `${kb.name}${kb.owner}${kb.department}`.toLowerCase().includes(q)) : knowledgeBases
 })
 const pinnedKnowledgeBases = computed(() => displayedKnowledgeBases.value.filter(kb => kb.pinned))
+const currentFileTree = computed(() => fileTree)
+const activeNode = computed(() => findTreeNode(fileTree, activeTreeItemId.value))
+const activeKbFolderNode = computed(() => {
+  if (!selectedKbId.value) return undefined
+  if (activeNode.value?.type === 'folder' && getNodeKbId(activeNode.value) === selectedKbId.value) return activeNode.value
+  return findKbTreeNode(fileTree, selectedKbId.value)
+})
+// ─── 当前用户模拟（后续对接钉钉） ───
+const currentUser = { departments: ['技术部', '集团整体'], name: '当前用户' }
+
+// 用户的安全许可 = 从当前用户在知识库中的角色派生
+function getUserClearance(kbId?: string): SecurityLevel {
+  if (!kbId) return '部门'
+  const members = (nodePermissions[kbId] ?? [])
+  const me = members.find(m => m.name === '当前用户' || m.name === '我')
+  return me?.securityClearance ?? getDefaultClearance(me?.role ?? 'VIEWER')
+}
+
+// 可访问的文件名称集合（密级生效检查）
+const accessibleDocNames = computed(() => {
+  const clearance = getUserClearance(selectedKbId.value ?? undefined)
+  return new Set(
+    docs.value
+      .filter(d => canAccessFileBySecurityLevel(clearance, d.securityLevel) && canAccessFile(currentUser, d))
+      .map(d => d.name)
+  )
+})
+
+function isDocAccessible(doc: DocItem): boolean {
+  return accessibleDocNames.value.has(doc.name)
+}
+
 const filteredDocs = computed(() => {
   const q = fileSearch.value.trim().toLowerCase()
   if (!q) return docs.value
@@ -420,13 +505,6 @@ const filteredDocs = computed(() => {
     if (d.tags?.some(t => t.toLowerCase().includes(q))) return true
     return false
   })
-})
-const currentFileTree = computed(() => fileTrees[activeSpace.value])
-const activeNode = computed(() => findTreeNode(currentFileTree.value, activeTreeId.value))
-const activeKbFolderNode = computed(() => {
-  if (!selectedKbId.value) return undefined
-  if (activeNode.value?.type === 'folder' && getNodeKbId(activeNode.value) === selectedKbId.value) return activeNode.value
-  return findKbTreeNode(fileTrees[activeSpace.value], selectedKbId.value)
 })
 const visibleFolderNodes = computed(() => {
   const children = activeKbFolderNode.value?.children ?? []
@@ -437,18 +515,13 @@ const visibleFolderNodes = computed(() => {
 const hasKnowledgeItems = computed(() => visibleFolderNodes.value.length > 0 || filteredDocs.value.length > 0)
 const fileCount = computed(() => visibleFolderNodes.value.length + filteredDocs.value.length)
 const folderOptions = computed<FolderOption[]>(() => [
-  { id: '__root__', label: '当前空间根目录', depth: 0 },
-  ...collectFolderOptions(currentFileTree.value, 1),
+  { id: '__root__', label: '知识库根目录', depth: 0 },
+  ...collectFolderOptions(fileTree, 1),
 ])
-const createKbContainerOptions = computed<FolderOption[]>(() => defaultSpaceFolders[createKbSpace.value].map(folder => ({
-  id: folder.id,
-  label: folder.label,
-  depth: 0,
-})))
 const kbFolderOptions = computed<FolderOption[]>(() => {
   const expanded = expandedFolderSelectorIds.value
-  return currentSpaceItems.value.flatMap((kb) => {
-    const root = findKbTreeNode(fileTrees[activeSpace.value], kb.id)
+  return knowledgeBases.flatMap((kb) => {
+    const root = findKbTreeNode(fileTree, kb.id)
     if (!root) return []
     const rows: FolderOption[] = [
       { id: root.id, label: kb.name, depth: 0, node: root },
@@ -467,16 +540,8 @@ const qaSources = computed(() => {
     reason: index === 0 ? '命中标题与正文关键段落' : index === 1 ? '匹配预算、流程或执行建议' : '可作为补充来源',
   }))
 })
-const currentDirectoryChildren = computed(() => {
-  const children = activeNode.value?.children ?? currentFileTree.value
-  const q = kbSearch.value.trim().toLowerCase()
-  return q ? children.filter(node => node.label.toLowerCase().includes(q)) : children
-})
-
 const targetKbs = computed(() => {
-  const all = (Object.entries(knowledgeBases) as [SpaceKey, KnowledgeBaseItem[]][]).flatMap(([space, items]) =>
-    items.filter(kb => kb.id !== selectedKbId.value).map(kb => ({ ...kb, space }))
-  )
+  const all = knowledgeBases.filter(kb => kb.id !== selectedKbId.value)
   const q = targetSearch.value.trim().toLowerCase()
   return q ? all.filter(kb => kb.name.toLowerCase().includes(q)) : all
 })
@@ -496,31 +561,8 @@ const mainRightMargin = computed(() => {
   return parts.length ? `calc(${parts.join(' + ')})` : '0px'
 })
 
-function getSpaceFolderKbs(folder: SpaceFolder) {
-  return folder.kbIds
-    .map(id => knowledgeBases[folder.space].find(kb => kb.id === id))
-    .filter((kb): kb is KnowledgeBaseItem => Boolean(kb))
-}
-
-function getSpaceFolderTree(folder: SpaceFolder): TreeRow[] {
-  return getSpaceFolderKbs(folder).flatMap((kb) => {
-    const root = findKbTreeNode(fileTrees[folder.space], kb.id) ?? {
-      id: `virtual-${kb.id}`,
-      label: kb.name,
-      type: 'folder' as const,
-      kbId: kb.id,
-      isKnowledgeBase: true,
-      children: [],
-    }
-    return [
-      { id: `${folder.id}-${root.id}`, node: root, depth: 0, kbId: kb.id },
-      ...(expandedTreeIds.value.includes(root.id) ? flattenTreeRows(root.children ?? [], 1, folder.id, kb.id) : []),
-    ]
-  })
-}
-
 function getKbTreeRows(kbId: string): TreeRow[] {
-  const root = findKbTreeNode(fileTrees[activeSpace.value], kbId)
+  const root = findKbTreeNode(fileTree, kbId)
   if (!root) return []
   return flattenTreeRows(root.children ?? [], 1, 'kb', kbId)
 }
@@ -554,8 +596,7 @@ function toggleTreeRowExpand(row: TreeRow) {
 }
 
 function openTreeRow(row: TreeRow) {
-  activeSpace.value = findNodeSpace(row.node) ?? activeSpace.value
-  activeTreeId.value = row.node.id
+  activeTreeItemId.value = row.node.id
   selectedFileIds.value = []
   const kbId = row.kbId ?? getNodeKbId(row.node)
   if (row.node.type === 'file') {
@@ -570,101 +611,6 @@ function openTreeRow(row: TreeRow) {
   }
 }
 
-function isSpaceFolderExpanded(folder: SpaceFolder) {
-  return expandedTreeIds.value.includes(folder.id)
-}
-
-function toggleSpaceFolderExpand(folder: SpaceFolder) {
-  activeSpace.value = folder.space
-  createKbSpace.value = folder.space
-  expandedTreeIds.value = isSpaceFolderExpanded(folder)
-    ? expandedTreeIds.value.filter(id => id !== folder.id)
-    : [...new Set([...expandedTreeIds.value, folder.id])]
-}
-
-function openSpaceFolder(folder: SpaceFolder) {
-  closeRecycleIfOpen()
-  activeSpace.value = folder.space
-  selectedKbId.value = null
-  createKbSpace.value = folder.space
-  selectedFileIds.value = []
-  previewDoc.value = null
-  fileSearch.value = ''
-  kbSearch.value = ''
-  activeTreeId.value = folder.id
-  if (!isSpaceFolderExpanded(folder)) {
-    expandedTreeIds.value = [...new Set([...expandedTreeIds.value, folder.id])]
-  }
-}
-
-function reorderSpaceFolder(target: SpaceFolder) {
-  if (!draggingSpaceFolderId.value || draggingSpaceFolderId.value === target.id) return
-  const folders = defaultSpaceFolders[target.space]
-  const from = folders.findIndex(folder => folder.id === draggingSpaceFolderId.value)
-  const to = folders.findIndex(folder => folder.id === target.id)
-  if (from < 0 || to < 0) return
-  const [moved] = folders.splice(from, 1)
-  folders.splice(to, 0, moved)
-  dragOverSpaceFolderId.value = ''
-}
-
-function finishSpaceFolderDrag() {
-  draggingSpaceFolderId.value = ''
-  dragOverSpaceFolderId.value = ''
-}
-
-function reorderFavoriteKb(target: KnowledgeBaseItem) {
-  if (!draggingFavoriteKbId.value || draggingFavoriteKbId.value === target.id) return
-  const list = knowledgeBases[activeSpace.value]
-  const from = list.findIndex(kb => kb.id === draggingFavoriteKbId.value)
-  const to = list.findIndex(kb => kb.id === target.id)
-  if (from < 0 || to < 0) return
-  const [moved] = list.splice(from, 1)
-  list.splice(to, 0, moved)
-  dragOverFavoriteKbId.value = ''
-}
-
-function finishFavoriteDrag() {
-  draggingFavoriteKbId.value = ''
-  dragOverFavoriteKbId.value = ''
-}
-
-function finishTreeDrag() {
-  draggingTreeNodeId.value = ''
-  dragOverTreeNodeId.value = ''
-}
-
-function findNodeParent(nodes: TreeNode[], id: string): TreeNode[] | null {
-  for (const node of nodes) {
-    if (!node.children) continue
-    if (node.children.some(c => c.id === id)) return node.children
-    const found = findNodeParent(node.children, id)
-    if (found) return found
-  }
-  return null
-}
-
-function reorderTreeItems(targetNode: TreeNode) {
-  if (!draggingTreeNodeId.value || draggingTreeNodeId.value === targetNode.id) {
-    finishTreeDrag()
-    return
-  }
-  const tree = currentFileTree.value
-  const parent = findNodeParent(tree, draggingTreeNodeId.value)
-  const targetParent = findNodeParent(tree, targetNode.id)
-  if (parent === null || targetParent === null || parent !== targetParent) {
-    showFileActionToast('只能在同一层级拖拽排序')
-    finishTreeDrag()
-    return
-  }
-  const fromIdx = parent.findIndex(n => n.id === draggingTreeNodeId.value)
-  const toIdx = parent.findIndex(n => n.id === targetNode.id)
-  if (fromIdx === -1 || toIdx === -1) { finishTreeDrag(); return }
-  const [item] = parent.splice(fromIdx, 1)
-  parent.splice(toIdx, 0, item)
-  finishTreeDrag()
-}
-
 function openFavoriteMenu(kb: KnowledgeBaseItem, event: MouseEvent) {
   event.stopPropagation()
   favoriteMenuKbId.value = favoriteMenuKbId.value === kb.id ? '' : kb.id
@@ -677,41 +623,26 @@ function openKnowledgeQaFromKb(kb: KnowledgeBaseItem) {
 }
 
 function getKbTreeRootId(kbId: string): string {
-  const root = findKbTreeNode(fileTrees[activeSpace.value], kbId)
+  const root = findKbTreeNode(fileTree, kbId)
   return root?.id ?? kbId
 }
 
-function switchSpace(space: SpaceKey) {
-  closeRecycleIfOpen()
-  activeSpace.value = space
-  activeSpaceRoot.value = true
-  selectedKbId.value = null
-  createKbSpace.value = space
-  selectedFileIds.value = []
-  previewDoc.value = null
-  activeTreeId.value = ''
-  expandedTreeIds.value = space === 'public'
-    ? ['default-public-group', 'folder-shared', 'folder-solution-center']
-    : ['default-personal-daily', 'personal-customer', 'personal-drafts']
-}
 function selectKb(id: string) {
-  closeRecycleIfOpen()
-  activeSpaceRoot.value = false
+  if (activeKnowledgeTab.value === 'trash') activeKnowledgeTab.value = 'assets'
   selectedKbId.value = id
   selectedFileIds.value = []
   previewDoc.value = null
-  const node = findKbTreeNode(fileTrees[activeSpace.value], id)
-  if (node) activeTreeId.value = node.id
-  const folder = defaultSpaceFolders[activeSpace.value].find(item => item.kbIds.includes(id))
-  if (folder) expandedTreeIds.value = [...new Set([...expandedTreeIds.value, folder.id])]
+  const node = findKbTreeNode(fileTree, id)
+  if (node) activeTreeItemId.value = node.id
 }
 
 function deselectKb() {
   selectedKbId.value = null
+  activeTreeItemId.value = ''
   fileSearch.value = ''
 }
 function previewFileFromTree(row: TreeRow) {
-  closeRecycleIfOpen()
+  if (activeKnowledgeTab.value === 'trash') activeKnowledgeTab.value = 'assets'
   if (!row.kbId) return
   const docName = row.node.docName || row.node.label
   const docs = allDocs[row.kbId] || []
@@ -723,8 +654,7 @@ function previewFileFromTree(row: TreeRow) {
 }
 
 function toggleTreeNode(node: TreeNode) {
-  closeRecycleIfOpen()
-  activeTreeId.value = node.id
+  if (activeKnowledgeTab.value === 'trash') activeKnowledgeTab.value = 'assets'
   const kbId = getNodeKbId(node)
   if (node.type === 'file' && kbId) {
     selectedKbId.value = kbId
@@ -732,6 +662,7 @@ function toggleTreeNode(node: TreeNode) {
     if (doc) openPreview(doc)
     return
   }
+  activeTreeItemId.value = node.id
   if (kbId) selectedKbId.value = kbId
   else selectedKbId.value = null
   if (node.children?.length) {
@@ -749,15 +680,11 @@ function toggleTreeExpandOnly(node: TreeNode) {
 }
 
 function selectTreeNode(node: TreeNode) {
-  closeRecycleIfOpen()
-  activeTreeId.value = node.id
+  if (activeKnowledgeTab.value === 'trash') activeKnowledgeTab.value = 'assets'
+  activeTreeItemId.value = node.id
   const kbId = getNodeKbId(node)
   selectedKbId.value = kbId ?? null
   selectedFileIds.value = []
-}
-
-function closeRecycleIfOpen() {
-  if (activeKnowledgeTab.value === 'trash') activeKnowledgeTab.value = 'assets'
 }
 
 function collectKbIds(nodes: TreeNode[]): string[] {
@@ -798,18 +725,18 @@ function collectFolderOptionsLevelByLevel(nodes: TreeNode[], depth: number, expa
 }
 
 function getKbTreeChildren(kbId: string): TreeNode[] {
-  const root = findKbTreeNode(fileTrees[activeSpace.value], kbId)
+  const root = findKbTreeNode(fileTree, kbId)
   return root?.children ?? []
 }
 
 function kbNodeHasFolderChildren(kbId: string): boolean {
-  const root = findKbTreeNode(fileTrees[activeSpace.value], kbId)
+  const root = findKbTreeNode(fileTree, kbId)
   return (root?.children ?? []).some(c => c.type === 'folder' || c.type === 'file')
 }
 
 function toggleKbTreeExpand(kbId: string, event: MouseEvent) {
   event.stopPropagation()
-  const root = findKbTreeNode(fileTrees[activeSpace.value], kbId)
+  const root = findKbTreeNode(fileTree, kbId)
   if (!root) return
   toggleTreeExpandOnly(root)
 }
@@ -834,10 +761,7 @@ function findTreeNodeKbId(nodes: TreeNode[], id: string, inheritedKbId?: string)
 }
 function getNodeKbId(node?: TreeNode) {
   if (!node) return undefined
-  return node.kbId ?? findTreeNodeKbId(fileTrees[activeSpace.value], node.id)
-}
-function findNodeSpace(node: TreeNode): SpaceKey | undefined {
-  return (Object.keys(fileTrees) as SpaceKey[]).find(space => Boolean(findTreeNode(fileTrees[space], node.id)))
+  return node.kbId ?? findTreeNodeKbId(fileTree, node.id)
 }
 function toggleFileSelect(name: string) {
   const i = selectedFileIds.value.indexOf(name)
@@ -849,14 +773,19 @@ function selectAllFiles() {
 }
 function deleteSelectedDocs() {
   if (!selectedKbId.value || selectedFileIds.value.length === 0) return
-  const deletedCount = selectedFileIds.value.length
+  const kb = findKbById(selectedKbId.value)
   const selectedSet = new Set(selectedFileIds.value)
+  const deletedDocs = (allDocs[selectedKbId.value] ?? []).filter(item => selectedSet.has(item.name))
+  deletedDocs.forEach(doc => {
+    pushRecycleItem({ type: 'file', name: doc.name, space: kb?.space ?? 'public', kbId: selectedKbId.value ?? undefined, kbName: kb?.name, detail: `${doc.size ?? '-'} · ${doc.format}` })
+  })
   allDocs[selectedKbId.value] = (allDocs[selectedKbId.value] ?? []).filter(item => !selectedSet.has(item.name))
   if (previewDoc.value && selectedSet.has(previewDoc.value.name)) previewDoc.value = null
   previewTabs.value = previewTabs.value.filter(item => !selectedSet.has(item.name))
   if (selectedSet.has(activeRightTab.value)) activeRightTab.value = previewTabs.value[0]?.name ?? ''
+  const deletedCount = selectedFileIds.value.length
   selectedFileIds.value = []
-  showFileActionToast(`已删除 ${deletedCount} 个文件`)
+  showFileActionToast(`已删除 ${deletedCount} 个文件，可在回收站找回`)
 }
 function confirmFileAction() {
   if (fileActionType.value === 'move' && targetKbId.value && selectedKbId.value) {
@@ -887,55 +816,44 @@ function openCreateModal() {
     showFileActionToast('知识库内只能新建文件夹，不能新建知识库')
     return
   }
-  createKbSpace.value = activeSpace.value
-  createKbFolderId.value = activeDefaultFolder.value?.id ?? defaultSpaceFolders[activeSpace.value][0]?.id ?? ''
   createMode.value = true
-}
-function openCreateModalAt(parentId: string) {
-  createKbSpace.value = activeSpace.value
-  const targetFolder = defaultSpaceFolders[activeSpace.value].find(folder => folder.id === parentId)
-  createKbFolderId.value = targetFolder?.id ?? defaultSpaceFolders[activeSpace.value][0]?.id ?? ''
-  createMode.value = true
-  contextMenu.value = null
+  createKbType.value = 'public'
+  createKbName.value = ''
 }
 function createKnowledgeBase() {
-  const name = createKbName.value.trim()
-  if (!name) { showFileActionToast('请输入知识库名称'); return }
-  if (name.length > 64) { showFileActionToast('知识库名称不能超过64个字符'); return }
-  if (/[\/\?"\*\:]/.test(name)) { showFileActionToast('名称格式错误，不能包含 / ? : " * 等特殊字符'); return }
-  const folder = defaultSpaceFolders[createKbSpace.value].find(f => f.id === createKbFolderId.value)
-  if (folder && folder.kbIds.some(id => {
-    const kb = knowledgeBases[createKbSpace.value].find(k => k.id === id)
-    return kb && kb.name === name
-  })) { showFileActionToast('名称已存在，请更换'); return }
-  const isPublic = createKbSpace.value === 'public'
+  const isPublic = createKbType.value === 'public'
   const newKb: KnowledgeBaseItem = {
-    id: `kb-${createKbSpace.value}-${Date.now()}`,
+    id: `kb-${createKbType.value}-${Date.now()}`,
     name: createKbName.value || '未命名知识库',
     docs: 0,
     owner: '当前用户',
     department: isPublic ? '按角色授权' : '个人',
-    visibility: isPublic ? '按角色授权' : '仅自己可见',
-    space: createKbSpace.value,
+    visibility: isPublic ? '全员可检索' : '仅自己可见',
+    space: createKbType.value,
     canEdit: true,
     pinned: false,
     recent: '刚刚',
+    permissionMode: 'independent',
+    permissions: isPublic
+      ? [{ id: `${Date.now()}-all`, name: '全员', scope: '系统', department: '全部', role: 'VIEWER', joinedAt: new Date().toISOString().slice(0, 10) }]
+      : [],
   }
-  knowledgeBases[createKbSpace.value].push(newKb)
+  knowledgeBases.push(newKb)
   allDocs[newKb.id] = []
-  const targetTree = fileTrees[createKbSpace.value]
-  const defaultFolder = defaultSpaceFolders[createKbSpace.value].find(folder => folder.id === createKbFolderId.value)
-  const container = createKbFolderId.value ? findTreeNode(targetTree, createKbFolderId.value) : undefined
-  const newNode: TreeNode = { id: `folder-${newKb.id}`, label: newKb.name, type: 'folder', kbId: newKb.id, isKnowledgeBase: true, children: [] }
-  if (defaultFolder) defaultFolder.kbIds.push(newKb.id)
-  if (container?.children) container.children.push(newNode)
-  else targetTree.push(newNode)
-  createKbName.value = ''; createMode.value = false
-  const containerId = container?.id
-  switchSpace(createKbSpace.value)
-  if (containerId) expandedTreeIds.value = [...new Set([...expandedTreeIds.value, containerId])]
-  if (defaultFolder) expandedTreeIds.value = [...new Set([...expandedTreeIds.value, defaultFolder.id])]
-  selectedKbId.value = newKb.id; activeTreeId.value = newNode.id
+  const newNode: TreeNode = {
+    id: `kb-node-${newKb.id}`,
+    label: newKb.name,
+    type: 'folder',
+    kbId: newKb.id,
+    isKnowledgeBase: true,
+    children: [],
+  }
+  fileTree.push(newNode)
+  createKbName.value = ''
+  createMode.value = false
+  selectedKbId.value = newKb.id
+  activeTreeItemId.value = newNode.id
+  expandedTreeIds.value = [...new Set([...expandedTreeIds.value, newNode.id])]
 }
 function openUploadModal() {
   if (!selectedKb.value) {
@@ -945,25 +863,47 @@ function openUploadModal() {
   uploadModalOpen.value = true
   uploadFileNames.value = []
 }
+const uploadFileErrors = ref<string[]>([])
+const uploadDragOver = ref(false)
 function handleUploadFiles(event: Event) {
   const files = Array.from((event.target as HTMLInputElement).files ?? [])
-  uploadFileNames.value = files
-    .filter((file) => {
-      const ext = file.name.split('.').pop()?.toLowerCase()
-      return ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'png', 'jpg', 'jpeg'].includes(ext || '')
-    })
-    .map(file => file.name)
+  uploadFileErrors.value = []
+  const MAX_SIZE = 20 * 1024 * 1024 // 20MB
+  const allowed = new Set(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'png', 'jpg', 'jpeg'])
+  const selected: string[] = []
+  files.forEach((file) => {
+    const ext = file.name.split('.').pop()?.toLowerCase()
+    if (!ext || !allowed.has(ext)) {
+      uploadFileErrors.value.push(`「${file.name}」格式不支持（支持: PDF/Word/Excel/PPT/TXT/PNG/JPG）`)
+      return
+    }
+    if (file.size > MAX_SIZE) {
+      uploadFileErrors.value.push(`「${file.name}」超过 20MB 限制`)
+      return
+    }
+    if (selected.includes(file.name)) {
+      uploadFileErrors.value.push(`「${file.name}」重复选择`)
+      return
+    }
+    selected.push(file.name)
+  })
+  if (selected.length > 30) {
+    uploadFileErrors.value.push('单次最多上传 30 个文件，已截取前 30 个')
+    selected.splice(30)
+  }
+  uploadFileNames.value = selected
 }
 function confirmUpload() {
   const names = uploadFileNames.value.length ? uploadFileNames.value : ['方案补充资料.pdf', '客户需求表.xlsx']
+  const space = selectedKb.value?.space ?? 'public'
   const tasks = names.map((name, index) => {
     const format = (name.split('.').pop() || 'PDF').toUpperCase()
-    const doc: DocItem = { name, format, status: activeSpace.value === 'public' ? '待审核' : '已索引', updatedAt: '刚刚', uploadedBy: '当前用户', tags: uploadTags.value.length ? [...uploadTags.value] : undefined, securityLevel: uploadSecurityLevel.value }
+    const doc: DocItem = { name, format, status: space === 'public' ? '待审核' : '已索引', updatedAt: '刚刚', uploadedBy: '当前用户', tags: uploadTags.value.length ? [...uploadTags.value] : undefined, securityLevel: uploadSecurityLevel.value, allowedDepts: uploadSecurityLevel.value === '部门' ? [...uploadAllowedDepts.value] : undefined }
     if (selectedKbId.value) {
       allDocs[selectedKbId.value] = [doc, ...(allDocs[selectedKbId.value] ?? [])]
       const targetNode = activeNode.value?.type === 'folder' && activeNode.value.kbId === selectedKbId.value
         ? activeNode.value
-        : findKbTreeNode(fileTrees[activeSpace.value], selectedKbId.value)
+        : findKbTreeNode(fileTree, selectedKbId.value)
       if (targetNode) {
         targetNode.children = targetNode.children ?? []
         targetNode.children.unshift({
@@ -976,7 +916,7 @@ function confirmUpload() {
         expandedTreeIds.value = [...new Set([...expandedTreeIds.value, targetNode.id])]
       }
     }
-    return { id: `upload-${Date.now()}-${index}`, name, status: activeSpace.value === 'public' ? 'reviewing' as const : 'success' as const, progress: 100, doc }
+    return { id: `upload-${Date.now()}-${index}`, name, status: space === 'public' ? 'reviewing' as const : 'done' as const, progress: 100, doc }
   })
   uploadTasks.value = [...tasks, ...uploadTasks.value].slice(0, 4)
   uploadModalOpen.value = false
@@ -988,10 +928,13 @@ function dismissUploadTask(id: string) {
 function getFileIcon(f: string) { if (f === 'XLSX') return FileSpreadsheet; if (f === 'DOCX' || f === 'MD' || f === 'PDF') return FileText; return File }
 function getIconColor(f: string) { if (f === 'XLSX') return 'text-emerald-500 bg-emerald-50'; if (f === 'DOCX') return 'text-blue-500 bg-blue-50'; if (f === 'PDF') return 'text-red-500 bg-red-50'; if (f === 'MD') return 'text-violet-500 bg-violet-50'; return 'text-zinc-500 bg-zinc-50' }
 function openPreview(doc: DocItem) {
+  if (!isDocAccessible(doc)) {
+    showFileActionToast('你的安全等级不足以查看此文件')
+    return
+  }
   previewDoc.value = doc
   previewTabs.value = [doc, ...previewTabs.value.filter(item => item.name !== doc.name)].slice(0, 5)
   activeRightTab.value = doc.name
-  qaOpen.value = true
 }
 function openQaPanel() {
   qaOpen.value = true
@@ -1030,7 +973,7 @@ function commitRenameDoc(doc: DocItem) {
         if (node.children) updateTreeLabel(node.children)
       }
     }
-    updateTreeLabel(fileTrees[activeSpace.value])
+    updateTreeLabel(fileTree)
     // Sync preview tab
     if (previewDoc.value?.name === oldName) previewDoc.value = doc
     previewTabs.value = previewTabs.value.map(t => t.name === oldName ? doc : t)
@@ -1038,7 +981,14 @@ function commitRenameDoc(doc: DocItem) {
   }
   renamingDocName.value = ''; draftDocTitle.value = ''
 }
-function exportDoc(_doc?: DocItem | null) {}
+function exportDoc(_doc?: DocItem | null) {
+  if (!_doc) return
+  if (!isDocAccessible(_doc)) {
+    showFileActionToast('你的安全等级不足以下载此文件')
+    return
+  }
+  showFileActionToast('文件下载中：' + _doc.name)
+}
 function chooseExportFormat(_format?: string) {}
 function moveDoc(doc?: DocItem) {
   if (doc) selectedFileIds.value = [doc.name]
@@ -1050,12 +1000,14 @@ function moveDoc(doc?: DocItem) {
 }
 function deleteDoc(doc: DocItem) {
   if (!selectedKbId.value) return
+  const kb = findKbById(selectedKbId.value)
+  pushRecycleItem({ type: 'file', name: doc.name, space: kb?.space ?? 'public', kbId: selectedKbId.value, kbName: kb?.name, detail: `${doc.size ?? '-'} · ${doc.format}` })
   allDocs[selectedKbId.value] = (allDocs[selectedKbId.value] ?? []).filter(item => item.name !== doc.name)
   selectedFileIds.value = selectedFileIds.value.filter(name => name !== doc.name)
   if (previewDoc.value?.name === doc.name) previewDoc.value = null
   previewTabs.value = previewTabs.value.filter(item => item.name !== doc.name)
   if (activeRightTab.value === doc.name) activeRightTab.value = previewTabs.value[0]?.name ?? ''
-  showFileActionToast(`已删除：${doc.name}`)
+  showFileActionToast(`已删除：${doc.name}，可在回收站找回`)
 }
 function toggleKbPinned(kb: KnowledgeBaseItem) {
   kb.pinned = !kb.pinned
@@ -1068,12 +1020,23 @@ function beginRenameKb(kb: KnowledgeBaseItem) {
 function commitRenameKb(_kb?: KnowledgeBaseItem) { renamingKbId.value = ''; draftKbTitle.value = '' }
 function deleteKb(kb: KnowledgeBaseItem) {
   if (!kb.canEdit) return
-  knowledgeBases[kb.space] = knowledgeBases[kb.space].filter(item => item.id !== kb.id)
-  removeTreeNodesByPredicate(fileTrees[kb.space], node => node.kbId === kb.id && node.type === 'folder')
-  delete allDocs[kb.id]
-  if (selectedKbId.value === kb.id) selectedKbId.value = null
-  if (activeTreeId.value && !findTreeNode(fileTrees[activeSpace.value], activeTreeId.value)) activeTreeId.value = ''
-  showFileActionToast(`已删除知识库：${kb.name}`)
+  if (kb.isBuiltIn) {
+    showFileActionToast('系统内置知识库不可删除')
+    return
+  }
+  const confirmMsg = `确认删除知识库「${kb.name}」？此操作不可恢复！`
+  showConfirm('删除知识库', confirmMsg, () => {
+    pushRecycleItem({ type: 'knowledgeBase', name: kb.name, space: kb.space, kbId: kb.id, kbName: kb.name, detail: `${kb.docs} 文档` })
+    removeTreeNodesByPredicate(fileTree, node => node.kbId === kb.id && node.type === 'folder')
+    delete allDocs[kb.id]
+    const idx = knowledgeBases.findIndex(item => item.id === kb.id)
+    if (idx >= 0) knowledgeBases.splice(idx, 1)
+    if (selectedKbId.value === kb.id) {
+      selectedKbId.value = null
+      activeTreeItemId.value = ''
+    }
+    showFileActionToast(`已删除知识库：${kb.name}，可在回收站找回`)
+  })
 }
 function updateTreeLabel(nodes: TreeNode[], kbId: string, label: string) {
   for (const node of nodes) {
@@ -1082,14 +1045,14 @@ function updateTreeLabel(nodes: TreeNode[], kbId: string, label: string) {
   }
 }
 function openCreateFolderModal() {
-  const fallbackKbId = selectedKb.value?.id ?? displayedKnowledgeBases.value[0]?.id ?? currentSpaceItems.value[0]?.id
+  const fallbackKbId = selectedKb.value?.id ?? displayedKnowledgeBases.value[0]?.id ?? knowledgeBases[0]?.id
   if (!fallbackKbId) {
     showFileActionToast('请先创建知识库后再新建文件夹')
     return
   }
   if (!selectedKb.value) selectKb(fallbackKbId)
   createFolderName.value = ''
-  const selectedKbRoot = findKbTreeNode(fileTrees[activeSpace.value], fallbackKbId)
+  const selectedKbRoot = findKbTreeNode(fileTree, fallbackKbId)
   const activeFolderInCurrentKb = activeNode.value?.type === 'folder' && activeNode.value.kbId === selectedKbId.value
     ? activeNode.value
     : undefined
@@ -1103,19 +1066,11 @@ function openCreateFolderModalAt(parentId: string) {
   contextMenu.value = null
 }
 function createFolder() {
-  const name = createFolderName.value.trim()
-  if (!name) { showFileActionToast('请输入文件夹名称'); return }
-  if (name.length > 64) { showFileActionToast('文件夹名称不能超过64个字符'); return }
-  if (/[\/\?"\*\:]/.test(name)) { showFileActionToast('名称格式错误，不能包含 / ? : " * 等特殊字符'); return }
-  const parent = createFolderParentId.value === '__root__' ? undefined : findTreeNode(fileTrees[activeSpace.value], createFolderParentId.value)
-  const finalName = name
-  if (parent) {
-    const siblings = parent.children ?? []
-    if (siblings.some(c => c.label === finalName)) { showFileActionToast('名称已存在，请更换'); return }
-  }
+  const parent = createFolderParentId.value === '__root__' ? undefined : findTreeNode(fileTree, createFolderParentId.value)
+  const name = createFolderName.value.trim() || '投标资料'
   const node: TreeNode = {
     id: `folder-custom-${Date.now()}`,
-    label: finalName,
+    label: name,
     type: 'folder',
     kbId: parent?.kbId,
     children: [],
@@ -1124,22 +1079,17 @@ function createFolder() {
     parent.children = parent.children ?? []
     parent.children.push(node)
     expandedTreeIds.value = [...new Set([...expandedTreeIds.value, parent.id])]
-    activeTreeId.value = parent.id
+    activeTreeItemId.value = parent.id
     if (parent.kbId) selectedKbId.value = parent.kbId
   } else {
-    fileTrees[activeSpace.value].push(node)
-    activeTreeId.value = ''
+    fileTree.push(node)
+    activeTreeItemId.value = ''
   }
-  showFileActionToast(`已新建文件夹：${finalName}，支持重命名文件夹`)
+  showFileActionToast(`已新建文件夹：${name}，支持重命名文件夹`)
   createFolderMode.value = false
 }
 function showFileActionToast(message: string) {
-  fileActionFeedback.value = message
-  if (fileActionToastTimer) window.clearTimeout(fileActionToastTimer)
-  fileActionToastTimer = window.setTimeout(() => {
-    fileActionFeedback.value = ''
-    fileActionToastTimer = undefined
-  }, 3000)
+  toast.success(message)
 }
 function showConfirm(title: string, message: string, onConfirm: () => void, danger = true) {
   confirmModal.value = { show: true, title, message, confirmText: '确认', danger, onConfirm }
@@ -1196,15 +1146,6 @@ const contextTreeDoc = computed(() => {
   if (!node || node.type !== 'file' || !node.kbId || !node.docName) return undefined
   return (allDocs[node.kbId] ?? []).find(doc => doc.name === node.docName)
 })
-const contextSpaceFolder = computed(() => {
-  if (contextMenu.value?.type !== 'tree') return undefined
-  const id = contextMenu.value.id
-  return [...defaultPublicFolders, ...defaultPersonalFolders].find(f => f.id === id)
-})
-const canContextCreateKb = computed(() => Boolean(
-  contextMenu.value?.id === '__root__' ||
-  (contextTreeNode.value && !contextTreeNode.value.kbId && contextTreeDepth.value === 0)
-))
 const canContextCreateFolder = computed(() => contextMenu.value?.type === 'tree' && Boolean(contextTreeNode.value?.type === 'folder' && contextTreeNode.value.kbId))
 function deleteTreeDoc(node: TreeNode) {
   if (!node.kbId || !node.docName) return
@@ -1241,11 +1182,11 @@ function isNodeInside(parent: TreeNode, targetId: string): boolean {
 function canDeleteFolder(node?: TreeNode) {
   if (!node || node.type !== 'folder') return false
   if (isKnowledgeBaseNode(node)) {
-    const kb = node.kbId ? [...knowledgeBases.public, ...knowledgeBases.personal].find(item => item.id === node.kbId) : undefined
-    return Boolean(kb?.canEdit)
+    const kb = node.kbId ? knowledgeBases.find(item => item.id === node.kbId) : undefined
+    return Boolean(kb?.canEdit && !kb?.isBuiltIn)
   }
   if (node.kbId) {
-    const kb = [...knowledgeBases.public, ...knowledgeBases.personal].find(item => item.id === node.kbId)
+    const kb = knowledgeBases.find(item => item.id === node.kbId)
     return Boolean(kb?.canEdit)
   }
   return true
@@ -1253,25 +1194,31 @@ function canDeleteFolder(node?: TreeNode) {
 function deleteTreeFolder(node: TreeNode) {
   if (!canDeleteFolder(node)) return
   if (isKnowledgeBaseNode(node) && node.kbId) {
-    const kb = [...knowledgeBases.public, ...knowledgeBases.personal].find(item => item.id === node.kbId)
+    const kb = knowledgeBases.find(item => item.id === node.kbId)
     if (kb) deleteKb(kb)
     contextMenu.value = null
     return
   }
+  const kb = node.kbId ? findKbById(node.kbId) : undefined
   const docMap = collectDocsByKb([node])
   Object.entries(docMap).forEach(([kbId, names]) => {
     const deleted = new Set(names)
+    const docs = (allDocs[kbId] ?? []).filter(doc => deleted.has(doc.name))
+    docs.forEach(doc => {
+      pushRecycleItem({ type: 'file', name: doc.name, space: kb?.space ?? 'public', kbId, kbName: kb?.name, detail: `${doc.size ?? '-'} · ${doc.format}` })
+    })
     allDocs[kbId] = (allDocs[kbId] ?? []).filter(doc => !deleted.has(doc.name))
     if (previewDoc.value && deleted.has(previewDoc.value.name)) previewDoc.value = null
     selectedFileIds.value = selectedFileIds.value.filter(name => !deleted.has(name))
   })
-  const wasActive = activeTreeId.value ? isNodeInside(node, activeTreeId.value) : false
-  removeTreeNodesByPredicate(fileTrees[activeSpace.value], item => item.id === node.id)
+  pushRecycleItem({ type: 'folder', name: node.label, space: kb?.space ?? 'public', kbId: node.kbId, kbName: kb?.name, detail: `包含 ${Object.values(docMap).reduce((sum, names) => sum + names.length, 0)} 个文件` })
+  const wasActive = activeTreeItemId.value ? isNodeInside(node, activeTreeItemId.value) : false
+  removeTreeNodesByPredicate(fileTree, item => item.id === node.id)
   if (wasActive) {
-    activeTreeId.value = ''
+    activeTreeItemId.value = ''
     if (node.kbId === selectedKbId.value) selectedKbId.value = null
   }
-  showFileActionToast(`已删除文件夹：${node.label}`)
+  showFileActionToast(`已删除文件夹：${node.label}，可在回收站找回`)
   contextMenu.value = null
 }
 function beginRenameFolder(node: TreeNode) {
@@ -1378,14 +1325,34 @@ function openCitationRef(index: number, citations?: string[]) {
   }
 }
 
+function sendQuickQuestion(question: string) {
+  qaQuestion.value = question
+  askKnowledgeBase()
+}
+
+function typewriteAnswer(msg: QaMessage, fullText: string, speed = 18) {
+  let pos = 0
+  msg.content = ''
+  const timer = setInterval(() => {
+    pos += 1
+    msg.content = fullText.slice(0, pos)
+    if (pos >= fullText.length) {
+      clearInterval(timer)
+      qaLoading.value = false
+    }
+  }, speed)
+}
+
 function askKnowledgeBase() {
   const text = qaQuestion.value.trim()
-  if (!text) return
+  if (!text || qaLoading.value) return
+  qaLoading.value = true
   qaMessages.value.push({ id: Date.now(), role: 'user', content: text })
+  qaHistoryCount.value = qaMessages.value.length
   const citations = qaSources.value.map(source => source.doc.name)
   qaThinking.value = [
     { id: 's1', label: '理解问题', detail: '正在分析用户问题意图……', status: 'completed', icon: 'search', elapsed: 1500 },
-    { id: 's2', label: '知识库检索', detail: `在「${selectedKb.value?.name ?? activeSpaceLabel.value}」中检索相关文档……`, status: 'completed', icon: 'database', elapsed: 2200 },
+    { id: 's2', label: '知识库检索', detail: `在「${selectedKb.value?.name ?? '知识中心'}」中检索相关文档……`, status: 'completed', icon: 'database', elapsed: 2200 },
     { id: 's3', label: '结果过滤', detail: '对检索结果进行排序和过滤……', status: 'running', icon: 'filter', elapsed: 800 },
     { id: 's4', label: '生成回答', detail: '基于检索结果生成回答并标注引用', status: 'pending', icon: 'sparkles' },
   ]
@@ -1393,25 +1360,34 @@ function askKnowledgeBase() {
   // Simulate thinking chain completion
   setTimeout(() => {
     qaThinking.value = qaThinking.value.map(s => ({ ...s, status: 'completed' as const }))
-    qaMessages.value.push({
+    const fullContent = `已在「${selectedKb.value?.name ?? '知识中心'}」中完成检索。根据[[ref:1]]，员工加班与休假需提前报备审批。具体可查看[[ref:2]]相关条款。如需进一步按行业场景适配，可参考[[ref:3]]中的执行口径。`
+    const msg: QaMessage = {
       id: Date.now() + 1,
       role: 'assistant',
-      content: `已在「${selectedKb.value?.name ?? activeSpaceLabel.value}」中完成检索。根据[[ref:1]]，员工加班与休假需提前报备审批。具体可查看[[ref:2]]相关条款。如需进一步按行业场景适配，可参考[[ref:3]]中的执行口径。`,
+      content: '',
       citations: ['考勤管理制度_v3.pdf', '员工手册2026版.docx', '运动鞋团购成功案例.md'],
       thinking: [...qaThinking.value.map(s => ({ ...s, status: 'completed' as const }))],
-    })
+    }
+    qaMessages.value.push(msg)
+    typewriteAnswer(msg, fullContent, 15)
   }, 2000)
   qaQuestion.value = ''
   if (qaTextarea.value) { qaTextarea.value.rows = 1; qaTextarea.value.style.height = 'auto' }
 }
-function openKbContextMenu(kb: KnowledgeBaseItem, event: MouseEvent) {
+
+function clearQaHistory() {
+  qaMessages.value = []
+  qaHistoryCount.value = 0
+}
+function openKbContextMenu(kb: KnowledgeBaseItem | null | undefined, event: MouseEvent) {
+  if (!kb) return
   contextMenu.value = { type: 'kb', id: kb.id, x: event.clientX, y: event.clientY }
 }
 function openDocContextMenu(doc: DocItem, event: MouseEvent) {
   contextMenu.value = { type: 'doc', id: doc.name, x: event.clientX, y: event.clientY }
 }
 const contextKb = computed(() => contextMenu.value?.type === 'kb'
-  ? currentSpaceItems.value.find(kb => kb.id === contextMenu.value?.id)
+  ? knowledgeBases.find(kb => kb.id === contextMenu.value?.id)
   : undefined)
 const contextDoc = computed(() => contextMenu.value?.type === 'doc'
   ? docs.value.find(doc => doc.name === contextMenu.value?.id)
@@ -1422,42 +1398,65 @@ const contextDoc = computed(() => contextMenu.value?.type === 'doc'
 // ========== 知识库行权限徽标 ==========
 
 function findKbById(kbId: string): KnowledgeBaseItem | undefined {
-  return [...knowledgeBases.public, ...knowledgeBases.personal].find(kb => kb.id === kbId)
+  return knowledgeBases.find(kb => kb.id === kbId)
 }
 function getPermissionBadge(kb?: KnowledgeBaseItem): { text: string; cls: string } | null {
   if (!kb) return null
-  const my = (permissionMembers[kb.id] ?? []).find(m => m.name === '当前用户' || m.name === '我')
+  const my = (nodePermissions[kb.id] ?? []).find(m => m.name === '当前用户' || m.name === '我')
   if (my) {
     const map: Record<string, { text: string; cls: string }> = {
       OWNER: { text: '所有者', cls: 'border-indigo-200 bg-indigo-50 text-indigo-700' },
       MANAGER: { text: '管理员', cls: 'border-blue-200 bg-blue-50 text-blue-700' },
       EDITOR: { text: '可编辑', cls: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
-      DOWNLOADER: { text: '可下载', cls: 'border-amber-200 bg-amber-50 text-amber-700' },
-      READER: { text: '只读', cls: 'border-zinc-200 bg-zinc-50 text-zinc-500' },
+      VIEWER: { text: '可查看', cls: 'border-zinc-200 bg-zinc-50 text-zinc-500' },
     }
     return map[my.role] ?? null
   }
   return kb.canEdit ? { text: '可编辑', cls: 'border-emerald-200 bg-emerald-50 text-emerald-700' } : { text: '只读', cls: 'border-zinc-200 bg-zinc-50 text-zinc-500' }
 }
 
+// ─── 文档管理 Tab 状态 ───
+const fileSettingsDocSearch = ref('')
+const docSettingsSecurityLevelFilter = ref('')
+const docSettingsFilteredDocs = computed(() => {
+  if (!settingsKbId.value) return []
+  const docs = allDocs[settingsKbId.value] ?? []
+  const q = fileSettingsDocSearch.value.trim().toLowerCase()
+  const level = docSettingsSecurityLevelFilter.value
+  return docs.filter(d => {
+    if (q && !d.name.toLowerCase().includes(q)) return false
+    if (level && d.securityLevel !== level) return false
+    return true
+  })
+})
+const docSettingsCountByLevel = computed(() => {
+  if (!settingsKbId.value) return {}
+  const docs = allDocs[settingsKbId.value] ?? []
+  const counts: Record<string, number> = {}
+  docs.forEach(d => { const l = d.securityLevel ?? '部门'; counts[l] = (counts[l] ?? 0) + 1 })
+  return counts
+})
+function selectAllDocsInSettings() {
+  const names = docSettingsFilteredDocs.value.map(d => d.name)
+  selectedFileIds.value = selectedFileIds.value.length === names.length ? [] : names
+}
+
 // ========== 权限管理 ==========
-const settingsKbId = ref('')
 const fileSettingsDoc = ref<DocItem | null>(null)
-const permissionMembers = reactive<Record<string, PermissionEntry[]>>({})
 const settingsAddMemberOpen = ref(false)
 const settingsAddMemberSearch = ref('')
-const settingsTab = ref<'members' | 'documents' | 'audit'>('members')
 
 function ensureDefaultPermissions(kbId: string) {
-  if (permissionMembers[kbId] && permissionMembers[kbId].length) return
-  permissionMembers[kbId] = [
-    { id: kbId + '-sys-owner', name: '系统管理员', scope: '系统', department: '系统', role: 'OWNER', joinedAt: '2026-01-01' },
-    { id: kbId + '-sys-me', name: '当前用户', scope: '个人', department: '技术部', role: kbId.startsWith('kb-personal') ? 'OWNER' : (kbId === 'kb-public-5' ? 'MANAGER' : kbId === 'kb-public-1' ? 'EDITOR' : kbId === 'kb-public-7' ? 'DOWNLOADER' : 'READER'), joinedAt: '2026-06-01' },
+  if (nodePermissions[kbId] && nodePermissions[kbId].length) return
+  const myRole: PermissionRole = kbId.startsWith('kb-personal') ? 'OWNER' : (kbId === 'kb-public-5' ? 'MANAGER' : kbId === 'kb-public-1' ? 'EDITOR' : 'VIEWER')
+  nodePermissions[kbId] = [
+    { id: kbId + '-sys-owner', name: '系统管理员', scope: '系统', department: '系统', role: 'OWNER', securityClearance: '机密', joinedAt: '2026-01-01' },
+    { id: kbId + '-sys-me', name: '当前用户', scope: '个人', department: '技术部', role: myRole, securityClearance: getDefaultClearance(myRole), joinedAt: '2026-06-01' },
   ]
 }
 
-const activeSettingsKb = computed(() => [...knowledgeBases.public, ...knowledgeBases.personal].find(kb => kb.id === settingsKbId.value))
-const activeSettingsMembers = computed(() => settingsKbId.value ? (permissionMembers[settingsKbId.value] ?? []) : [])
+const activeSettingsKb = computed(() => knowledgeBases.find(kb => kb.id === settingsKbId.value))
+const activeSettingsMembers = computed(() => settingsKbId.value ? (nodePermissions[settingsKbId.value] ?? []) : [])
 
 function openKbSettings(kb: KnowledgeBaseItem) {
   settingsKbId.value = kb.id
@@ -1465,6 +1464,21 @@ function openKbSettings(kb: KnowledgeBaseItem) {
   ensureDefaultPermissions(kb.id)
 }
 function closeKbSettings() { settingsKbId.value = '' }
+
+function openTreeMenu(event: MouseEvent, targetId: string) {
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  treeMenuPos.value = { x: rect.right, y: rect.top }
+  treeMenuTargetId.value = treeMenuTargetId.value === targetId ? '' : targetId
+}
+function openFolderPermission(nodeId: string) {
+  const node = findTreeNode(fileTree, nodeId)
+  if (!node) return
+  if (node.kbId) {
+    settingsKbId.value = node.kbId
+    settingsTab.value = 'members'
+  }
+  contextMenu.value = null
+}
 
 const mockAuditLogs = [
   { user: '张三', action: '修改了成员权限 - 商品知识库', icon: 'user', time: '2026-07-04 09:15', sensitive: false },
@@ -1494,33 +1508,52 @@ const permissionPresetOptions = [
 ]
 function applyPermissionPreset(key: string) {
   if (!settingsKbId.value) return
-  if (!permissionMembers[settingsKbId.value]) permissionMembers[settingsKbId.value] = []
+  if (!nodePermissions[settingsKbId.value]) nodePermissions[settingsKbId.value] = []
   if (key === 'team-write') {
-    permissionMembers[settingsKbId.value] = [{ id: settingsKbId.value+'-admin', name: activeSettingsKb.value?.department+'管理员', scope: '部门', department: activeSettingsKb.value?.department??'', role: 'MANAGER', joinedAt: new Date().toISOString().slice(0,10) }, { id: settingsKbId.value+'-editor', name: activeSettingsKb.value?.department+'全员', scope: '部门', department: activeSettingsKb.value?.department??'', role: 'EDITOR', joinedAt: new Date().toISOString().slice(0,10) }]
+    nodePermissions[settingsKbId.value] = [{ id: settingsKbId.value+'-admin', name: activeSettingsKb.value?.department+'管理员', scope: '部门', department: activeSettingsKb.value?.department??'', role: 'MANAGER', joinedAt: new Date().toISOString().slice(0,10) }, { id: settingsKbId.value+'-editor', name: activeSettingsKb.value?.department+'全员', scope: '部门', department: activeSettingsKb.value?.department??'', role: 'EDITOR', joinedAt: new Date().toISOString().slice(0,10) }]
     showFileActionToast('已预设：本部门读写')
   } else if (key === 'company-read') {
-    permissionMembers[settingsKbId.value] = [{ id: settingsKbId.value+'-admin', name: activeSettingsKb.value?.department+'管理员', scope: '部门', department: activeSettingsKb.value?.department??'', role: 'MANAGER', joinedAt: new Date().toISOString().slice(0,10) }, { id: settingsKbId.value+'-reader', name: '全员', scope: '个人', department: '全部', role: 'READER', joinedAt: new Date().toISOString().slice(0,10) }]
+    nodePermissions[settingsKbId.value] = [{ id: settingsKbId.value+'-admin', name: activeSettingsKb.value?.department+'管理员', scope: '部门', department: activeSettingsKb.value?.department??'', role: 'MANAGER', joinedAt: new Date().toISOString().slice(0,10) }, { id: settingsKbId.value+'-viewer', name: '全员', scope: '个人', department: '全部', role: 'VIEWER', joinedAt: new Date().toISOString().slice(0,10) }]
     showFileActionToast('已预设：全公司阅读')
   } else if (key === 'custom-dept') {
-    permissionMembers[settingsKbId.value] = [{ id: settingsKbId.value+'-dept', name: '指定部门', scope: '部门', department: '请选择部门', role: 'READER', joinedAt: new Date().toISOString().slice(0,10) }]
+    nodePermissions[settingsKbId.value] = [{ id: settingsKbId.value+'-dept', name: '指定部门', scope: '部门', department: '请选择部门', role: 'VIEWER', joinedAt: new Date().toISOString().slice(0,10) }]
     showFileActionToast('已预设：指定部门可见')
   } else if (key === 'public') {
-    permissionMembers[settingsKbId.value] = []
+    nodePermissions[settingsKbId.value] = []
     showFileActionToast('已预设：公开')
   }
 }
 function deletePermissionMember(member: PermissionEntry) {
   if (!settingsKbId.value) return
   showConfirm('移除成员「'+member.name+'」', '确认移除该成员的访问权限？移除后该成员将不再可见该知识库内容。', () => {
-    permissionMembers[settingsKbId.value] = (permissionMembers[settingsKbId.value] ?? []).filter(item => item.id !== member.id)
+    nodePermissions[settingsKbId.value] = (nodePermissions[settingsKbId.value] ?? []).filter(item => item.id !== member.id)
     showFileActionToast('已移除授权：'+member.name)
   })
 }
 function updatePermissionRole(member: PermissionEntry, newRole: PermissionRole) {
   if (!settingsKbId.value) return
-  const list = permissionMembers[settingsKbId.value] ?? []
+  const list = nodePermissions[settingsKbId.value] ?? []
   const idx = list.findIndex(m => m.id === member.id)
-  if (idx >= 0) { list[idx] = { ...list[idx], role: newRole }; showFileActionToast('已更新 '+member.name+' 的权限') }
+  if (idx >= 0) {
+    const updated = { ...list[idx], role: newRole }
+    // 角色变更时，如果安全许可低于新角色默认值，自动提升
+    const defaultClearance = getDefaultClearance(newRole)
+    if (updated.securityClearance && defaultClearance) {
+      const order: Record<SecurityLevel, number> = { '全员': 0, '部门': 1, '秘密': 2, '机密': 3 }
+      if (order[updated.securityClearance] < order[defaultClearance]) {
+        updated.securityClearance = defaultClearance
+      }
+    }
+    list[idx] = updated
+    showFileActionToast('已更新 '+member.name+' 的权限')
+  }
+}
+
+function updateMemberClearance(member: PermissionEntry, clearance: SecurityLevel) {
+  if (!settingsKbId.value) return
+  const list = nodePermissions[settingsKbId.value] ?? []
+  const idx = list.findIndex(m => m.id === member.id)
+  if (idx >= 0) { list[idx] = { ...list[idx], securityClearance: clearance }; showFileActionToast('已更新 '+member.name+' 的安全许可') }
 }
 
 // ========== 文件权限管理（独立弹窗，继承知识库权限，支持自定义） ==========
@@ -1536,7 +1569,7 @@ const fileSettingsMemberFilter = ref('')
 
 const fileParentKb = computed(() => {
   if (!fileSettingsDoc.value) return null
-  for (const kb of [...knowledgeBases.public, ...knowledgeBases.personal]) {
+  for (const kb of knowledgeBases) {
     if ((allDocs[kb.id] ?? []).some(d => d.name === fileSettingsDoc.value!.name)) return kb
   }
   return null
@@ -1546,7 +1579,7 @@ function ensureFileMembers(docName: string) {
   if (fileInheritedFromKb[docName] === undefined) fileInheritedFromKb[docName] = true
   if (!filePermissionMembersByDoc[docName]) {
     const kbId = fileParentKb.value?.id
-    const kbMembers = kbId ? (permissionMembers[kbId] ?? []) : []
+    const kbMembers = kbId ? (nodePermissions[kbId] ?? []) : []
     filePermissionMembersByDoc[docName] = kbMembers.map(m => ({ ...m }))
   }
 }
@@ -1573,10 +1606,25 @@ function updateFilePermissionRole(member: PermissionEntry, newRole: PermissionRo
   const list = filePermissionMembersByDoc[fileSettingsDoc.value.name] ?? []
   const idx = list.findIndex(m => m.id === member.id)
   if (idx >= 0) {
-    list[idx] = { ...list[idx], role: newRole }
+    const updated = { ...list[idx], role: newRole }
+    const defaultClearance = getDefaultClearance(newRole)
+    if (updated.securityClearance && defaultClearance) {
+      const order: Record<SecurityLevel, number> = { '全员': 0, '部门': 1, '秘密': 2, '机密': 3 }
+      if (order[updated.securityClearance] < order[defaultClearance]) {
+        updated.securityClearance = defaultClearance
+      }
+    }
+    list[idx] = updated
     fileInheritedFromKb[fileSettingsDoc.value.name] = false
     showFileActionToast('已更新 ' + member.name + ' 的权限')
   }
+}
+
+function updateFileMemberClearance(member: PermissionEntry, clearance: SecurityLevel) {
+  if (!fileSettingsDoc.value) return
+  const list = filePermissionMembersByDoc[fileSettingsDoc.value.name] ?? []
+  const idx = list.findIndex(m => m.id === member.id)
+  if (idx >= 0) { list[idx] = { ...list[idx], securityClearance: clearance }; fileInheritedFromKb[fileSettingsDoc.value.name] = false; showFileActionToast('已更新 ' + member.name + ' 的安全许可') }
 }
 
 function deleteFilePermissionMember(member: PermissionEntry) {
@@ -1607,6 +1655,7 @@ function confirmAddFileMembers() {
       id: docName + '-' + c.name + '-' + Date.now(),
       name: c.name, scope: '个人', department: c.dept,
       role: fileSettingsAddMemberRole.value,
+      securityClearance: getDefaultClearance(fileSettingsAddMemberRole.value),
       joinedAt: new Date().toISOString().slice(0, 10),
     })
     added++
@@ -1640,7 +1689,7 @@ function breakInheritanceAndCustomize() {
   if (!fileSettingsDoc.value) return
   const docName = fileSettingsDoc.value.name
   const kbId = fileParentKb.value?.id
-  const kbMembers = kbId ? (permissionMembers[kbId] ?? []) : []
+  const kbMembers = kbId ? (nodePermissions[kbId] ?? []) : []
   filePermissionMembersByDoc[docName] = kbMembers.map(m => ({ ...m }))
   fileInheritedFromKb[docName] = false
   showFileActionToast('已切换为自定义权限')
@@ -1651,7 +1700,7 @@ function restoreInheritance() {
   const docName = fileSettingsDoc.value.name
   fileInheritedFromKb[docName] = true
   const kbId = fileParentKb.value?.id
-  const kbMembers = kbId ? (permissionMembers[kbId] ?? []) : []
+  const kbMembers = kbId ? (nodePermissions[kbId] ?? []) : []
   filePermissionMembersByDoc[docName] = kbMembers.map(m => ({ ...m }))
   showFileActionToast('已恢复继承知识库权限')
 }
@@ -1718,14 +1767,44 @@ const filteredRecycleItems = computed(() => {
 watch(activeKnowledgeTab, (v) => { if (v === 'trash') autoPurgeRecycle() })
 // Adding qaOpen close to switchSpace (function already exists above)
 
-onBeforeUnmount(() => {
-  if (fileActionToastTimer) window.clearTimeout(fileActionToastTimer)
-})
+// ─── 密级常量 ───
+const SECURITY_LEVELS = [
+  { value: '全员' as const, order: 0, label: '全员', bizDesc: '知识库内所有成员可见，无限制', activeClass: 'bg-zinc-100 text-zinc-600 border-zinc-300', displayClass: 'bg-zinc-50 text-zinc-500' },
+  { value: '部门' as const, order: 1, label: '部门', bizDesc: '仅指定钉钉部门的成员可见', activeClass: 'bg-blue-100 text-blue-700 border-blue-300', displayClass: 'bg-blue-50 text-blue-600' },
+  { value: '秘密' as const, order: 2, label: '秘密', bizDesc: '仅授权成员列表中的成员可见', activeClass: 'bg-yellow-100 text-yellow-700 border-yellow-300', displayClass: 'bg-yellow-50 text-yellow-700' },
+  { value: '机密' as const, order: 3, label: '机密', bizDesc: '高度敏感，仅最小知悉范围成员可见', activeClass: 'bg-red-100 text-red-700 border-red-300', displayClass: 'bg-red-50 text-red-600' },
+] as const
 
 function getDocSecurityClass(level?: string) {
-  return level === '机密' ? 'bg-red-50 text-red-600' : level === '秘密' ? 'bg-yellow-50 text-yellow-700' : level === '内部' ? 'bg-blue-50 text-blue-600' : 'bg-zinc-50 text-zinc-500'
+  const found = SECURITY_LEVELS.find(s => s.value === level)
+  return found?.displayClass ?? 'bg-zinc-50 text-zinc-500'
 }
-function getDocSecurityLabel(level?: string) { return level ?? '内部' }
+function getDocSecurityLabel(level?: string) { return level ?? '部门' }
+
+// ─── 密级生效检查函数 ───
+function canAccessFileBySecurityLevel(userClearance: SecurityLevel, fileLevel?: SecurityLevel): boolean {
+  const order: Record<SecurityLevel, number> = { '全员': 0, '部门': 1, '秘密': 2, '机密': 3 }
+  const effectiveLevel = fileLevel ?? '部门'
+  return order[userClearance] >= order[effectiveLevel]
+}
+
+function canAccessFile(user: { departments: string[] }, file: DocItem): boolean {
+  const level = file.securityLevel ?? '部门'
+  if (level === '全员') return true
+  if (level === '部门' && file.allowedDepts?.length) {
+    const userDepts = new Set(user.departments)
+    return file.allowedDepts.some(d => userDepts.has(d.id))
+  }
+  return true
+}
+
+// ─── 成员的安全许可（从角色派生） ───
+function getDefaultClearance(role: PermissionRole): SecurityLevel {
+  const map: Record<PermissionRole, SecurityLevel> = {
+    OWNER: '机密', MANAGER: '机密', EDITOR: '秘密', VIEWER: '全员',
+  }
+  return map[role]
+}
 
 
 const mockMemberCandidates = [
@@ -1734,6 +1813,92 @@ const mockMemberCandidates = [
   { name: '杨磊', dept: '品牌营销部' }, { name: '周婷', dept: '人力中心' }, { name: '吴迪', dept: '技术部' },
   { name: '郑丽', dept: '设计部' }, { name: '孙鹏', dept: '产品部' }, { name: '黄鑫', dept: '财务部' },
 ]
+
+// ─── 组织架构树（模拟钉钉，后续对接 MCP） ───
+interface OrgNode { id: string; name: string; type: 'dept' | 'user'; children?: OrgNode[]; userId?: string }
+const orgTree: OrgNode[] = [
+  { id: 'dept-tech', name: '技术部', type: 'dept', children: [
+    { id: 'user-zhangwei', name: '张伟', type: 'user', userId: 'u001' },
+    { id: 'user-wangqiang', name: '王强', type: 'user', userId: 'u002' },
+    { id: 'user-yangpeng', name: '杨鹏', type: 'user', userId: 'u003' },
+  ]},
+  { id: 'dept-brand', name: '品牌营销部', type: 'dept', children: [
+    { id: 'user-lijuan', name: '李娟', type: 'user', userId: 'u004' },
+    { id: 'user-yanglei', name: '杨磊', type: 'user', userId: 'u005' },
+  ]},
+  { id: 'dept-design', name: '设计部', type: 'dept', children: [
+    { id: 'user-zhaomin', name: '赵敏', type: 'user', userId: 'u006' },
+    { id: 'user-zhengli', name: '郑丽', type: 'user', userId: 'u007' },
+  ]},
+  { id: 'dept-product', name: '产品部', type: 'dept', children: [
+    { id: 'user-liuyang', name: '刘洋', type: 'user', userId: 'u008' },
+    { id: 'user-sunpeng', name: '孙鹏', type: 'user', userId: 'u009' },
+  ]},
+  { id: 'dept-finance', name: '财务部', type: 'dept', children: [
+    { id: 'user-chenfang', name: '陈芳', type: 'user', userId: 'u010' },
+    { id: 'user-huangxin', name: '黄鑫', type: 'user', userId: 'u011' },
+  ]},
+  { id: 'dept-hr', name: '人力中心', type: 'dept', children: [
+    { id: 'user-zhouting', name: '周婷', type: 'user', userId: 'u012' },
+  ]},
+  { id: 'dept-admin', name: '行政部', type: 'dept', children: [
+    { id: 'user-wudong', name: '吴迪', type: 'user', userId: 'u013' },
+  ]},
+  { id: 'dept-goods', name: '商品部', type: 'dept', children: [] },
+]
+
+// 部门树选中状态
+const orgDeptChecked = ref<Set<string>>(new Set())
+const orgUserChecked = ref<Set<string>>(new Set())
+const orgExpandedDepts = ref<Set<string>>(new Set())
+
+function toggleOrgDept(deptId: string) {
+  const newSet = new Set(orgDeptChecked.value)
+  if (newSet.has(deptId)) { newSet.delete(deptId) }
+  else { newSet.add(deptId) }
+  orgDeptChecked.value = newSet
+}
+function toggleOrgUser(userId: string) {
+  const newSet = new Set(orgUserChecked.value)
+  if (newSet.has(userId)) { newSet.delete(userId) }
+  else { newSet.add(userId) }
+  orgUserChecked.value = newSet
+}
+function toggleOrgDeptExpand(deptId: string) {
+  const newSet = new Set(orgExpandedDepts.value)
+  if (newSet.has(deptId)) { newSet.delete(deptId) }
+  else { newSet.add(deptId) }
+  orgExpandedDepts.value = newSet
+}
+function getDeptUsers(deptId: string): OrgNode[] {
+  const dept = findOrgNode(orgTree, deptId)
+  return dept?.children?.filter(c => c.type === 'user') ?? []
+}
+function findOrgNode(nodes: OrgNode[], id: string): OrgNode | undefined {
+  for (const n of nodes) {
+    if (n.id === id) return n
+    const found = n.children ? findOrgNode(n.children, id) : undefined
+    if (found) return found
+  }
+  return undefined
+}
+function isDeptPartiallyChecked(deptId: string): boolean {
+  const users = getDeptUsers(deptId)
+  if (!users.length) return false
+  const checked = users.filter(u => orgUserChecked.value.has(u.userId!)).length
+  return checked > 0 && checked < users.length
+}
+function isDeptFullyChecked(deptId: string): boolean {
+  const users = getDeptUsers(deptId)
+  if (!users.length) return orgDeptChecked.value.has(deptId)
+  return users.every(u => orgUserChecked.value.has(u.userId!))
+}
+function getDeptCheckState(deptId: string): 'none' | 'partial' | 'all' {
+  if (isDeptFullyChecked(deptId)) return 'all'
+  if (isDeptPartiallyChecked(deptId)) return 'partial'
+  return 'none'
+}
+
 const filteredCandidates = computed(() => {
   const q = settingsAddMemberSearch.value.trim().toLowerCase()
   if (!q) return mockMemberCandidates
@@ -1772,17 +1937,18 @@ function toggleAddCandidate(c: { name: string; dept: string }) {
 
 function confirmAddMembers() {
   if (!settingsKbId.value) return
-  if (!permissionMembers[settingsKbId.value]) permissionMembers[settingsKbId.value] = []
+  if (!nodePermissions[settingsKbId.value]) nodePermissions[settingsKbId.value] = []
   let added = 0
   settingsAddMemberSelected.value.forEach(c => {
-    const exists = permissionMembers[settingsKbId.value].some(m => m.name === c.name)
+    const exists = nodePermissions[settingsKbId.value].some(m => m.name === c.name)
     if (exists) return
-    permissionMembers[settingsKbId.value].push({
+    nodePermissions[settingsKbId.value].push({
       id: settingsKbId.value + '-' + c.name + '-' + Date.now(),
       name: c.name,
       scope: '个人',
       department: c.dept,
       role: settingsAddMemberRole.value,
+      securityClearance: getDefaultClearance(settingsAddMemberRole.value),
       joinedAt: new Date().toISOString().slice(0, 10),
     })
     added++
@@ -1795,10 +1961,10 @@ function confirmAddMembers() {
 
 function addCandidateMember(name: string, dept: string) {
   if (!settingsKbId.value) return
-  const exists = (permissionMembers[settingsKbId.value] ?? []).some(m => m.name === name)
+  const exists = (nodePermissions[settingsKbId.value] ?? []).some(m => m.name === name)
   if (exists) { showFileActionToast('「' + name + '」已在成员列表中'); return }
-  if (!permissionMembers[settingsKbId.value]) permissionMembers[settingsKbId.value] = []
-  permissionMembers[settingsKbId.value].push({ id: settingsKbId.value + '-' + name, name, scope: '个人', department: dept, role: 'READER', joinedAt: new Date().toISOString().slice(0, 10) })
+  if (!nodePermissions[settingsKbId.value]) nodePermissions[settingsKbId.value] = []
+  nodePermissions[settingsKbId.value].push({ id: settingsKbId.value + '-' + name, name, scope: '个人', department: dept, role: 'VIEWER', securityClearance: getDefaultClearance('VIEWER'), joinedAt: new Date().toISOString().slice(0, 10) })
   showFileActionToast('已添加授权：' + name)
   settingsAddMemberOpen.value = false
 }
@@ -1811,25 +1977,6 @@ function addCandidateMember(name: string, dept: string) {
 
 <template>
   <div class="flex h-[calc(100vh-4rem)] bg-zinc-50 text-zinc-950">
-    <Transition
-      enter-active-class="transition duration-200 ease-out"
-      enter-from-class="-translate-y-2 opacity-0"
-      enter-to-class="translate-y-0 opacity-100"
-      leave-active-class="transition duration-150 ease-in"
-      leave-from-class="translate-y-0 opacity-100"
-      leave-to-class="-translate-y-2 opacity-0"
-    >
-      <div
-        v-if="fileActionFeedback"
-        data-testid="knowledge-toast"
-        class="fixed left-1/2 top-20 z-[70] flex min-w-[280px] max-w-[min(560px,calc(100vw-2rem))] -translate-x-1/2 items-center gap-3 rounded-xl border border-blue-100 bg-white px-4 py-3 text-sm font-medium text-blue-700 shadow-2xl shadow-blue-100/60"
-      >
-        <span class="min-w-0 flex-1 truncate">{{ fileActionFeedback }}</span>
-        <button type="button" class="rounded-md p-1 text-blue-500 hover:bg-blue-50 hover:text-blue-800" aria-label="关闭操作提示" @click="fileActionFeedback = ''">
-          <X class="h-3.5 w-3.5" />
-        </button>
-      </div>
-    </Transition>
     <!-- Sidebar collapsed: only expand button -->
     <div v-if="!sidebarVisible" class="fixed left-3 top-[4.75rem] z-40 flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white/95 p-1 shadow-sm backdrop-blur">
       <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-xl text-zinc-600 transition hover:bg-zinc-100" aria-label="展开侧边栏" @click="sidebarVisible = true">
@@ -1840,209 +1987,236 @@ function addCandidateMember(name: string, dept: string) {
       class="fixed inset-y-0 left-0 z-50 flex w-[clamp(286px,21vw,400px)] flex-col overflow-hidden border-r border-zinc-200 bg-white transition-transform duration-300 lg:top-16 lg:h-[calc(100vh-4rem)]"
       :class="sidebarVisible ? 'translate-x-0' : '-translate-x-full'"
     >
-      <div data-testid="knowledge-sidebar-subheader" class="flex items-center justify-between gap-2 border-b border-zinc-100 px-3 py-3">
-        <div class="min-w-0">
-          <div class="text-sm font-semibold text-zinc-900">知识中心</div>
-          <div class="mt-0.5 text-[11px] text-zinc-400">按空间和文件树浏览</div>
+      <div data-testid="knowledge-sidebar-subheader" class="border-b border-zinc-100 px-3 py-3">
+        <div class="flex items-center justify-between gap-2">
+          <div class="min-w-0">
+            <div class="text-sm font-semibold text-zinc-900">知识中心</div>
+          </div>
+          <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-500 shadow-sm hover:bg-zinc-50" aria-label="折叠侧边栏" @click="sidebarVisible = false">
+            <ChevronLeft class="h-4 w-4" />
+          </button>
         </div>
-        <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-500 shadow-sm hover:bg-zinc-50" aria-label="折叠侧边栏" @click="sidebarVisible = false">
-          <ChevronLeft class="h-4 w-4" />
-        </button>
+        <!-- 空间切换下拉 -->
+        <div class="relative mt-2" @click.stop>
+          <button
+            type="button"
+            class="flex h-8 w-full items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+            @click="spaceDropdownOpen = !spaceDropdownOpen"
+          >
+            <Folder class="h-3.5 w-3.5" :class="activeSpace === 'public' ? 'text-amber-500' : 'text-emerald-500'" />
+            <span class="flex-1 text-left">{{ activeSpace === 'public' ? '公共空间' : '个人空间' }}</span>
+            <ChevronDown class="h-3.5 w-3.5 text-zinc-400" :class="spaceDropdownOpen ? 'rotate-180' : ''" />
+          </button>
+          <div v-if="spaceDropdownOpen" class="fixed inset-0 z-40" @click="spaceDropdownOpen = false"></div>
+          <div v-if="spaceDropdownOpen" class="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-zinc-200 bg-white p-1 shadow-xl" @click.stop>
+            <button
+              type="button"
+              class="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs transition"
+              :class="activeSpace === 'public' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-zinc-600 hover:bg-zinc-50'"
+              @click="selectActiveSpace('public'); spaceDropdownOpen = false"
+            >
+              <Folder class="h-3.5 w-3.5 text-amber-500" />
+              <span>公共空间</span>
+              <span v-if="activeSpace === 'public'" class="ml-auto text-blue-600">✓</span>
+            </button>
+            <button
+              type="button"
+              class="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs transition"
+              :class="activeSpace === 'personal' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-zinc-600 hover:bg-zinc-50'"
+              @click="selectActiveSpace('personal'); spaceDropdownOpen = false"
+            >
+              <Folder class="h-3.5 w-3.5 text-emerald-500" />
+              <span>个人空间</span>
+              <span v-if="activeSpace === 'personal'" class="ml-auto text-blue-600">✓</span>
+            </button>
+          </div>
+        </div>
       </div>
       <div class="border-b border-zinc-100 px-2 py-2">
-        <button type="button" class="flex h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-sm font-medium text-zinc-700 transition hover:bg-zinc-50" aria-label="新建知识库" @click="openCreateModal">
+        <Button variant="ghost" size="sm" class="w-full justify-start gap-2 text-sm font-medium" aria-label="新建知识库" @click="openCreateModal">
           <BookOpen class="h-4 w-4 text-orange-500" />
           <span>新建知识库</span>
-        </button>
-        <button type="button" class="mt-1 flex h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-sm font-medium text-zinc-700 transition hover:bg-zinc-50" aria-label="新建文件夹" @click="openCreateFolderModal">
-          <Folder class="h-4 w-4 text-zinc-500" />
-          <span>新建文件夹</span>
-        </button>
-        <button type="button" class="mt-2 flex h-9 w-full items-center gap-2 rounded-lg bg-zinc-50 px-2 text-left text-sm font-medium text-zinc-700 transition hover:bg-zinc-100" :class="activeKnowledgeTab === 'trash' ? 'bg-red-50 font-semibold text-red-700 ring-1 ring-red-200' : ''" aria-label="回收站" @click="activeKnowledgeTab = activeKnowledgeTab === 'trash' ? 'assets' : 'trash'">
-          <Trash2 class="h-4 w-4" :class="activeKnowledgeTab === 'trash' ? 'text-red-500' : 'text-zinc-400'" />
-          <span>回收站</span>
-          <span v-if="recycleItems.length" class="ml-auto rounded-full px-1.5 text-[10px] font-semibold" :class="activeKnowledgeTab === 'trash' ? 'bg-red-600 text-white' : 'bg-zinc-200 text-zinc-600'">{{ recycleItems.length }}</span>
-        </button>
+        </Button>
       </div>
       <div class="flex-1 overflow-y-auto p-2" data-testid="knowledge-tree-panel" @contextmenu.prevent="openTreeBlankContextMenu($event)">
-        <div class="flex items-center rounded-lg">
-          <button type="button" class="grid h-7 w-7 shrink-0 place-items-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700" :aria-label="`${publicSpaceGroupOpen ? '收起' : '展开'}公共空间`" @click.stop="publicSpaceGroupOpen = !publicSpaceGroupOpen">
-            <ChevronDown v-if="publicSpaceGroupOpen" class="h-3.5 w-3.5 text-zinc-500" />
-            <ChevronRight v-else class="h-3.5 w-3.5 text-zinc-500" />
-          </button>
-          <button type="button" class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1.5 py-1.5 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-50" @click="switchSpace('public')" @contextmenu.prevent="openTreeContextMenu('public_space', $event)">
-            <Folder class="h-4 w-4 shrink-0 text-amber-500" />
-            <span>公共空间</span>
-            <span class="ml-auto text-[11px] font-normal text-zinc-400">{{ defaultPublicFolders.length }}</span>
-          </button>
-        </div>
-        <div v-if="publicSpaceGroupOpen" class="ml-5 mt-1 space-y-0.5">
-          <div v-for="folder in defaultPublicFolders" :key="folder.id" class="space-y-0.5">
+        <!-- KB列表 - 平铺显示 -->
+        <div class="space-y-0.5">
+          <div v-for="kbNode in filteredFileTree" :key="kbNode.id" class="space-y-0.5">
+            <!-- KB 节点行 -->
             <div
-              class="group flex items-center rounded-lg"
-              :class="activeSpace === folder.space && activeTreeId === folder.id && !selectedKbId ? 'bg-blue-50 text-blue-700' : ''"
-              draggable="true"
-              @dragstart="draggingSpaceFolderId = folder.id"
-              @dragover.prevent="dragOverSpaceFolderId = folder.id"
-              @drop.prevent="reorderSpaceFolder(folder)"
-              @dragend="finishSpaceFolderDrag"
-              @contextmenu.prevent="openTreeContextMenu(folder.id, $event)"
+              class="group relative flex items-center rounded-lg"
+              :class="selectedKbId === kbNode.kbId ? 'bg-blue-50 text-blue-700' : 'hover:bg-zinc-50'"
+              @mouseenter="hoveredNodeId = kbNode.id"
+              @mouseleave="hoveredNodeId = ''"
             >
-              <GripVertical class="h-4 w-4 shrink-0 cursor-grab text-zinc-300 opacity-0 transition group-hover:opacity-100" :class="dragOverSpaceFolderId === folder.id ? 'opacity-100 text-blue-500' : ''" />
-              <button type="button" class="grid h-7 w-5 shrink-0 place-items-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700" :aria-label="`${isSpaceFolderExpanded(folder) ? '收起' : '展开'}${folder.label}`" @click.stop="toggleSpaceFolderExpand(folder)">
-                <ChevronDown v-if="isSpaceFolderExpanded(folder)" class="h-3.5 w-3.5" />
+              <button
+                v-if="kbNodeHasFolderChildren(kbNode.kbId ?? '')"
+                type="button"
+                class="grid h-7 w-7 shrink-0 place-items-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
+                @click="toggleTreeNode(kbNode)"
+              >
+                <ChevronDown v-if="expandedTreeIds.includes(kbNode.id)" class="h-3.5 w-3.5" />
                 <ChevronRight v-else class="h-3.5 w-3.5" />
               </button>
+              <span v-else class="inline-block w-7 shrink-0" />
               <button
                 type="button"
-                class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1.5 py-1.5 text-left text-sm text-zinc-600 hover:bg-zinc-50"
-                :class="activeSpace === folder.space && activeTreeId === folder.id && !selectedKbId ? 'text-blue-700' : ''"
-                @click="openSpaceFolder(folder)"
+                class="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-left text-xs transition"
+                :class="selectedKbId === kbNode.kbId ? 'font-medium' : 'text-zinc-600 hover:bg-zinc-50'"
+                @click="selectKb(kbNode.kbId ?? '')"
+                @contextmenu.prevent="openKbContextMenu(knowledgeBases.find(kb => kb.id === kbNode.kbId), $event)"
               >
-                <Folder class="h-4 w-4 shrink-0 text-zinc-500" />
-                <span class="truncate">{{ folder.label }}</span>
+                <BookOpen class="h-3.5 w-3.5 shrink-0 text-orange-500" />
+                <span class="truncate">{{ kbNode.label }}</span>
+                <span v-if="kbNode.isBuiltIn" class="shrink-0 rounded bg-blue-50 px-1 py-0.5 text-[9px] font-medium text-blue-600 border border-blue-100">系统内置</span>
               </button>
+              <!-- KB 悬停操作按钮 -->
+              <div class="absolute right-1 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-0.5 bg-white pl-1.5 shadow-sm rounded-lg" :class="selectedKbId === kbNode.kbId ? 'bg-blue-50' : ''" @click.stop>
+                <button type="button" class="inline-flex h-6 w-6 items-center justify-center rounded text-zinc-400 hover:text-blue-600 hover:bg-blue-50" aria-label="权限配置" title="权限配置" @click="openKbSettings(knowledgeBases.find(kb => kb.id === kbNode.kbId) ?? null as any); treeMenuTargetId = ''">
+                  <Settings class="h-3.5 w-3.5" />
+                </button>
+                <button type="button" class="inline-flex h-6 w-6 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100" aria-label="更多操作" title="更多操作" @click="openTreeMenu($event, kbNode.id)">
+                  <MoreVertical class="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <!-- KB ⋮ 下拉菜单 -->
+              <Teleport to="body">
+                <div v-if="treeMenuTargetId === kbNode.id" class="fixed inset-0 z-[70]" @click="treeMenuTargetId = ''">
+                  <div class="absolute w-44 overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 text-sm shadow-2xl" :style="{ left: `${treeMenuPos.x}px`, top: `${treeMenuPos.y}px` }" @click.stop>
+                    <div class="px-3 py-2 text-xs font-semibold text-zinc-400">{{ kbNode.label }}</div>
+                    <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="selectKb(kbNode.kbId ?? ''); treeMenuTargetId = ''"><BookOpen class="h-4 w-4 text-orange-500" />打开</button>
+                    <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openCreateFolderModalAt(kbNode.kbId ?? ''); treeMenuTargetId = ''"><Folder class="h-4 w-4" />新建文件夹</button>
+                    <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openKbSettings(knowledgeBases.find(kb => kb.id === kbNode.kbId) ?? null as any); treeMenuTargetId = ''"><Settings class="h-4 w-4 text-blue-500" />权限配置</button>
+                    <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteKb(knowledgeBases.find(kb => kb.id === kbNode.kbId) ?? null as any); treeMenuTargetId = ''"><Trash2 class="h-4 w-4" />删除</button>
+                  </div>
+                </div>
+              </Teleport>
             </div>
-            <div v-if="isSpaceFolderExpanded(folder)" class="ml-8 space-y-0.5">
-              <div v-for="row in getSpaceFolderTree(folder)" :key="row.id" :style="{ marginLeft: (row.depth * 12) + 'px' }">
-                <div class="group flex items-center" :class="row.node.isKnowledgeBase && selectedKbId === row.kbId ? 'bg-blue-50 text-blue-700 rounded-lg' : ''" draggable="true" @dragstart="draggingTreeNodeId = row.node.id" @dragover.prevent="dragOverTreeNodeId = row.node.id" @drop.prevent="reorderTreeItems(row.node)" @dragend="finishTreeDrag">
-                  <GripVertical class="-ml-1 mr-0.5 h-4 w-4 shrink-0 cursor-grab text-zinc-300 opacity-0 transition group-hover:opacity-100" />
+            <!-- KB 下的子节点 -->
+            <div v-if="expandedTreeIds.includes(kbNode.id)" class="ml-6 border-l border-zinc-100 text-xs">
+              <div v-for="child in (findKbTreeNode(fileTree, kbNode.kbId ?? '')?.children ?? [])" :key="child.id" class="flex items-center gap-0.5 ml-1">
+                <button
+                  v-if="child.type === 'folder' && child.children?.length"
+                  type="button"
+                  class="grid h-6 w-5 shrink-0 place-items-center rounded text-zinc-400 hover:text-zinc-700"
+                  @click.stop="toggleTreeNode(child)"
+                >
+                  <ChevronDown v-if="expandedTreeIds.includes(child.id)" class="h-3 w-3" />
+                  <ChevronRight v-else class="h-3 w-3" />
+                </button>
+                <span v-else class="inline-block w-5 shrink-0" />
+                <div class="group relative flex min-w-0 flex-1 items-center" @mouseenter="hoveredNodeId = child.id" @mouseleave="hoveredNodeId = ''">
                   <button
-                    v-if="row.node.type === 'folder'"
+                    v-if="child.type === 'file'"
                     type="button"
-                    class="grid h-7 w-7 shrink-0 place-items-center rounded text-zinc-400 hover:text-zinc-700"
-                    @click.stop="toggleTreeExpandOnly(row.node)"
+                    class="flex min-w-0 flex-1 items-center gap-1.5 rounded-md py-1 cursor-pointer hover:bg-zinc-100"
+                    @click="toggleTreeNode(child)"
+                    @contextmenu.prevent="openTreeContextMenu(child.id, $event)"
                   >
-                    <ChevronDown v-if="expandedTreeIds.includes(row.node.id)" class="h-3.5 w-3.5" />
-                    <ChevronRight v-else class="h-3.5 w-3.5" />
-                  </button>
-                  <span v-else class="inline-block w-7 shrink-0" />
-                  <button
-                    v-if="row.node.isKnowledgeBase"
-                    type="button"
-                    class="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-left text-xs transition"
-                    :class="selectedKbId === row.kbId ? '' : 'text-zinc-600 hover:bg-zinc-50'"
-                    @click="row.kbId && selectKb(row.kbId)"
-                  >
-                    <BookOpen class="h-3.5 w-3.5 shrink-0 text-orange-500" />
-                    <span class="truncate">{{ row.node.label }}</span>
-                    <span v-if="row.kbId" class="shrink-0 rounded border px-1 py-0.5 text-[9px] font-medium" :class="(findKbById(row.kbId) ? getPermissionBadge(findKbById(row.kbId))?.cls ?? '' : '')">{{ (findKbById(row.kbId) ? getPermissionBadge(findKbById(row.kbId))?.text ?? '' : '') }}</span>
-                  </button>
-                  <button
-                    v-else-if="row.node.type === 'file'"
-                    type="button"
-                    class="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1.5 text-left text-xs cursor-pointer hover:bg-zinc-100"
-                    @click="previewFileFromTree(row)"
-                    @contextmenu.prevent="openTreeContextMenu(row.node.id, $event)"
-                  >
-                    <FileText class="h-3.5 w-3.5 shrink-0 text-zinc-300" />
-                    <span class="truncate text-zinc-500">{{ row.node.label }}</span>
+                    <FileText class="h-3 w-3 shrink-0 text-zinc-300" />
+                    <span class="truncate text-zinc-500">{{ child.label }}</span>
                   </button>
                   <button
                     v-else
                     type="button"
-                    class="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1.5 text-left text-xs text-zinc-600 hover:bg-zinc-50"
-                    @click="selectTreeNode(row.node)"
-                    @contextmenu.prevent="openTreeContextMenu(row.node.id, $event)"
+                    class="flex min-w-0 flex-1 items-center gap-1.5 rounded-md py-1 cursor-pointer hover:bg-zinc-100"
+                    @click="toggleTreeNode(child)"
+                    @contextmenu.prevent="openTreeContextMenu(child.id, $event)"
                   >
-                    <Folder class="h-3.5 w-3.5 shrink-0 text-amber-500" />
-                    <span class="truncate">{{ row.node.label }}</span>
+                    <Folder class="h-3 w-3 shrink-0 text-zinc-400" />
+                    <span class="truncate text-zinc-600">{{ child.label }}</span>
                   </button>
+                  <!-- 子节点悬停操作按钮 -->
+                  <div class="shrink-0 hidden group-hover:flex items-center gap-0.5 bg-white pl-1 shadow-sm rounded-md absolute right-0" @click.stop>
+                    <!-- 文件夹特有操作 -->
+                    <template v-if="child.type === 'folder'">
+                      <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded text-zinc-400 hover:text-blue-600 hover:bg-blue-50" aria-label="权限配置" title="权限配置" @click="openFolderPermission(child.id); treeMenuTargetId = ''">
+                        <Settings class="h-3 w-3" />
+                      </button>
+                    </template>
+                    <!-- 文件特有操作 -->
+                    <template v-else>
+                      <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded text-zinc-400 hover:text-blue-600 hover:bg-blue-50" aria-label="预览" title="预览" @click="previewFileFromTree({ id: child.id, node: child, depth: 1, kbId: kbNode.kbId })">
+                        <Eye class="h-3 w-3" />
+                      </button>
+                      <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded text-zinc-400 hover:text-red-500 hover:bg-red-50" aria-label="删除文件" title="删除" @click="deleteTreeDoc(child)">
+                        <Trash2 class="h-3 w-3" />
+                      </button>
+                    </template>
+                    <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100" aria-label="更多操作" title="更多操作" @click="openTreeMenu($event, `${kbNode.id}-${child.id}`)">
+                      <MoreVertical class="h-3 w-3" />
+                    </button>
+                  </div>
+                  <!-- 子节点 ⋮ 下拉菜单 -->
+                  <Teleport to="body">
+                    <div v-if="treeMenuTargetId === `${kbNode.id}-${child.id}`" class="fixed inset-0 z-[70]" @click="treeMenuTargetId = ''">
+                      <div class="absolute w-44 overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 text-sm shadow-2xl" :style="{ left: `${treeMenuPos.x}px`, top: `${treeMenuPos.y}px` }" @click.stop>
+                        <div class="px-3 py-2 text-xs font-semibold text-zinc-400">{{ child.label }}</div>
+                        <template v-if="child.type === 'folder'">
+                          <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="toggleTreeNode(child); treeMenuTargetId = ''"><Folder class="h-4 w-4" />打开</button>
+                          <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openCreateFolderModalAt(child.id); treeMenuTargetId = ''"><Folder class="h-4 w-4" />新建文件夹</button>
+                          <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openFolderPermission(child.id); treeMenuTargetId = ''"><Settings class="h-4 w-4 text-blue-500" />权限配置</button>
+                          <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteTreeFolder(child); treeMenuTargetId = ''"><Trash2 class="h-4 w-4" />删除</button>
+                        </template>
+                        <template v-else>
+                          <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="previewFileFromTree({ id: child.id, node: child, depth: 1, kbId: kbNode.kbId }); treeMenuTargetId = ''"><Eye class="h-4 w-4" />预览</button>
+                          <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteTreeDoc(child); treeMenuTargetId = ''"><Trash2 class="h-4 w-4" />删除</button>
+                        </template>
+                      </div>
+                    </div>
+                  </Teleport>
+                </div>
+              </div>
+              <!-- 嵌套的子文件夹 -->
+              <div v-for="child in (findKbTreeNode(fileTree, kbNode.kbId ?? '')?.children ?? []).filter(c => c.type === 'folder' && expandedTreeIds.includes(c.id))" :key="child.id" class="ml-6">
+                <div v-for="grandchild in child.children ?? []" :key="grandchild.id" class="flex items-center gap-0.5 ml-1">
+                  <span class="inline-block w-5 shrink-0" />
+                  <div class="group relative flex min-w-0 flex-1 items-center" @mouseenter="hoveredNodeId = grandchild.id" @mouseleave="hoveredNodeId = ''">
+                    <button
+                      v-if="grandchild.type === 'file'"
+                      type="button"
+                      class="flex min-w-0 flex-1 items-center gap-1.5 rounded-md py-1 cursor-pointer hover:bg-zinc-100"
+                      @click="toggleTreeNode(grandchild)"
+                    >
+                      <FileText class="h-3 w-3 shrink-0 text-zinc-300" />
+                      <span class="truncate text-zinc-500">{{ grandchild.label }}</span>
+                    </button>
+                    <!-- 嵌套子节点悬停操作按钮 -->
+                    <div class="shrink-0 hidden group-hover:flex items-center gap-0.5 bg-white pl-1 shadow-sm rounded-md absolute right-0" @click.stop>
+                      <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded text-zinc-400 hover:text-blue-600 hover:bg-blue-50" aria-label="预览" title="预览" @click="previewFileFromTree({ id: grandchild.id, node: grandchild, depth: 2, kbId: kbNode.kbId })">
+                        <Eye class="h-3 w-3" />
+                      </button>
+                      <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded text-zinc-400 hover:text-red-500 hover:bg-red-50" aria-label="删除文件" title="删除" @click="deleteTreeDoc(grandchild)">
+                        <Trash2 class="h-3 w-3" />
+                      </button>
+                      <button type="button" class="inline-flex h-5 w-5 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100" aria-label="更多操作" title="更多操作" @click="openTreeMenu($event, `${kbNode.id}-${grandchild.id}`)">
+                        <MoreVertical class="h-3 w-3" />
+                      </button>
+                    </div>
+                    <!-- 嵌套子节点 ⋮ 菜单 -->
+                    <Teleport to="body">
+                      <div v-if="treeMenuTargetId === `${kbNode.id}-${grandchild.id}`" class="fixed inset-0 z-[70]" @click="treeMenuTargetId = ''">
+                        <div class="absolute w-44 overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 text-sm shadow-2xl" :style="{ left: `${treeMenuPos.x}px`, top: `${treeMenuPos.y}px` }" @click.stop>
+                          <div class="px-3 py-2 text-xs font-semibold text-zinc-400">{{ grandchild.label }}</div>
+                          <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="previewFileFromTree({ id: grandchild.id, node: grandchild, depth: 2, kbId: kbNode.kbId }); treeMenuTargetId = ''"><Eye class="h-4 w-4" />预览</button>
+                          <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteTreeDoc(grandchild); treeMenuTargetId = ''"><Trash2 class="h-4 w-4" />删除</button>
+                        </div>
+                      </div>
+                    </Teleport>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-
-        <div class="mt-6" />
-        <div class="flex items-center rounded-lg">
-          <button type="button" class="grid h-7 w-7 shrink-0 place-items-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700" :aria-label="`${personalSpaceGroupOpen ? '收起' : '展开'}个人空间`" @click.stop="personalSpaceGroupOpen = !personalSpaceGroupOpen">
-            <ChevronDown v-if="personalSpaceGroupOpen" class="h-3.5 w-3.5 text-zinc-500" />
-            <ChevronRight v-else class="h-3.5 w-3.5 text-zinc-500" />
-          </button>
-          <button type="button" class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1.5 py-1.5 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-50" @click="switchSpace('personal')" @contextmenu.prevent="openTreeContextMenu('personal_space', $event)">
-            <Folder class="h-4 w-4 shrink-0 text-emerald-500" />
-            <span>个人空间</span>
-            <span class="ml-auto text-[11px] font-normal text-zinc-400">{{ defaultPersonalFolders.length }}</span>
-          </button>
-        </div>
-        <div v-if="personalSpaceGroupOpen" class="ml-5 mt-1 space-y-0.5">
-          <div v-for="folder in defaultPersonalFolders" :key="folder.id" class="space-y-0.5">
-            <div
-              class="group flex items-center rounded-lg"
-              :class="activeSpace === folder.space && activeTreeId === folder.id && !selectedKbId ? 'bg-blue-50 text-blue-700' : ''"
-              draggable="true"
-              @dragstart="draggingSpaceFolderId = folder.id"
-              @dragover.prevent="dragOverSpaceFolderId = folder.id"
-              @drop.prevent="reorderSpaceFolder(folder)"
-              @dragend="finishSpaceFolderDrag"
-              @contextmenu.prevent="openTreeContextMenu(folder.id, $event)"
-            >
-              <GripVertical class="h-4 w-4 shrink-0 cursor-grab text-zinc-300 opacity-0 transition group-hover:opacity-100" :class="dragOverSpaceFolderId === folder.id ? 'opacity-100 text-blue-500' : ''" />
-              <button type="button" class="grid h-7 w-5 shrink-0 place-items-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700" :aria-label="`${isSpaceFolderExpanded(folder) ? '收起' : '展开'}${folder.label}`" @click.stop="toggleSpaceFolderExpand(folder)">
-                <ChevronDown v-if="isSpaceFolderExpanded(folder)" class="h-3.5 w-3.5" />
-                <ChevronRight v-else class="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1.5 py-1.5 text-left text-sm text-zinc-600 hover:bg-zinc-50"
-                :class="activeSpace === folder.space && activeTreeId === folder.id && !selectedKbId ? 'text-blue-700' : ''"
-                @click="openSpaceFolder(folder)"
-              >
-                <Folder class="h-4 w-4 shrink-0 text-zinc-500" />
-                <span class="truncate">{{ folder.label }}</span>
-              </button>
-            </div>
-            <div v-if="isSpaceFolderExpanded(folder)" class="ml-8 space-y-0.5">
-              <div v-for="row in getSpaceFolderTree(folder)" :key="row.id" :style="{ marginLeft: (row.depth * 12) + 'px' }">
-                <div class="group flex items-center" :class="row.node.isKnowledgeBase && selectedKbId === row.kbId ? 'bg-blue-50 text-blue-700 rounded-lg' : ''" draggable="true" @dragstart="draggingTreeNodeId = row.node.id" @dragover.prevent="dragOverTreeNodeId = row.node.id" @drop.prevent="reorderTreeItems(row.node)" @dragend="finishTreeDrag">
-                  <GripVertical class="-ml-1 mr-0.5 h-4 w-4 shrink-0 cursor-grab text-zinc-300 opacity-0 transition group-hover:opacity-100" />
-                  <button
-                    v-if="row.node.type === 'folder'"
-                    type="button"
-                    class="grid h-7 w-7 shrink-0 place-items-center rounded text-zinc-400 hover:text-zinc-700"
-                    @click.stop="toggleTreeExpandOnly(row.node)"
-                  >
-                    <ChevronDown v-if="expandedTreeIds.includes(row.node.id)" class="h-3.5 w-3.5" />
-                    <ChevronRight v-else class="h-3.5 w-3.5" />
-                  </button>
-                  <span v-else class="inline-block w-7 shrink-0" />
-                  <button
-                    v-if="row.node.isKnowledgeBase"
-                    type="button"
-                    class="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-left text-xs transition"
-                    :class="selectedKbId === row.kbId ? '' : 'text-zinc-600 hover:bg-zinc-50'"
-                    @click="row.kbId && selectKb(row.kbId)"
-                  >
-                    <BookOpen class="h-3.5 w-3.5 shrink-0 text-orange-500" />
-                    <span class="truncate">{{ row.node.label }}</span>
-                    <span v-if="row.kbId" class="shrink-0 rounded border px-1 py-0.5 text-[9px] font-medium" :class="(findKbById(row.kbId) ? getPermissionBadge(findKbById(row.kbId))?.cls ?? '' : '')">{{ (findKbById(row.kbId) ? getPermissionBadge(findKbById(row.kbId))?.text ?? '' : '') }}</span>
-                  </button>
-                  <button
-                    v-else-if="row.node.type === 'file'"
-                    type="button"
-                    class="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1.5 text-left text-xs cursor-pointer hover:bg-zinc-100"
-                    @click="previewFileFromTree(row)"
-                    @contextmenu.prevent="openTreeContextMenu(row.node.id, $event)"
-                  >
-                    <FileText class="h-3.5 w-3.5 shrink-0 text-zinc-300" />
-                    <span class="truncate text-zinc-500">{{ row.node.label }}</span>
-                  </button>
-                  <button
-                    v-else
-                    type="button"
-                    class="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1.5 text-left text-xs text-zinc-600 hover:bg-zinc-50"
-                    @click="selectTreeNode(row.node)"
-                    @contextmenu.prevent="openTreeContextMenu(row.node.id, $event)"
-                  >
-                    <Folder class="h-3.5 w-3.5 shrink-0 text-amber-500" />
-                    <span class="truncate">{{ row.node.label }}</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+      </div>
+      <!-- 回收站入口 -->
+      <div class="border-t border-zinc-100 p-3">
+        <button type="button" class="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-medium" :class="activeKnowledgeTab === 'trash' ? 'bg-blue-50 text-blue-700' : 'text-zinc-600 hover:bg-zinc-50'" @click="activeKnowledgeTab = activeKnowledgeTab === 'trash' ? 'assets' : 'trash'">
+          <Trash2 class="h-4 w-4" />
+          <span>回收站</span>
+          <span v-if="recycleItems.length" class="ml-auto rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600">{{ recycleItems.length }}</span>
+        </button>
       </div>
     </aside>
 
@@ -2095,8 +2269,8 @@ function addCandidateMember(name: string, dept: string) {
             <input v-else v-model="kbSearch" type="text" placeholder="搜索知识库..." class="w-[clamp(180px,18vw,320px)] rounded-lg border border-zinc-200 py-2 pl-8 pr-3 text-xs text-zinc-600 placeholder:text-zinc-300 focus:border-blue-200 focus:outline-none" />
           </div>
           <div class="inline-flex h-9 overflow-hidden rounded-lg border border-zinc-200 bg-white">
-            <button class="px-2.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600" :class="{ 'bg-zinc-100 text-zinc-600': selectedKb ? fileView === 'list' : kbView === 'list' }" aria-label="列表视图" @click="selectedKb ? fileView = 'list' : kbView = 'list'"><List class="h-4 w-4" /></button>
-            <button class="px-2.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600" :class="{ 'bg-zinc-100 text-zinc-600': selectedKb ? fileView === 'grid' : kbView === 'grid' }" aria-label="宫格视图" @click="selectedKb ? fileView = 'grid' : kbView = 'grid'"><LayoutGrid class="h-4 w-4" /></button>
+            <button class="px-2.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600" :class="{ 'bg-zinc-100 text-zinc-600': fileView === 'list' }" aria-label="列表视图" @click="fileView = 'list'"><List class="h-4 w-4" /></button>
+            <button class="px-2.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600" :class="{ 'bg-zinc-100 text-zinc-600': fileView === 'grid' }" aria-label="宫格视图" @click="fileView = 'grid'"><LayoutGrid class="h-4 w-4" /></button>
           </div>
         </div>
         </template>
@@ -2132,44 +2306,12 @@ function addCandidateMember(name: string, dept: string) {
             </section>
           </article>
         </div>
-        <div v-else-if="!selectedKb && activeSpaceRoot" class="space-y-6">
-          <section>
-            <div class="mb-4">
-              <h2 class="text-lg font-semibold text-zinc-950">{{ activeSpace === 'public' ? '部门分组' : '知识分组' }}</h2>
-              <p class="mt-1 text-xs text-zinc-400">当前空间：{{ activeSpaceLabel }}，{{ activeSpace === 'public' ? '按部门/业务域组织知识库' : '按用途组织知识库' }}</p>
-            </div>
-            <div class="overflow-hidden rounded-xl border border-zinc-200 bg-white">
-              <div class="grid grid-cols-[minmax(260px,1fr)_120px_80px] border-b border-zinc-100 bg-zinc-50 px-4 py-3 text-xs font-medium text-zinc-500">
-                <span>分组名称</span>
-                <span class="text-center">知识库数量</span>
-                <span class="text-center">操作</span>
-              </div>
-              <div
-                v-for="folder in defaultSpaceFolders[activeSpace]"
-                :key="folder.id"
-                class="grid grid-cols-[minmax(260px,1fr)_120px_80px] items-center border-b border-zinc-100 px-4 py-3 last:border-0 hover:bg-zinc-50"
-              >
-                <div class="flex min-w-0 items-center gap-3">
-                  <Folder class="h-5 w-5 shrink-0 text-blue-500" />
-                  <div class="min-w-0">
-                    <div class="truncate text-sm font-semibold text-zinc-900">{{ folder.label }}</div>
-                    <div class="mt-0.5 text-xs text-zinc-400">{{ activeSpaceLabel }} · {{ activeSpace === 'public' ? '部门分组' : '知识分组' }}</div>
-                  </div>
-                </div>
-                <span class="text-center text-xs text-zinc-500">{{ folder.kbIds.length }} 个知识库</span>
-                <div class="flex justify-center">
-                  <button type="button" class="text-xs font-medium text-blue-600 hover:text-blue-700" @click="openSpaceFolder(folder)">进入</button>
-                </div>
-              </div>
-            </div>
-          </section>
-        </div>
-        <div v-else-if="!selectedKb && !activeSpaceRoot" class="space-y-8">
+        <div v-if="!selectedKbId" class="space-y-8">
           <section>
             <div class="mb-3 flex items-center justify-between gap-3">
               <div>
                 <h2 class="text-base font-semibold text-zinc-950">收藏知识库</h2>
-                <p class="mt-1 text-xs text-zinc-400">当前目录：{{ activeNode?.label ?? activeSpaceLabel }}</p>
+                <p class="mt-1 text-xs text-zinc-400">{{ activeNode?.label ?? '全部知识库' }}</p>
               </div>
               <span class="rounded-full bg-white px-2 py-1 text-xs text-zinc-400">{{ displayedKnowledgeBases.length }} 个知识库</span>
             </div>
@@ -2178,15 +2320,8 @@ function addCandidateMember(name: string, dept: string) {
                 v-for="kb in pinnedKnowledgeBases"
                 :key="kb.id"
                 class="group relative min-h-20 rounded-lg border border-zinc-200 bg-white px-4 py-3 transition hover:border-blue-300 hover:bg-blue-50/40"
-                :class="dragOverFavoriteKbId === kb.id ? 'border-blue-400 bg-blue-50' : ''"
-                draggable="true"
-                @dragstart="draggingFavoriteKbId = kb.id"
-                @dragover.prevent="dragOverFavoriteKbId = kb.id"
-                @drop.prevent="reorderFavoriteKb(kb)"
-                @dragend="finishFavoriteDrag"
                 @contextmenu.prevent="openKbContextMenu(kb, $event)"
               >
-                <GripVertical class="absolute left-1/2 top-1 h-4 w-4 -translate-x-1/2 cursor-grab text-zinc-300 opacity-0 transition group-hover:opacity-100" />
                 <button type="button" class="flex w-full items-center gap-3 text-left" @click="selectKb(kb.id)">
                   <div class="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-orange-50 text-orange-500">
                     <BookOpen class="h-6 w-6" />
@@ -2220,7 +2355,7 @@ function addCandidateMember(name: string, dept: string) {
                 <Plus class="h-4 w-4" />新建知识库
               </button>
             </div>
-            <div v-if="kbView === 'grid'" class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               <div
                 v-for="kb in displayedKnowledgeBases"
                 :key="kb.id"
@@ -2250,65 +2385,7 @@ function addCandidateMember(name: string, dept: string) {
                 </div>
               </div>
             </div>
-            <div v-else class="overflow-hidden rounded-xl border border-zinc-200 bg-white">
-              <div class="grid grid-cols-[minmax(260px,1fr)_160px_160px_104px] border-b border-zinc-100 bg-zinc-50 px-4 py-3 text-xs font-medium text-zinc-500">
-                <span>名称</span>
-                <span>归属小组</span>
-                <span>最近访问</span>
-                <span class="text-right">操作</span>
-              </div>
-              <div
-                v-for="kb in displayedKnowledgeBases"
-                :key="kb.id"
-                class="grid grid-cols-[minmax(260px,1fr)_160px_160px_104px] items-center border-b border-zinc-100 px-4 py-3 last:border-0 hover:bg-zinc-50"
-                @contextmenu.prevent="openKbContextMenu(kb, $event)"
-              >
-                <button type="button" class="flex min-w-0 items-center gap-3 text-left" @click="selectKb(kb.id)">
-                  <div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-orange-50 text-orange-500">
-                    <BookOpen class="h-5 w-5" />
-                  </div>
-                  <div class="min-w-0">
-                    <input
-                      v-if="renamingKbId === kb.id"
-                      v-model="draftKbTitle"
-                      class="w-full rounded-md border border-blue-200 bg-white px-2 py-1 text-sm outline-none ring-2 ring-blue-100"
-                      aria-label="编辑知识库名称"
-                      @click.stop
-                      @keydown.enter.prevent="commitRenameKb(kb)"
-                      @keydown.esc.prevent="renamingKbId = ''; draftKbTitle = ''"
-                      @blur="commitRenameKb(kb)"
-                    />
-                    <div v-else class="flex items-center gap-2">
-                      <span class="truncate text-sm font-semibold text-zinc-900">{{ kb.name }}</span>
-                      <span
-                        v-if="getPermissionBadge(kb)"
-                        class="hidden rounded-md border px-1.5 py-0.5 text-[10px] font-medium lg:inline-block"
-                        :class="getPermissionBadge(kb)?.cls"
-                        :title="`我的权限：${getPermissionBadge(kb)?.text}`"
-                      >{{ getPermissionBadge(kb)?.text }}</span>
-                    </div>
-                    <div class="mt-0.5 truncate text-xs text-zinc-400">{{ kb.docs }} 文档 · {{ kb.visibility }}</div>
-                  </div>
-                </button>
-                <span class="text-xs text-zinc-500">{{ kb.department }}</span>
-                <span class="text-xs text-zinc-500">{{ kb.recent }}</span>
-                <div class="flex justify-end gap-1">
-                  <button type="button" class="rounded-md p-1.5 text-zinc-400 hover:bg-amber-50 hover:text-amber-600" :aria-label="`收藏知识库 ${kb.name}`" @click="toggleKbPinned(kb)">
-                    <Star class="h-4 w-4" :class="kb.pinned ? 'fill-amber-500 text-amber-500' : ''" />
-                  </button>
-                  <button v-if="kb.canEdit" type="button" class="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-800" :aria-label="`重命名知识库 ${kb.name}`" @click="beginRenameKb(kb)">
-                    <Pencil class="h-4 w-4" />
-                  </button>
-                  <button v-if="kb.canEdit" type="button" class="rounded-md p-1.5 text-zinc-400 hover:bg-blue-50 hover:text-blue-600" :aria-label="`移动知识库 ${kb.name}`" @click="moveKb(kb)">
-                    <Move class="h-4 w-4" />
-                  </button>
-                  <button v-if="kb.canEdit" type="button" class="rounded-md p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600" :aria-label="`删除知识库 ${kb.name}`" @click="deleteKb(kb)">
-                    <Trash2 class="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </section>
+            </section>
         </div>
 
         <div v-if="selectedKb && !isThreeColumn" data-testid="knowledge-action-row" class="mb-3 flex flex-wrap items-center gap-2">
@@ -2319,6 +2396,10 @@ function addCandidateMember(name: string, dept: string) {
           <button class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-600 hover:bg-zinc-50" aria-label="上传文件" @click="openUploadModal">
             <Upload class="h-4 w-4" />
             <span>上传文件</span>
+          </button>
+          <button class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-600 hover:bg-zinc-50" aria-label="知识库问答" @click="openQaPanel">
+            <MessageSquareText class="h-4 w-4" />
+            <span>知识库问答</span>
           </button>
         </div>
 
@@ -2337,7 +2418,7 @@ function addCandidateMember(name: string, dept: string) {
           <button class="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-orange-500 px-4 py-2 text-xs font-medium text-white hover:bg-orange-600" @click="openUploadModal"><Upload class="h-3.5 w-3.5" />上传第一个文档</button>
         </div>
 
-        <div v-else-if="selectedKb && fileView === 'list'" class="overflow-hidden rounded-xl border border-zinc-200 bg-white" v-show="!isThreeColumn">
+        <div v-if="selectedKb && fileView === 'list'" class="overflow-hidden rounded-xl border border-zinc-200 bg-white" v-show="!isThreeColumn">
           <table class="w-full">
             <thead class="border-b border-zinc-200 bg-zinc-50">
               <tr>
@@ -2375,7 +2456,7 @@ function addCandidateMember(name: string, dept: string) {
                   </div>
                 </td>
               </tr>
-              <tr v-for="doc in filteredDocs" :key="doc.name" data-testid="knowledge-file-row" class="cursor-pointer border-b border-zinc-100 last:border-0 hover:bg-zinc-50" :class="{ 'bg-blue-50/50': selectedFileIds.includes(doc.name) }" @click="openPreview(doc)" @contextmenu.prevent="openDocContextMenu(doc, $event)">
+              <tr v-for="doc in filteredDocs" :key="doc.name" data-testid="knowledge-file-row" class="border-b border-zinc-100 last:border-0" :class="{ 'opacity-40 cursor-default': !isDocAccessible(doc), 'cursor-pointer hover:bg-zinc-50': isDocAccessible(doc), 'bg-blue-50/50': selectedFileIds.includes(doc.name) }" @click="isDocAccessible(doc) && openPreview(doc)" @contextmenu.prevent="openDocContextMenu(doc, $event)">
                 <td class="px-3 py-3"><button class="text-zinc-400 hover:text-blue-500" @click.stop="toggleFileSelect(doc.name)"><CheckSquare v-if="selectedFileIds.includes(doc.name)" class="h-4 w-4 text-blue-500" /><Square v-else class="h-4 w-4" /></button></td>
                 <td class="py-3">
                   <div class="flex items-center gap-2 text-sm text-zinc-800">
@@ -2425,7 +2506,7 @@ function addCandidateMember(name: string, dept: string) {
               <button v-if="canDeleteFolder(folder)" type="button" class="rounded-md px-2 py-1 text-[11px] text-red-600 hover:bg-red-50" :aria-label="`删除文件夹 ${folder.label}`" @click.stop="deleteTreeFolder(folder)">删除</button>
             </div>
           </div>
-          <div v-for="doc in filteredDocs" :key="doc.name" data-testid="knowledge-file-card" class="relative cursor-pointer rounded-xl border border-zinc-200 bg-white transition hover:border-orange-300" :class="[selectedFileIds.includes(doc.name) ? 'ring-2 ring-blue-300' : '', previewDoc ? 'p-3' : 'p-4']" @click="openPreview(doc)" @contextmenu.prevent="openDocContextMenu(doc, $event)">
+          <div v-for="doc in filteredDocs" :key="doc.name" data-testid="knowledge-file-card" class="relative rounded-xl border border-zinc-200 bg-white transition" :class="[isDocAccessible(doc) ? 'cursor-pointer hover:border-orange-300' : 'opacity-40 cursor-default', selectedFileIds.includes(doc.name) ? 'ring-2 ring-blue-300' : '', previewDoc ? 'p-3' : 'p-4']" @click="isDocAccessible(doc) && openPreview(doc)" @contextmenu.prevent="openDocContextMenu(doc, $event)">
             <button class="absolute left-3 top-3 z-10 rounded p-0.5 bg-white/80 backdrop-blur" @click.stop="toggleFileSelect(doc.name)"><CheckSquare v-if="selectedFileIds.includes(doc.name)" class="h-4 w-4 text-blue-500" /><Square v-else class="h-4 w-4 text-zinc-300" /></button>
             <div class="mb-3 mt-3 flex items-center justify-center rounded-xl shadow-sm" :class="[getIconColor(doc.format), previewDoc ? 'h-12 w-12' : 'h-14 w-14']"><component :is="getFileIcon(doc.format)" class="h-6 w-6" /></div>
             <strong class="block truncate text-sm font-semibold text-zinc-900" :title="doc.name">{{ previewDoc ? doc.name.split('.')[0] : doc.name }}</strong>
@@ -2449,7 +2530,7 @@ function addCandidateMember(name: string, dept: string) {
           <div class="text-sm font-semibold text-zinc-950">文件预览</div>
           <div class="truncate text-xs text-zinc-400">{{ activePreviewDoc?.name ?? '已打开文件' }}</div>
         </div>
-        <button type="button" class="rounded-lg p-2 text-zinc-500 hover:bg-zinc-100" aria-label="关闭文件预览" @click="closePreviewPanel">
+        <button type="button" class="rounded-lg p-2 text-zinc-500 hover:bg-zinc-100" aria-label="关闭预览" @click="closePreviewPanel">
           <X class="h-4 w-4" />
         </button>
       </div>
@@ -2496,13 +2577,31 @@ function addCandidateMember(name: string, dept: string) {
             <MessageSquareText class="h-4 w-4" />
           </div>
           <div class="min-w-0">
-            <div class="text-sm font-semibold text-zinc-950">小智</div>
-            <div class="truncate text-xs text-zinc-400">知识库问答助手</div>
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-semibold text-zinc-950">小智</span>
+              <span v-if="qaMessages.length > 0" class="text-[10px] text-zinc-400">共 {{ qaMessages.length }} 条消息</span>
+            </div>
+            <div class="truncate text-xs text-zinc-400">
+              <template v-if="selectedKb">基于「{{ selectedKb.name }}」</template>
+              <template v-else>知识库问答助手</template>
+            </div>
           </div>
         </div>
-        <button type="button" class="rounded-lg p-2 text-zinc-500 hover:bg-zinc-100" aria-label="关闭小智" @click="closeQaPanel">
-          <X class="h-4 w-4" />
-        </button>
+        <div class="flex items-center gap-1">
+          <button
+            v-if="qaMessages.length > 0"
+            type="button"
+            class="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
+            aria-label="新建对话"
+            title="清空对话"
+            @click="clearQaHistory"
+          >
+            <RotateCw class="h-4 w-4" />
+          </button>
+          <button type="button" class="rounded-lg p-2 text-zinc-500 hover:bg-zinc-100" aria-label="关闭小智" @click="closeQaPanel">
+            <X class="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       <div class="grid grid-cols-2 gap-2 border-b border-transparent px-4 py-3">
@@ -2516,10 +2615,14 @@ function addCandidateMember(name: string, dept: string) {
         <div v-if="qaMessages.length === 0" class="space-y-4">
           <div class="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-4">
             <div class="text-lg font-semibold text-zinc-950">你好，我是小智</div>
-            <div class="mt-2 text-sm leading-6 text-zinc-500">我可以基于当前知识库和已打开文件回答问题，并在回答里保留可追溯引用。</div>
+            <div class="mt-2 text-sm leading-6 text-zinc-500">
+              我可以基于当前
+              <span class="font-medium text-blue-600">{{ selectedKb?.name ?? '知识库' }}</span>
+              和已打开文件回答问题，并在回答里保留可追溯引用。
+            </div>
           </div>
           <div class="space-y-2">
-            <button v-for="question in ['这个知识库里有哪些可复用案例？', '预算分档应该怎么解释给客户？', '找出需要人工复核的风险点']" :key="question" type="button" class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-left text-xs text-zinc-600 hover:border-blue-200 hover:bg-blue-50" @click="qaQuestion = question">{{ question }}</button>
+            <button v-for="question in ['这个知识库里有哪些可复用案例？', '预算分档应该怎么解释给客户？', '找出需要人工复核的风险点']" :key="question" type="button" class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-left text-xs text-zinc-600 hover:border-blue-200 hover:bg-blue-50" @click="sendQuickQuestion(question)">{{ question }}</button>
           </div>
         </div>
         <div v-for="(msg, index) in qaMessages" :key="msg.id || index" class="group/qa" :class="msg.role === 'user' ? 'ml-8' : 'mr-8'">
@@ -2576,6 +2679,14 @@ function addCandidateMember(name: string, dept: string) {
                 <CheckCircle2 v-if="qaCopiedId === msg.id" class="h-3.5 w-3.5 text-emerald-500" />
                 <Copy v-else class="h-3.5 w-3.5" />
               </button>
+              <span class="mx-1 h-4 w-px bg-zinc-200" />
+              <button type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition hover:bg-green-50 hover:text-green-600" aria-label="有用" title="答案有帮助">
+                <ThumbsUp class="h-3.5 w-3.5" />
+              </button>
+              <button type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition hover:bg-red-50 hover:text-red-500" aria-label="没用" title="答案无帮助">
+                <ThumbsDown class="h-3.5 w-3.5" />
+              </button>
+              <span class="mx-1 h-4 w-px bg-zinc-200" />
               <button type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700" aria-label="引用" @click="citeQaMessage(msg)">
                 <Quote class="h-3.5 w-3.5" />
               </button>
@@ -2590,7 +2701,8 @@ function addCandidateMember(name: string, dept: string) {
             ref="qaTextarea"
             v-model="qaQuestion"
             class="max-h-[192px] min-h-[36px] flex-1 resize-none bg-transparent py-1 text-sm leading-6 outline-none placeholder:text-zinc-400"
-            placeholder="问小智任何问题..."
+            :placeholder="qaLoading ? '小智正在回答...' : '问小智任何问题...'"
+            :disabled="qaLoading"
             rows="1"
             @input="resizeQaTextarea"
             @keydown.enter.exact.prevent="askKnowledgeBase"
@@ -2598,11 +2710,12 @@ function addCandidateMember(name: string, dept: string) {
           <button
             type="button"
             class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition"
-            :class="qaQuestion.trim() ? 'bg-zinc-950 text-white hover:bg-zinc-800' : 'cursor-not-allowed bg-zinc-100 text-zinc-300'"
-            :disabled="!qaQuestion.trim()"
+            :class="qaQuestion.trim() && !qaLoading ? 'bg-zinc-950 text-white hover:bg-zinc-800' : 'cursor-not-allowed bg-zinc-100 text-zinc-300'"
+            :disabled="!qaQuestion.trim() || qaLoading"
             @click="askKnowledgeBase"
           >
-            <ArrowUp class="h-4 w-4" />
+            <ArrowUp v-if="!qaLoading" class="h-4 w-4" />
+            <RotateCw v-else class="h-4 w-4 animate-spin" />
           </button>
         </div>
       </div>
@@ -2612,51 +2725,44 @@ function addCandidateMember(name: string, dept: string) {
     <Teleport to="body">
       <div v-if="contextMenu" class="fixed inset-0 z-[55]" @click="contextMenu = null">
         <div class="absolute w-44 overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 text-sm shadow-2xl" :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }" @click.stop>
-          <!-- 右键根空间空白处 -->
-          <template v-if="contextMenu.type === 'tree' && contextMenu.id === '__root__'">
-            <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="showFileActionToast('新建空间文件夹'); contextMenu = null"><Folder class="h-4 w-4" />新建空间文件夹</button>
-            <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="showFileActionToast('功能开发中'); contextMenu = null"><Trash2 class="h-4 w-4" />删除</button>
-          </template>
-          <!-- 右键空间文件夹 -->
-          <template v-else-if="contextMenu.type === 'tree' && contextSpaceFolder">
-            <div class="px-3 py-2 text-xs font-semibold text-zinc-400">{{ contextSpaceFolder.label }}</div>
-            <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openCreateModalAt(contextMenu.id); contextMenu = null"><BookOpen class="h-4 w-4 text-orange-500" />新建知识库</button>
-            <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="showFileActionToast('功能开发中'); contextMenu = null"><Settings class="h-4 w-4 text-blue-500" />设置</button>
-            <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="showFileActionToast('功能开发中'); contextMenu = null"><Trash2 class="h-4 w-4" />删除</button>
-          </template>
           <!-- 右键知识库行 -->
-          <template v-else-if="contextMenu.type === 'kb' && contextKb">
+          <template v-if="contextMenu.type === 'kb' && contextKb">
             <div class="px-3 py-2 text-xs font-semibold text-zinc-400">{{ contextKb.name }}</div>
+            <button v-if="contextKb.canEdit" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="selectKb(contextKb.id); contextMenu = null"><BookOpen class="h-4 w-4 text-orange-500" />打开</button>
             <button v-if="contextKb.canEdit" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openCreateFolderModalAt(contextKb.id); contextMenu = null"><Folder class="h-4 w-4" />新建文件夹</button>
-            <button v-if="contextKb.canEdit" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openKbSettings(contextKb); contextMenu = null"><Settings class="h-4 w-4 text-blue-500" />设置</button>
-            <button v-if="contextKb.canEdit" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteKb(contextKb); contextMenu = null"><Trash2 class="h-4 w-4" />删除</button>
+            <button v-if="contextKb.canEdit" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openKbSettings(contextKb); contextMenu = null"><Settings class="h-4 w-4 text-blue-500" />权限配置</button>
+            <button v-if="contextKb.canEdit && !contextKb.isBuiltIn" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteKb(contextKb); contextMenu = null"><Trash2 class="h-4 w-4" />删除</button>
           </template>
           <!-- 右键文件（文件列表中） -->
           <template v-else-if="contextMenu.type === 'doc' && contextDoc">
             <div class="px-3 py-2 text-xs font-semibold text-zinc-400">文件操作</div>
             <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openPreview(contextDoc); contextMenu = null"><Eye class="h-4 w-4" />预览</button>
-            <button v-if="selectedKb?.canEdit" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openFileSettings(contextDoc); contextMenu = null"><Settings class="h-4 w-4 text-blue-500" />设置</button>
+            <button v-if="selectedKb?.canEdit" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="moveDoc(contextDoc); contextMenu = null"><Move class="h-4 w-4" />移动</button>
+            <button v-if="selectedKb?.canEdit" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openFileSettings(contextDoc); contextMenu = null"><Settings class="h-4 w-4 text-blue-500" />权限设置</button>
             <button v-if="selectedKb?.canEdit" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteDoc(contextDoc); contextMenu = null"><Trash2 class="h-4 w-4" />删除</button>
           </template>
           <!-- 右键文件树节点 -->
-          <template v-else-if="contextMenu.type === 'tree' && contextTreeNode && contextMenu.id !== '__root__' && !contextSpaceFolder">
+          <template v-else-if="contextMenu.type === 'tree' && contextTreeNode && contextMenu.id !== '__root__'">
             <template v-if="contextTreeNode?.type === 'file' && contextTreeDoc">
               <div class="px-3 py-2 text-xs font-semibold text-zinc-400">{{ contextTreeDoc.name }}</div>
               <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openPreview(contextTreeDoc); contextMenu = null"><Eye class="h-4 w-4" />预览</button>
-              <button v-if="true" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openFileSettings(contextTreeDoc); contextMenu = null"><Settings class="h-4 w-4 text-blue-500" />设置</button>
+              <button v-if="true" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="moveDoc(contextTreeDoc); contextMenu = null"><Move class="h-4 w-4" />移动</button>
+              <button v-if="true" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openFileSettings(contextTreeDoc); contextMenu = null"><Settings class="h-4 w-4 text-blue-500" />权限设置</button>
               <button v-if="true" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteTreeDoc(contextTreeNode)"><Trash2 class="h-4 w-4" />删除</button>
             </template>
             <template v-else-if="contextTreeNode?.type === 'folder'">
               <div class="px-3 py-2 text-xs font-semibold text-zinc-400">{{ contextTreeNode.label }}</div>
-              <!-- 知识库节点：新建文件夹、设置、删除 -->
+              <button v-if="true" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="toggleTreeNode(contextTreeNode); contextMenu = null"><Folder class="h-4 w-4" />打开</button>
+              <!-- 知识库节点：新建文件夹、权限配置、删除 -->
               <template v-if="isKnowledgeBaseNode(contextTreeNode)">
                 <button v-if="true" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openCreateFolderModalAt(contextMenu.id); contextMenu = null"><Folder class="h-4 w-4" />新建文件夹</button>
-                <button v-if="true" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="showFileActionToast('功能开发中'); contextMenu = null"><Settings class="h-4 w-4 text-blue-500" />设置</button>
+                <button v-if="true" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openFolderPermission(contextMenu.id); contextMenu = null"><Settings class="h-4 w-4 text-blue-500" />权限配置</button>
                 <button v-if="canDeleteFolder(contextTreeNode)" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteTreeFolder(contextTreeNode)"><Trash2 class="h-4 w-4" />删除</button>
               </template>
-              <!-- 普通文件夹：新建文件夹、删除 -->
+              <!-- 普通文件夹：新建文件夹、权限配置、删除 -->
               <template v-else>
                 <button v-if="true" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openCreateFolderModalAt(contextMenu.id); contextMenu = null"><Folder class="h-4 w-4" />新建文件夹</button>
+                <button v-if="true" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="openFolderPermission(contextMenu.id); contextMenu = null"><Settings class="h-4 w-4 text-blue-500" />权限配置</button>
                 <button v-if="canDeleteFolder(contextTreeNode)" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="deleteTreeFolder(contextTreeNode)"><Trash2 class="h-4 w-4" />删除</button>
               </template>
             </template>
@@ -2665,90 +2771,82 @@ function addCandidateMember(name: string, dept: string) {
       </div>
     </Teleport>
 
-    <Teleport to="body">
-      <div v-if="createMode" class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/40 px-4 py-8" @click.self="createMode = false">
-        <div class="w-full max-w-md overflow-hidden rounded-[32px] bg-white shadow-2xl ring-1 ring-zinc-200">
-          <div class="flex items-center justify-between gap-4 border-b border-zinc-200 px-6 py-4">
-            <div><div class="text-base font-semibold text-zinc-950">新建知识库</div><p class="mt-1 text-xs text-zinc-500">知识库创建在所选文件夹下</p></div>
-            <button type="button" class="rounded-full p-2 text-zinc-500 hover:bg-zinc-100" @click="createMode = false"><X class="h-4 w-4" /></button>
+    <Dialog v-model:open="createMode">
+      <DialogContent class="max-w-md">
+        <DialogHeader>
+          <DialogTitle>新建知识库</DialogTitle>
+          <DialogDescription>选择所属空间后创建知识库</DialogDescription>
+        </DialogHeader>
+        <div class="space-y-4 py-2">
+          <div class="grid gap-2">
+            <label class="text-xs font-medium text-zinc-600">知识库名称</label>
+            <Input v-model="createKbName" placeholder="输入知识库名称" />
           </div>
-          <div class="space-y-4 px-6 py-5">
-            <div><label class="text-xs font-medium text-zinc-600">知识库名称</label><input v-model="createKbName" aria-label="知识库名称" type="text" placeholder="输入知识库名称" class="mt-1.5 w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-orange-300" /></div>
-            <div><label class="text-xs font-medium text-zinc-600">所属文件夹</label>
-              <div class="mt-1.5 max-h-44 space-y-1 overflow-y-auto rounded-xl border border-zinc-200 bg-zinc-50 p-1">
+          <div class="grid gap-2">
+            <label class="text-xs font-medium text-zinc-600">所属空间</label>
+            <div class="flex gap-2">
+              <Button variant="outline" size="sm" class="flex-1" :class="createKbType === 'public' ? 'border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-50' : ''" @click="createKbType = 'public'">公共空间</Button>
+              <Button variant="outline" size="sm" class="flex-1" :class="createKbType === 'personal' ? 'border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-50' : ''" @click="createKbType = 'personal'">个人空间</Button>
+            </div>
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <Button variant="outline" @click="createMode = false">取消</Button>
+          <Button @click="createKnowledgeBase">创建</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog v-model:open="createFolderMode">
+      <DialogContent class="max-w-md">
+        <DialogHeader>
+          <DialogTitle>新建文件夹</DialogTitle>
+          <DialogDescription>在知识库中创建新的文件夹</DialogDescription>
+        </DialogHeader>
+        <div class="space-y-4 py-2">
+          <div class="grid gap-2">
+            <label class="text-xs font-medium text-zinc-600">文件夹名称</label>
+            <Input v-model="createFolderName" placeholder="例如：投标资料" />
+          </div>
+          <div class="grid gap-2">
+            <label class="text-xs font-medium text-zinc-600">选择所属文件夹</label>
+            <div class="max-h-52 space-y-1 overflow-y-auto rounded-lg border border-zinc-200 bg-zinc-50 p-1">
+              <div
+                v-for="option in kbFolderOptions"
+                :key="option.id"
+                class="flex items-center rounded-lg"
+                :class="createFolderParentId === option.id ? 'bg-white text-blue-700 shadow-sm' : ''"
+              >
                 <button
-                  v-for="option in createKbContainerOptions"
-                  :key="option.id"
+                  v-if="option.node?.children?.some((c: TreeNode) => c.type === 'folder')"
                   type="button"
-                  class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs transition"
-                  :class="createKbFolderId === option.id ? 'bg-white text-blue-700 shadow-sm' : 'text-zinc-600 hover:bg-white'"
-                  @click="createKbFolderId = option.id"
+                  class="grid h-7 w-7 shrink-0 place-items-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
+                  @click.stop="toggleFolderSelectorExpand(option.id)"
                 >
-                  <Folder class="h-3.5 w-3.5 shrink-0 text-zinc-600" />
+                  <ChevronDown v-if="expandedFolderSelectorIds.includes(option.id)" class="h-3.5 w-3.5" />
+                  <ChevronRight v-else class="h-3.5 w-3.5" />
+                </button>
+                <span v-else class="inline-block w-7 shrink-0" />
+                <button
+                  type="button"
+                  class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-3 py-2 text-left text-xs transition"
+                  :class="createFolderParentId === option.id ? 'bg-white text-blue-700 shadow-sm' : 'text-zinc-600 hover:bg-white'"
+                  @click="createFolderParentId = option.id"
+                >
+                  <BookOpen v-if="isKnowledgeBaseNode(option.node)" class="h-3.5 w-3.5 shrink-0 text-orange-500" />
+                  <Folder v-else class="h-3.5 w-3.5 shrink-0 text-zinc-600" />
                   <span class="truncate" :style="{ paddingLeft: `${option.depth * 10}px` }">{{ option.label }}</span>
                 </button>
               </div>
-              <p class="mt-1.5 text-[11px] leading-4 text-zinc-400">公共空间知识库提交后进入审核队列，AI 可辅助判断，最终由人工审核。</p>
             </div>
           </div>
-          <div class="flex items-center justify-end gap-2 border-t border-zinc-200 px-6 py-4">
-            <button type="button" class="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50" @click="createMode = false">取消</button>
-            <button type="button" class="rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-orange-600" aria-label="确认新建知识库" @click="createKnowledgeBase">创建</button>
-          </div>
         </div>
-      </div>
-    </Teleport>
-
-    <Teleport to="body">
-      <div v-if="createFolderMode" class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/40 px-4 py-8" @click.self="createFolderMode = false">
-        <div class="w-full max-w-sm overflow-hidden rounded-[28px] bg-white shadow-2xl ring-1 ring-zinc-200">
-          <div class="flex items-center justify-between border-b border-zinc-200 px-5 py-4">
-            <div class="text-base font-semibold text-zinc-950">新建文件夹</div>
-            <button type="button" class="rounded-full p-2 text-zinc-500 hover:bg-zinc-100" @click="createFolderMode = false"><X class="h-4 w-4" /></button>
-          </div>
-          <div class="px-5 py-4">
-            <label class="text-xs font-medium text-zinc-600">文件夹名称</label>
-            <input v-model="createFolderName" aria-label="文件夹名称" class="mt-2 w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-sm outline-none focus:border-blue-300" placeholder="例如：投标资料" />
-            <div class="mt-4">
-              <div class="text-xs font-medium text-zinc-600">选择所属文件夹</div>
-              <div class="mt-2 max-h-52 space-y-1 overflow-y-auto rounded-xl border border-zinc-200 bg-zinc-50 p-1">
-                <div
-                  v-for="option in kbFolderOptions"
-                  :key="option.id"
-                  class="flex items-center rounded-lg"
-                  :class="createFolderParentId === option.id ? 'bg-white text-blue-700 shadow-sm' : ''"
-                >
-                  <button
-                    v-if="option.node?.children?.some((c: TreeNode) => c.type === 'folder')"
-                    type="button"
-                    class="grid h-7 w-7 shrink-0 place-items-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
-                    @click.stop="toggleFolderSelectorExpand(option.id)"
-                  >
-                    <ChevronDown v-if="expandedFolderSelectorIds.includes(option.id)" class="h-3.5 w-3.5" />
-                    <ChevronRight v-else class="h-3.5 w-3.5" />
-                  </button>
-                  <span v-else class="inline-block w-7 shrink-0" />
-                  <button
-                    type="button"
-                    class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-3 py-2 text-left text-xs transition"
-                    :class="createFolderParentId === option.id ? 'bg-white text-blue-700 shadow-sm' : 'text-zinc-600 hover:bg-white'"
-                    @click="createFolderParentId = option.id"
-                  >
-                    <BookOpen v-if="isKnowledgeBaseNode(option.node)" class="h-3.5 w-3.5 shrink-0 text-orange-500" />
-                    <Folder v-else class="h-3.5 w-3.5 shrink-0 text-zinc-600" />
-                    <span class="truncate" :style="{ paddingLeft: `${option.depth * 10}px` }">{{ option.label }}</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="flex justify-end gap-2 border-t border-zinc-200 px-5 py-4">
-            <button type="button" class="rounded-xl border border-zinc-200 px-4 py-2 text-sm text-zinc-600" @click="createFolderMode = false">取消</button>
-            <button type="button" class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white" aria-label="确认新建文件夹" @click="createFolder">确认</button>
-          </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <Button variant="outline" @click="createFolderMode = false">取消</Button>
+          <Button data-testid="create-folder-confirm" @click="createFolder">确认</Button>
         </div>
-      </div>
-    </Teleport>
+      </DialogContent>
+    </Dialog>
 
     <!-- Floating upload tasks -->
     <Teleport to="body">
@@ -2773,11 +2871,11 @@ function addCandidateMember(name: string, dept: string) {
               </button>
             </div>
             <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-white">
-              <div class="h-full rounded-full" :class="task.status === 'failed' ? 'bg-rose-500' : task.status === 'reviewing' ? 'bg-amber-500' : 'bg-blue-500'" :style="{ width: `${task.progress}%` }" />
+              <div class="h-full rounded-full" :class="task.status === 'upload_failed' || task.status === 'process_failed' ? 'bg-rose-500' : task.status === 'reviewing' ? 'bg-amber-500' : 'bg-blue-500'" :style="{ width: `${task.progress}%` }" />
             </div>
             <div class="mt-2 flex items-center justify-between gap-2 text-[11px]">
-              <span class="font-medium" :class="task.status === 'success' ? 'text-emerald-600' : task.status === 'reviewing' ? 'text-amber-600' : task.status === 'failed' ? 'text-rose-600' : 'text-blue-600'">
-                {{ task.status === 'success' ? '上传成功' : task.status === 'reviewing' ? '上传成功 · 待人工审核' : task.status === 'failed' ? '上传失败' : '上传中' }}
+              <span class="font-medium" :class="task.status === 'done' ? 'text-emerald-600' : task.status === 'reviewing' ? 'text-amber-600' : task.status === 'upload_failed' || task.status === 'process_failed' ? 'text-rose-600' : 'text-blue-600'">
+                {{ task.status === 'done' ? '上传成功' : task.status === 'reviewing' ? '上传成功 · 待人工审核' : task.status === 'upload_failed' || task.status === 'process_failed' ? '上传失败' : '上传中' }}
               </span>
               <button v-if="task.doc" type="button" class="rounded-md px-2 py-1 text-blue-600 hover:bg-white" @click="openPreview(task.doc)">查看</button>
             </div>
@@ -2787,111 +2885,120 @@ function addCandidateMember(name: string, dept: string) {
     </Teleport>
 
     <!-- Upload modal -->
-    <Teleport to="body">
-      <div v-if="uploadModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/40 px-4 py-8" @click.self="uploadModalOpen = false">
-        <div class="w-full max-w-lg overflow-hidden rounded-[28px] bg-white shadow-2xl ring-1 ring-zinc-200">
-          <div class="flex items-center justify-between gap-4 border-b border-zinc-200 px-6 py-4">
+    <Dialog v-model:open="uploadModalOpen">
+      <DialogContent class="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>上传文件</DialogTitle>
+          <DialogDescription>{{ selectedKb ? `上传到 ${selectedKb.name}` : '请先选择知识库，或上传后再移动归档' }}</DialogDescription>
+        </DialogHeader>
+        <div class="space-y-4 py-2">
+          <label class="flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-4 py-6 text-center transition hover:border-blue-300 hover:bg-blue-50/50">
+            <Upload class="h-8 w-8 text-blue-500" />
+            <span class="mt-3 text-sm font-medium text-zinc-800">选择文件</span>
+            <span class="mt-1 text-xs text-zinc-400">支持 PDF、Word、Excel、PPT、TXT、PNG、JPG，单个文件 20MB 内</span>
+            <input class="hidden" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg" @change="handleUploadFiles" />
+          </label>
+          <div v-if="uploadFileNames.length" class="space-y-1 rounded-lg border border-zinc-200 bg-white p-2">
+            <div v-for="name in uploadFileNames" :key="name" class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-zinc-600">
+              <File class="h-3.5 w-3.5 text-zinc-400" />
+              <span class="min-w-0 flex-1 truncate">{{ name }}</span>
+            </div>
+          </div>
+          <!-- 标签选择 -->
+          <div class="space-y-3">
             <div>
-              <div class="text-base font-semibold text-zinc-950">上传文件</div>
-              <p class="mt-1 text-xs text-zinc-500">{{ selectedKb ? `上传到 ${selectedKb.name}` : '请先选择知识库，或上传后再移动归档' }}</p>
-            </div>
-            <button type="button" class="rounded-full p-2 text-zinc-500 hover:bg-zinc-100" @click="uploadModalOpen = false"><X class="h-4 w-4" /></button>
-          </div>
-          <div class="space-y-4 px-6 py-5">
-            <label class="flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 px-4 py-6 text-center transition hover:border-blue-300 hover:bg-blue-50/50">
-              <Upload class="h-8 w-8 text-blue-500" />
-              <span class="mt-3 text-sm font-medium text-zinc-800">选择文件</span>
-              <span class="mt-1 text-xs text-zinc-400">支持 PDF、Word、Excel、PPT、TXT、PNG、JPG，单个文件 20MB 内</span>
-              <input class="hidden" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg" @change="handleUploadFiles" />
-            </label>
-            <div v-if="uploadFileNames.length" class="space-y-1 rounded-xl border border-zinc-200 bg-white p-2">
-              <div v-for="name in uploadFileNames" :key="name" class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-zinc-600">
-                <File class="h-3.5 w-3.5 text-zinc-400" />
-                <span class="min-w-0 flex-1 truncate">{{ name }}</span>
+              <div class="mb-2 flex items-center justify-between">
+                <span class="text-xs font-medium text-zinc-600">标签</span>
+                <button type="button" class="text-xs text-blue-500 hover:text-blue-700" @click="uploadShowTagPicker = !uploadShowTagPicker">{{ uploadShowTagPicker ? '收起' : '+ 自定义标签' }}</button>
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                <button v-for="tag in predefinedTags" :key="tag.name" type="button" class="rounded-md border px-2 py-0.5 text-[11px] font-medium transition" :class="uploadTags.includes(tag.name) ? tag.color + ' border-current' : 'border-zinc-200 text-zinc-400 hover:border-zinc-300'" @click="toggleUploadTag(tag.name)">{{ tag.name }}</button>
+              </div>
+              <div v-if="uploadShowTagPicker" class="mt-2 flex items-center gap-2">
+                <Input v-model="uploadCustomTagName" placeholder="标签名称" class="flex-1" @keydown.enter.prevent="addCustomTag" />
+                <input v-model="uploadCustomTagColor" type="color" class="h-8 w-8 cursor-pointer rounded border border-zinc-200" />
+                <Button variant="secondary" size="sm" @click="addCustomTag">添加</Button>
               </div>
             </div>
-            <!-- 标签选择 -->
-            <div class="space-y-3">
-              <div>
-                <div class="mb-2 flex items-center justify-between">
-                  <span class="text-xs font-medium text-zinc-600">标签</span>
-                  <button type="button" class="text-xs text-blue-500 hover:text-blue-700" @click="uploadShowTagPicker = !uploadShowTagPicker">{{ uploadShowTagPicker ? '收起' : '+ 自定义标签' }}</button>
-                </div>
-                <div class="flex flex-wrap gap-1.5">
-                  <button v-for="tag in predefinedTags" :key="tag.name" type="button" class="rounded-md border px-2 py-0.5 text-[11px] font-medium transition" :class="uploadTags.includes(tag.name) ? tag.color + ' border-current' : 'border-zinc-200 text-zinc-400 hover:border-zinc-300'" @click="toggleUploadTag(tag.name)">{{ tag.name }}</button>
-                </div>
-                <div v-if="uploadShowTagPicker" class="mt-2 flex items-center gap-2">
-                  <input v-model="uploadCustomTagName" type="text" placeholder="标签名称" class="flex-1 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs outline-none focus:border-blue-300" @keydown.enter.prevent="addCustomTag" />
-                  <input v-model="uploadCustomTagColor" type="color" class="h-8 w-8 cursor-pointer rounded border border-zinc-200" />
-                  <button type="button" class="rounded-lg bg-zinc-100 px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-200" @click="addCustomTag">添加</button>
-                </div>
-              </div>
-              <div>
+            <div>
+              <div class="mb-2 flex items-center justify-between">
                 <span class="text-xs font-medium text-zinc-600">密级</span>
-                <select v-model="uploadSecurityLevel" class="ml-2 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs outline-none focus:border-blue-300">
-                  <option value="公开">公开</option>
-                  <option value="内部">内部</option>
-                  <option value="秘密">秘密</option>
-                  <option value="机密">机密</option>
-                </select>
+                <span class="text-[10px] text-zinc-400">标注文件敏感程度</span>
               </div>
+              <div class="flex gap-2">
+                <button v-for="sl in SECURITY_LEVELS" :key="sl.value" type="button"
+                  class="flex-1 rounded-md border px-3 py-1.5 text-xs font-medium transition"
+                  :class="uploadSecurityLevel === sl.value ? sl.activeClass : 'border-zinc-200 text-zinc-400 hover:border-zinc-300 hover:text-zinc-600'"
+                  :title="sl.bizDesc"
+                  @click="uploadSecurityLevel = sl.value">
+                  {{ sl.label }}
+                </button>
+              </div>
+              <div v-if="uploadSecurityLevel === '部门'" class="mt-2 rounded-xl border border-zinc-200 bg-zinc-50 p-2">
+                <div class="mb-1.5 text-[11px] font-medium text-zinc-600">选择部门</div>
+                <div class="max-h-32 space-y-1 overflow-y-auto">
+                  <label v-for="dept in orgTree.filter(n => n.type === 'dept')" :key="dept.id" class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-white">
+                    <input type="checkbox" :checked="uploadAllowedDepts.some(d => d.id === dept.id)" @change="toggleUploadDept(dept)" class="rounded border-zinc-300 text-blue-600" />
+                    <span class="text-zinc-700">{{ dept.name }}</span>
+                    <span class="ml-auto text-zinc-400">({{ dept.children?.length ?? 0  }}人)</span>
+                  </label>
+                </div>
+              </div>
+              <p v-if="uploadSecurityLevel === '部门' && !uploadAllowedDepts.length" class="mt-1 text-[10px] text-amber-500">请至少选择一个部门，否则文件默认为"全员"可见</p>
             </div>
           </div>
-          <div class="flex items-center justify-end gap-2 border-t border-zinc-200 px-6 py-4">
-            <button type="button" class="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50" @click="uploadModalOpen = false">取消</button>
-            <button type="button" class="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700" aria-label="确认上传文件" @click="confirmUpload">确认上传</button>
+          <div class="flex items-center justify-end gap-2 pt-2">
+            <Button variant="outline" @click="uploadModalOpen = false">取消</Button>
+            <Button aria-label="确认上传文件" @click="confirmUpload">确认上传</Button>
           </div>
         </div>
-      </div>
-    </Teleport>
+      </DialogContent>
+    </Dialog>
 
     <!-- Move/Share modal -->
-    <Teleport to="body">
-      <div v-if="fileActionModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/40 px-4 py-8" @click.self="cancelFileAction">
-        <div class="w-full max-w-lg overflow-hidden rounded-[32px] bg-white shadow-2xl ring-1 ring-zinc-200">
-          <div class="flex items-center justify-between gap-4 border-b border-zinc-200 px-6 py-4">
-            <div><div class="text-base font-semibold text-zinc-950">移动文件到知识库</div><p class="mt-1 text-xs text-zinc-500">选择目标知识库</p></div>
-            <button type="button" class="rounded-full p-2 text-zinc-500 hover:bg-zinc-100" @click="cancelFileAction"><X class="h-4 w-4" /></button>
-          </div>
-          <div class="p-4"><div class="relative"><Search class="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-300" /><input v-model="targetSearch" type="text" placeholder="搜索目标知识库..." class="w-full rounded-xl border border-zinc-200 py-2 pl-8 pr-3 text-sm text-zinc-700 placeholder:text-zinc-300 focus:border-orange-200 focus:outline-none" /></div></div>
-          <div class="max-h-64 overflow-y-auto px-4 pb-4 space-y-1">
-            <button v-for="kb in targetKbs" :key="kb.id" class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition" :class="targetKbId === kb.id ? 'bg-orange-50 border border-orange-200' : 'hover:bg-zinc-50 border border-transparent'" @click="targetKbId = kb.id">
-              <Database class="h-4 w-4 text-violet-500 shrink-0" />
-              <div class="min-w-0 flex-1"><div class="text-sm font-medium text-zinc-800">{{ kb.name }}</div><div class="text-[11px] text-zinc-400">{{ kb.space === 'public' ? '公共空间' : '个人空间' }} · {{ kb.docs }} 文档</div></div>
-              <CheckSquare v-if="targetKbId === kb.id" class="h-4 w-4 text-orange-500 shrink-0" />
-            </button>
-          </div>
-          <div class="flex items-center justify-end gap-2 border-t border-zinc-200 px-6 py-4">
-            <button type="button" class="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50" @click="cancelFileAction">取消</button>
-            <button type="button" class="rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-50" :disabled="!targetKbId" @click="confirmFileAction">确认</button>
-          </div>
+    <Dialog v-model:open="fileActionModalOpen">
+      <DialogContent class="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>移动文件到知识库</DialogTitle>
+          <DialogDescription>选择目标知识库</DialogDescription>
+        </DialogHeader>
+        <div class="relative mb-2">
+          <Search class="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-300" />
+          <Input v-model="targetSearch" placeholder="搜索目标知识库..." class="pl-8" />
         </div>
-      </div>
-        </Teleport>
-
-    <!-- 二次确认弹窗 -->
-    <Teleport to="body">
-      <div v-if="confirmModal.show" class="fixed inset-0 z-[100] flex items-center justify-center bg-zinc-950/40 px-4 py-8" @click.self="confirmModal.show = false">
-        <div class="w-full max-w-sm rounded-2xl bg-white shadow-xl">
-          <div class="px-6 pt-6">
-            <div class="mb-1 flex items-center gap-2">
-              <AlertTriangle v-if="confirmModal.danger" class="h-5 w-5 text-red-500" />
-              <h3 class="text-base font-semibold text-zinc-900">{{ confirmModal.title }}</h3>
-            </div>
-            <p class="mt-2 text-sm leading-relaxed text-zinc-600">{{ confirmModal.message }}</p>
-          </div>
-          <div class="flex items-center justify-end gap-2 border-t border-zinc-100 px-6 py-4 mt-5">
-            <button type="button" class="rounded-xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50" @click="confirmModal.show = false">取消</button>
-            <button type="button" :class="confirmModal.danger ? 'rounded-xl bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600' : 'rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600'" @click="confirmModal.onConfirm(); confirmModal.show = false">{{ confirmModal.confirmText ?? '确认' }}</button>
-          </div>
+        <div class="max-h-64 overflow-y-auto space-y-1">
+          <button v-for="kb in targetKbs" :key="kb.id" type="button" class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition" :class="targetKbId === kb.id ? 'bg-orange-50 border border-orange-200' : 'hover:bg-zinc-50 border border-transparent'" @click="targetKbId = kb.id">
+            <Database class="h-4 w-4 text-violet-500 shrink-0" />
+            <div class="min-w-0 flex-1"><div class="text-sm font-medium text-zinc-800">{{ kb.name }}</div><div class="text-[11px] text-zinc-400">{{ kb.space === 'public' ? '公共空间' : '个人空间' }} · {{ kb.docs }} 文档</div></div>
+            <CheckSquare v-if="targetKbId === kb.id" class="h-4 w-4 text-orange-500 shrink-0" />
+          </button>
         </div>
-      </div>
-    </Teleport>
+        <div class="flex justify-end gap-2 pt-2">
+          <Button variant="outline" @click="cancelFileAction">取消</Button>
+          <Button :disabled="!targetKbId" @click="confirmFileAction">确认</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
 
-    <!-- 知识库设置弹窗（重构后：像素级还原原型） -->
-    <Teleport to="body">
-      <div v-if="settingsKbId" class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/40 px-4 py-8" @click.self="closeKbSettings">
-        <div class="flex h-[720px] w-[1430px] overflow-hidden rounded-[28px] bg-white shadow-2xl ring-1 ring-zinc-200">
+    <!-- Confirm modal -->
+    <Dialog v-model:open="confirmModal.show">
+      <DialogContent class="max-w-sm">
+        <div class="flex items-center gap-2 mb-2">
+          <AlertTriangle v-if="confirmModal.danger" class="h-5 w-5 text-red-500" />
+          <DialogTitle>{{ confirmModal.title }}</DialogTitle>
+        </div>
+        <p class="text-sm leading-relaxed text-zinc-600">{{ confirmModal.message }}</p>
+        <div class="flex justify-end gap-2 pt-4">
+          <Button variant="outline" @click="confirmModal.show = false">取消</Button>
+          <Button :variant="confirmModal.danger ? 'destructive' : 'default'" @click="confirmModal.onConfirm(); confirmModal.show = false">{{ confirmModal.confirmText ?? '确认' }}</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    <!-- 知识库设置弹窗 -->
+    <Dialog v-model:open="settingsKbIdBool">
+      <DialogContent class="flex h-[720px] w-[1430px] max-w-[95vw] overflow-hidden rounded-[28px] p-0" aria-describedby="settings-description">
+        <div class="flex size-full">
           <!-- 左侧：知识库基础信息 -->
           <div class="flex w-[310px] shrink-0 flex-col border-r border-zinc-100 bg-zinc-50/40">
             <div class="flex flex-col items-center px-5 pt-6 pb-4">
@@ -2922,7 +3029,18 @@ function addCandidateMember(name: string, dept: string) {
               </div>
               <div class="flex items-start justify-between text-xs">
                 <span class="shrink-0 text-zinc-400">所处空间</span>
-                <span class="text-right text-zinc-700">{{ spaceNameMap[activeSettingsKb?.space ?? ''] ?? activeSettingsKb?.space ?? '—' }}</span>
+                <span class="text-right text-zinc-700">{{ activeSettingsKb?.space === 'public' ? '公共空间' : activeSettingsKb?.space === 'personal' ? '个人空间' : '—' }}</span>
+              </div>
+              <div class="border-t border-zinc-200 pt-3 mt-3">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <div class="text-xs font-medium text-zinc-700">全员可访问</div>
+                    <div class="text-[10px] text-zinc-400">允许团队所有成员访问</div>
+                  </div>
+                  <button type="button" role="switch" :aria-checked="kbVisibilityOpen" class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2" :class="kbVisibilityOpen ? 'bg-blue-600' : 'bg-zinc-200'" @click="kbVisibilityOpen = !kbVisibilityOpen; showFileActionToast(kbVisibilityOpen ? '已允许全员访问' : '已限制访问范围')">
+                    <span class="pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition" :class="kbVisibilityOpen ? 'translate-x-4' : 'translate-x-0'"></span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -2972,6 +3090,7 @@ function addCandidateMember(name: string, dept: string) {
                     <tr class="border-b border-zinc-100">
                       <th class="px-3 py-2 font-medium">成员</th>
                       <th class="px-3 py-2 font-medium">部门</th>
+                      <th class="px-3 py-2 font-medium">安全许可</th>
                       <th class="px-3 py-2 font-medium">权限</th>
                       <th class="px-3 py-2 font-medium">加入时间</th>
                       <th class="px-3 py-2 font-medium text-right">操作</th>
@@ -2990,8 +3109,13 @@ function addCandidateMember(name: string, dept: string) {
                         <div class="text-[10px] text-zinc-400">{{ member.scope === '个人' ? '直接授权' : member.scope === '部门' ? '按部门授权' : member.scope }}</div>
                       </td>
                       <td class="px-3 py-2.5">
+                        <select :value="member.securityClearance ?? getDefaultClearance(member.role)" class="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100" @change="updateMemberClearance(member, ($event.target as HTMLSelectElement).value as SecurityLevel)">
+                          <option v-for="sl in SECURITY_LEVELS" :key="sl.value" :value="sl.value">{{ sl.label }}</option>
+                        </select>
+                      </td>
+                      <td class="px-3 py-2.5">
                         <select :value="member.role" class="rounded-lg border border-zinc-200 px-2 py-1 text-xs outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100" @change="updatePermissionRole(member, ($event.target as HTMLSelectElement).value as PermissionRole)">
-                          <option value="OWNER">所有者</option><option value="MANAGER">管理员</option><option value="EDITOR">编辑者</option><option value="DOWNLOADER">下载者</option><option value="READER">查看者</option>
+                          <option value="OWNER">所有者</option><option value="MANAGER">管理员</option><option value="EDITOR">编辑者</option><option value="VIEWER">查看者</option>
                         </select>
                       </td>
                       <td class="px-3 py-2.5 text-xs text-zinc-500">{{ member.joinedAt?.slice(0, 10) }}</td>
@@ -3045,18 +3169,49 @@ function addCandidateMember(name: string, dept: string) {
             </template>
 
             <!-- 文档管理 -->
-            <template v-else>
-              <div class="flex-1 p-6 text-center text-xs text-zinc-400">文档管理</div>
-              <!-- 底部：取消 + 保存设置 -->
-              <div class="flex items-center justify-end gap-3 border-t border-zinc-100 bg-zinc-50/60 px-6 py-3">
-                <button type="button" class="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-50" @click="closeKbSettings">取消</button>
-                <button type="button" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700">保存设置</button>
+            <template v-else-if="settingsTab === 'documents'">
+              <div class="flex flex-1 flex-col overflow-hidden">
+                <div class="flex items-center gap-3 border-b border-zinc-100 px-6 py-3">
+                  <div class="relative flex-1">
+                    <Search class="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-300" />
+                    <input v-model="fileSettingsDocSearch" type="text" placeholder="搜索文件名称" class="h-8 w-full rounded-lg border border-zinc-200 pl-8 pr-3 text-xs outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100" />
+                  </div>
+                  <select v-model="docSettingsSecurityLevelFilter" class="h-8 rounded-lg border border-zinc-200 px-2 text-xs outline-none focus:border-blue-300">
+                    <option value="">全部密级</option>
+                    <option v-for="sl in SECURITY_LEVELS" :key="sl.value" :value="sl.value">{{ sl.label }}</option>
+                  </select>
+                  <button type="button" class="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50" @click="selectedFileIds.length && showFileActionToast('批量操作：改密级/标签')">批量操作</button>
+                </div>
+                <div class="flex-1 overflow-auto px-6 py-3">
+                  <table class="w-full text-left text-sm">
+                    <thead class="sticky top-0 z-[1] bg-white text-[11px] uppercase tracking-wide text-zinc-400">
+                      <tr class="border-b border-zinc-100">
+                        <th class="px-3 py-2 font-medium w-8"><button class="text-zinc-400 hover:text-zinc-600" @click="selectAllDocsInSettings"><Square class="h-4 w-4" /></button></th>
+                        <th class="px-3 py-2 font-medium">文件名</th>
+                        <th class="px-3 py-2 font-medium">密级</th>
+                        <th class="px-3 py-2 font-medium">标签</th>
+                        <th class="px-3 py-2 font-medium">更新时间</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-100">
+                      <tr v-for="doc in docSettingsFilteredDocs" :key="doc.name" class="hover:bg-zinc-50 transition" :class="{ 'opacity-40': !isDocAccessible(doc) }">
+                        <td class="px-3 py-2.5"><button class="text-zinc-400 hover:text-blue-500" @click.stop="toggleFileSelect(doc.name)"><Square v-if="!selectedFileIds.includes(doc.name)" class="h-4 w-4" /><CheckSquare v-else class="h-4 w-4 text-blue-500" /></button></td>
+                        <td class="px-3 py-2.5"><div class="flex items-center gap-2"><component :is="getFileIcon(doc.format)" class="h-4 w-4" :class="getIconColor(doc.format)" /><span class="truncate text-sm font-medium text-zinc-900">{{ doc.name }}</span></div></td>
+                        <td class="px-3 py-2.5"><span class="rounded-full px-1.5 py-0.5 text-[10px] font-medium" :class="getDocSecurityClass(doc.securityLevel)">{{ getDocSecurityLabel(doc.securityLevel) }}</span></td>
+                        <td class="px-3 py-2.5"><div class="flex gap-1"><span v-for="tag in doc.tags" :key="tag" class="rounded px-1 py-0.5 text-[10px] font-medium" :class="getTagStyle(tag)">{{ tag }}</span></div></td>
+                        <td class="px-3 py-2.5 text-xs text-zinc-400">{{ doc.updatedAt }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <div v-if="docSettingsFilteredDocs.length === 0" class="py-10 text-center text-xs text-zinc-400">暂未上传文件，或筛选条件无匹配</div>
+                </div>
+                <div class="border-t border-zinc-100 px-6 py-2 text-[11px] text-zinc-400">密级分布：<span v-for="sl in SECURITY_LEVELS" :key="sl.value" class="mr-3">{{ sl.label }} {{ docSettingsCountByLevel[sl.value] ?? 0 }}</span></div>
               </div>
             </template>
           </div>
         </div>
-      </div>
-    </Teleport>
+      </DialogContent>
+    </Dialog>
 
     <!-- 添加成员弹窗（覆盖在知识库设置弹窗之上） -->
     <Teleport to="body">
@@ -3100,7 +3255,7 @@ function addCandidateMember(name: string, dept: string) {
               <div class="flex items-center gap-1.5 text-xs">
                 <label class="text-zinc-500">统一角色</label>
                 <select v-model="settingsAddMemberRole" class="rounded-md border border-zinc-200 px-2 py-1 text-xs">
-                  <option value="EDITOR">编辑者</option><option value="MANAGER">管理员</option><option value="DOWNLOADER">下载者</option><option value="READER">查看者</option><option value="OWNER">所有者</option>
+                  <option value="EDITOR">编辑者</option><option value="MANAGER">管理员</option><option value="VIEWER">查看者</option><option value="OWNER">所有者</option>
                 </select>
               </div>
               <div class="flex items-center gap-2">
@@ -3207,6 +3362,7 @@ function addCandidateMember(name: string, dept: string) {
                     <tr class="border-b border-zinc-100">
                       <th class="px-3 py-2 font-medium">成员</th>
                       <th class="px-3 py-2 font-medium">部门</th>
+                      <th class="px-3 py-2 font-medium">安全许可</th>
                       <th class="px-3 py-2 font-medium">权限</th>
                       <th class="px-3 py-2 font-medium">加入时间</th>
                       <th class="px-3 py-2 font-medium text-right">操作</th>
@@ -3225,8 +3381,13 @@ function addCandidateMember(name: string, dept: string) {
                         <div class="text-[10px] text-zinc-400">{{ member.scope === '个人' ? '直接授权' : member.scope === '部门' ? '按部门授权' : member.scope }}</div>
                       </td>
                       <td class="px-3 py-2.5">
+                        <select :value="member.securityClearance ?? getDefaultClearance(member.role)" class="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100" @change="updateFileMemberClearance(member, ($event.target as HTMLSelectElement).value as SecurityLevel)">
+                          <option v-for="sl in SECURITY_LEVELS" :key="sl.value" :value="sl.value">{{ sl.label }}</option>
+                        </select>
+                      </td>
+                      <td class="px-3 py-2.5">
                         <select :value="member.role" class="rounded-lg border border-zinc-200 px-2 py-1 text-xs outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100" @change="updateFilePermissionRole(member, ($event.target as HTMLSelectElement).value as PermissionRole)">
-                          <option value="OWNER">所有者</option><option value="MANAGER">管理员</option><option value="EDITOR">编辑者</option><option value="DOWNLOADER">下载者</option><option value="READER">查看者</option>
+                          <option value="OWNER">所有者</option><option value="MANAGER">管理员</option><option value="EDITOR">编辑者</option><option value="VIEWER">查看者</option>
                         </select>
                       </td>
                       <td class="px-3 py-2.5 text-xs text-zinc-500">{{ member.joinedAt?.slice(0, 10) }}</td>
@@ -3274,9 +3435,34 @@ function addCandidateMember(name: string, dept: string) {
               </div>
             </template>
 
-            <!-- 文档管理 -->
-            <template v-else>
-              <div class="flex-1 p-6 text-center text-xs text-zinc-400">文档管理</div>
+            <!-- 文档管理（文件级别：展示版本/变更历史） -->
+            <template v-else-if="fileSettingsTab === 'documents'">
+              <div class="flex flex-1 flex-col">
+                <div class="flex-1 overflow-auto px-6 py-5">
+                  <div class="mb-5 space-y-4">
+                    <div class="flex items-center justify-between border-b border-zinc-100 pb-2">
+                      <span class="text-xs font-semibold text-zinc-700">文件信息</span>
+                    </div>
+                    <div class="grid grid-cols-[100px_1fr] gap-2 text-xs">
+                      <span class="text-zinc-400">文件格式</span><span class="text-zinc-700">{{ fileSettingsDoc?.format ?? '—' }}</span>
+                      <span class="text-zinc-400">索引状态</span><span class="text-zinc-700">{{ fileSettingsDoc?.status ?? '—' }}</span>
+                      <span class="text-zinc-400">密级</span><span class="text-zinc-700">{{ fileSettingsDoc?.securityLevel ?? '—' }}</span>
+                      <span class="text-zinc-400">上传者</span><span class="text-zinc-700">{{ fileSettingsDoc?.uploadedBy ?? '—' }}</span>
+                      <span class="text-zinc-400">更新时间</span><span class="text-zinc-700">{{ fileSettingsDoc?.updatedAt ?? '—' }}</span>
+                      <span class="text-zinc-400">标签</span><span class="flex flex-wrap gap-1"> <span v-for="tag in fileSettingsDoc?.tags" :key="tag" class="rounded px-1 py-0.5 text-[10px] font-medium" :class="getTagStyle(tag)">{{ tag }}</span> <span v-if="!fileSettingsDoc?.tags?.length" class="text-zinc-400">—</span></span>
+                    </div>
+                  </div>
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between border-b border-zinc-100 pb-2">
+                      <span class="text-xs font-semibold text-zinc-700">版本历史</span>
+                    </div>
+                    <div class="space-y-2 text-xs">
+                      <div class="flex items-center gap-3 rounded-lg border border-zinc-100 px-3 py-2"><span class="font-medium text-zinc-800">v1</span><span class="text-zinc-400">当前版本</span><span class="ml-auto text-zinc-400">{{ fileSettingsDoc?.updatedAt ?? '—' }}</span></div>
+                      <div class="text-center text-zinc-400 py-2">仅保留当前版本</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
               <div class="flex items-center justify-end gap-3 border-t border-zinc-100 bg-zinc-50/60 px-6 py-3">
                 <button type="button" class="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-50" @click="closeFileSettings">取消</button>
                 <button type="button" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700" @click="closeFileSettings">保存设置</button>
@@ -3328,7 +3514,7 @@ function addCandidateMember(name: string, dept: string) {
             <div class="flex items-center justify-between gap-2 border-t border-zinc-100 bg-zinc-50 px-4 py-3">
               <div class="flex items-center gap-1.5 text-xs">
                 <label class="text-zinc-500">统一角色</label>
-                <select v-model="fileSettingsAddMemberRole" class="rounded-md border border-zinc-200 px-2 py-1 text-xs"><option value="EDITOR">编辑者</option><option value="MANAGER">管理员</option><option value="DOWNLOADER">下载者</option><option value="READER">查看者</option><option value="OWNER">所有者</option></select>
+                <select v-model="fileSettingsAddMemberRole" class="rounded-md border border-zinc-200 px-2 py-1 text-xs"><option value="EDITOR">编辑者</option><option value="MANAGER">管理员</option><option value="VIEWER">查看者</option><option value="OWNER">所有者</option></select>
               </div>
               <div class="flex items-center gap-2">
                 <button type="button" class="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50" @click="fileSettingsAddMemberOpen = false">取消</button>
