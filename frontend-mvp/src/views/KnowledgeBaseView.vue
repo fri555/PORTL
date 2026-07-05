@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import {
   AlertTriangle, ArrowUp, BookOpen, CheckCircle2, CheckSquare, ChevronDown, ChevronLeft, ChevronRight, ChevronsRight, Copy, Database, Download, Eye, File,
   FileSpreadsheet, FileText, Folder, FolderKanban, GripVertical, LayoutGrid, List, MessageSquareText, MoreVertical, Pencil, Quote, RotateCw,
-  Move, Plus, Search, Square, Star, Trash2, Upload, X,
+  Calendar, History, Move, Plus, Search, Settings, Square, Star, ShieldCheck, Trash2, Upload, X,
 } from 'lucide-vue-next'
 
 type SpaceKey = 'public' | 'personal'
@@ -1221,6 +1221,23 @@ const contextDoc = computed(() => contextMenu.value?.type === 'doc'
 
 
 
+// ========== 知识库行权限徽标 ==========
+function getPermissionBadge(kb: KnowledgeBaseItem): { text: string; cls: string } | null {
+  if (!kb) return null
+  const my = (permissionMembers[kb.id] ?? []).find(m => m.name === '当前用户' || m.name === '我')
+  if (my) {
+    const map: Record<string, { text: string; cls: string }> = {
+      OWNER: { text: '所有者', cls: 'border-indigo-200 bg-indigo-50 text-indigo-700' },
+      MANAGER: { text: '管理员', cls: 'border-blue-200 bg-blue-50 text-blue-700' },
+      EDITOR: { text: '可编辑', cls: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
+      DOWNLOADER: { text: '可下载', cls: 'border-amber-200 bg-amber-50 text-amber-700' },
+      READER: { text: '只读', cls: 'border-zinc-200 bg-zinc-50 text-zinc-500' },
+    }
+    return map[my.role] ?? null
+  }
+  return kb.canEdit ? { text: '可编辑', cls: 'border-emerald-200 bg-emerald-50 text-emerald-700' } : { text: '只读', cls: 'border-zinc-200 bg-zinc-50 text-zinc-500' }
+}
+
 // ========== 权限管理 ==========
 const settingsKbId = ref('')
 const permissionMembers = reactive<Record<string, PermissionEntry[]>>({})
@@ -1228,12 +1245,21 @@ const settingsAddMemberOpen = ref(false)
 const settingsAddMemberSearch = ref('')
 const settingsTab = ref<'members' | 'documents' | 'audit'>('members')
 
+function ensureDefaultPermissions(kbId: string) {
+  if (permissionMembers[kbId] && permissionMembers[kbId].length) return
+  permissionMembers[kbId] = [
+    { id: kbId + '-sys-owner', name: '系统管理员', scope: '系统', department: '系统', role: 'OWNER', joinedAt: '2026-01-01' },
+    { id: kbId + '-sys-me', name: '当前用户', scope: '个人', department: '技术部', role: kbId.startsWith('kb-personal') ? 'OWNER' : (kbId === 'kb-public-5' ? 'MANAGER' : kbId === 'kb-public-1' ? 'EDITOR' : kbId === 'kb-public-7' ? 'DOWNLOADER' : 'READER'), joinedAt: '2026-06-01' },
+  ]
+}
+
 const activeSettingsKb = computed(() => [...knowledgeBases.public, ...knowledgeBases.personal].find(kb => kb.id === settingsKbId.value))
 const activeSettingsMembers = computed(() => settingsKbId.value ? (permissionMembers[settingsKbId.value] ?? []) : [])
 
 function openKbSettings(kb: KnowledgeBaseItem) {
   settingsKbId.value = kb.id
   settingsTab.value = 'members'
+  ensureDefaultPermissions(kb.id)
 }
 function closeKbSettings() { settingsKbId.value = '' }
 
@@ -1296,8 +1322,24 @@ function updatePermissionRole(member: PermissionEntry, newRole: PermissionRole) 
 
 // ========== 回收站 ==========
 const activeKnowledgeTab = ref<'assets' | 'trash'>('assets')
-const recycleItems = ref<RecycleItem[]>([])
+const recycleItems = ref<RecycleItem[]>([
+  { id: 'recycle-seed-1', type: 'folder', name: 'Q3 已关闭品牌活动', space: 'public', deletedAt: new Date(Date.now() - 1000*60*60*24*2).toISOString(), detail: '公共空间 · 品牌活动资料库 · 包含 3 项' },
+  { id: 'recycle-seed-2', type: 'file', name: '2025离职面谈记录.docx', space: 'public', deletedAt: new Date(Date.now() - 1000*60*60*24*12).toISOString(), detail: '公共空间 · 人力培训知识库 · 删除人：刘秘书' },
+  { id: 'recycle-seed-3', type: 'file', name: '临时方案草稿.md', space: 'personal', deletedAt: new Date(Date.now() - 1000*60*60*24*25).toISOString(), detail: '个人空间 · 临时方案草稿 · 删除人：您自己' },
+  { id: 'recycle-seed-4', type: 'file', name: '供应商报价(旧版).xlsx', space: 'personal', deletedAt: new Date(Date.now() - 1000*60*60*24*35).toISOString(), detail: '个人空间 · 个人资料 · 删除人：您自己' },
+])
 const recycleSearch = ref('')
+const recycleDateFrom = ref('')
+const recycleDateTo = ref('')
+
+function recycleDaysLeft(item: RecycleItem): number | null {
+  if (!item.deletedAt) return null
+  const elapsed = (Date.now() - new Date(item.deletedAt).getTime()) / (1000*60*60*24)
+  return Math.max(0, Math.ceil(30 - elapsed))
+}
+function recycleIsExpired(item: RecycleItem): boolean {
+  return recycleDaysLeft(item) === 0
+}
 function autoPurgeRecycle() {
   const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
   recycleItems.value = recycleItems.value.filter(item => {
@@ -1325,9 +1367,19 @@ function purgeRecycleItem(item: RecycleItem) {
 }
 const filteredRecycleItems = computed(() => {
   const q = recycleSearch.value.trim().toLowerCase()
-  return q ? recycleItems.value.filter(r => r.name.toLowerCase().includes(q)) : recycleItems.value
+  const from = recycleDateFrom.value ? new Date(recycleDateFrom.value).getTime() : null
+  const to = recycleDateTo.value ? new Date(recycleDateTo.value).getTime() + 1000*60*60*24 : null
+  return recycleItems.value.filter(r => {
+    if (q && !r.name.toLowerCase().includes(q) && !r.detail.toLowerCase().includes(q)) return false
+    const t = r.deletedAt ? new Date(r.deletedAt).getTime() : 0
+    if (from && t < from) return false
+    if (to && t > to) return false
+    return true
+  })
 })
 
+// 切到回收站时触发清理
+watch(activeKnowledgeTab, (v) => { if (v === 'trash') autoPurgeRecycle() })
 // Adding qaOpen close to switchSpace (function already exists above)
 
 onBeforeUnmount(() => {
@@ -1351,6 +1403,60 @@ const filteredCandidates = computed(() => {
   if (!q) return mockMemberCandidates
   return mockMemberCandidates.filter(c => c.name.includes(q) || c.dept.includes(q))
 })
+// ===== 新版添加成员 =====
+const settingsMemberFilter = ref('')
+const settingsAddMemberDept = ref('全部')
+const settingsAddMemberSelected = ref<{ name: string; dept: string }[]>([])
+const settingsAddMemberRole = ref<PermissionRole>('EDITOR')
+
+const presetDepartments = ['全部', '技术部', '品牌营销部', '设计部', '产品部', '财务部', '人力中心', '行政部', '商品部']
+
+const filteredCandidatesForDept = computed(() => {
+  const q = settingsAddMemberSearch.value.trim().toLowerCase()
+  const dept = settingsAddMemberDept.value
+  return mockMemberCandidates.filter(c => {
+    const matchDept = dept === '全部' || c.dept === dept
+    const matchName = q === '' || c.name.toLowerCase().includes(q) || c.dept.toLowerCase().includes(q)
+    return matchDept && matchName
+  })
+})
+
+const filteredActiveSettingsMembers = computed(() => {
+  const q = settingsMemberFilter.value.trim().toLowerCase()
+  const all = activeSettingsMembers.value
+  if (!q) return all
+  return all.filter(m => m.name.toLowerCase().includes(q) || m.department.toLowerCase().includes(q) || m.scope.toLowerCase().includes(q))
+})
+
+function toggleAddCandidate(c: { name: string; dept: string }) {
+  const idx = settingsAddMemberSelected.value.findIndex(s => s.name === c.name)
+  if (idx >= 0) settingsAddMemberSelected.value.splice(idx, 1)
+  else settingsAddMemberSelected.value.push({ ...c })
+}
+
+function confirmAddMembers() {
+  if (!settingsKbId.value) return
+  if (!permissionMembers[settingsKbId.value]) permissionMembers[settingsKbId.value] = []
+  let added = 0
+  settingsAddMemberSelected.value.forEach(c => {
+    const exists = permissionMembers[settingsKbId.value].some(m => m.name === c.name)
+    if (exists) return
+    permissionMembers[settingsKbId.value].push({
+      id: settingsKbId.value + '-' + c.name + '-' + Date.now(),
+      name: c.name,
+      scope: '个人',
+      department: c.dept,
+      role: settingsAddMemberRole.value,
+      joinedAt: new Date().toISOString().slice(0, 10),
+    })
+    added++
+  })
+  if (added > 0) showFileActionToast('成功添加 ' + added + ' 名成员')
+  settingsAddMemberSelected.value = []
+  settingsAddMemberRole.value = 'EDITOR'
+  settingsAddMemberOpen.value = false
+}
+
 function addCandidateMember(name: string, dept: string) {
   if (!settingsKbId.value) return
   const exists = (permissionMembers[settingsKbId.value] ?? []).some(m => m.name === name)
@@ -1415,6 +1521,11 @@ function addCandidateMember(name: string, dept: string) {
         <button type="button" class="mt-1 flex h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-sm font-medium text-zinc-700 transition hover:bg-zinc-50" aria-label="新建文件夹" @click="openCreateFolderModal">
           <Folder class="h-4 w-4 text-zinc-500" />
           <span>新建文件夹</span>
+        </button>
+        <button type="button" class="mt-2 flex h-9 w-full items-center gap-2 rounded-lg bg-zinc-50 px-2 text-left text-sm font-medium text-zinc-700 transition hover:bg-zinc-100" :class="activeKnowledgeTab === 'trash' ? 'bg-red-50 font-semibold text-red-700 ring-1 ring-red-200' : ''" aria-label="回收站" @click="activeKnowledgeTab = activeKnowledgeTab === 'trash' ? 'assets' : 'trash'">
+          <Trash2 class="h-4 w-4" :class="activeKnowledgeTab === 'trash' ? 'text-red-500' : 'text-zinc-400'" />
+          <span>回收站</span>
+          <span v-if="recycleItems.length" class="ml-auto rounded-full px-1.5 text-[10px] font-semibold" :class="activeKnowledgeTab === 'trash' ? 'bg-red-600 text-white' : 'bg-zinc-200 text-zinc-600'">{{ recycleItems.length }}</span>
         </button>
       </div>
       <div class="flex-1 overflow-y-auto p-2" data-testid="knowledge-tree-panel" @contextmenu.prevent="openTreeBlankContextMenu($event)">
@@ -1609,6 +1720,7 @@ function addCandidateMember(name: string, dept: string) {
 
     <!-- Main -->
     <main
+      v-if="activeKnowledgeTab !== 'trash'"
       data-testid="knowledge-main-pane"
       class="flex min-w-0 flex-1 flex-col overflow-hidden transition-[margin] duration-300"
       :class="{ 'knowledge-main-pane--compact': rightPanelOpen }"
@@ -1773,8 +1885,8 @@ function addCandidateMember(name: string, dept: string) {
                     <button type="button" class="rounded-md p-1.5 text-zinc-400 hover:bg-amber-50 hover:text-amber-600" :aria-label="`收藏知识库 ${kb.name}`" @click.stop="toggleKbPinned(kb)">
                       <Star class="h-4 w-4" :class="kb.pinned ? 'fill-amber-500 text-amber-500' : ''" />
                     </button>
-                    <button v-if="false && kb.canEdit" type="button" class="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-800" :aria-label="`重命名知识库 ${kb.name}`" @click.stop="beginRenameKb(kb)"><Pencil class="h-4 w-4" /></button>
-                    <button v-if="false && kb.canEdit" type="button" class="rounded-md p-1.5 text-zinc-400 hover:bg-blue-50 hover:text-blue-600" :aria-label="`移动知识库 ${kb.name}`" @click.stop="moveKb(kb)"><Move class="h-4 w-4" /></button>
+                    <button v-if="kb.canEdit" type="button" class="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-800" :aria-label="`重命名知识库 ${kb.name}`" @click.stop="beginRenameKb(kb)"><Pencil class="h-4 w-4" /></button>
+                    <button v-if="kb.canEdit" type="button" class="rounded-md p-1.5 text-zinc-400 hover:bg-blue-50 hover:text-blue-600" :aria-label="`移动知识库 ${kb.name}`" @click.stop="moveKb(kb)"><Move class="h-4 w-4" /></button>
                     <button v-if="kb.canEdit" type="button" class="rounded-md p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600" :aria-label="`删除知识库 ${kb.name}`" @click.stop="deleteKb(kb)"><Trash2 class="h-4 w-4" /></button>
                   </div>
                 </div>
@@ -1808,7 +1920,15 @@ function addCandidateMember(name: string, dept: string) {
                       @keydown.esc.prevent="renamingKbId = ''; draftKbTitle = ''"
                       @blur="commitRenameKb(kb)"
                     />
-                    <div v-else class="truncate text-sm font-semibold text-zinc-900">{{ kb.name }}</div>
+                    <div v-else class="flex items-center gap-2">
+                      <span class="truncate text-sm font-semibold text-zinc-900">{{ kb.name }}</span>
+                      <span
+                        v-if="getPermissionBadge(kb)"
+                        class="hidden rounded-md border px-1.5 py-0.5 text-[10px] font-medium lg:inline-block"
+                        :class="getPermissionBadge(kb)?.cls"
+                        :title="`我的权限：${getPermissionBadge(kb)?.text}`"
+                      >{{ getPermissionBadge(kb)?.text }}</span>
+                    </div>
                     <div class="mt-0.5 truncate text-xs text-zinc-400">{{ kb.docs }} 文档 · {{ kb.visibility }}</div>
                   </div>
                 </button>
@@ -1818,10 +1938,10 @@ function addCandidateMember(name: string, dept: string) {
                   <button type="button" class="rounded-md p-1.5 text-zinc-400 hover:bg-amber-50 hover:text-amber-600" :aria-label="`收藏知识库 ${kb.name}`" @click="toggleKbPinned(kb)">
                     <Star class="h-4 w-4" :class="kb.pinned ? 'fill-amber-500 text-amber-500' : ''" />
                   </button>
-                  <button v-if="false && kb.canEdit" type="button" class="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-800" :aria-label="`重命名知识库 ${kb.name}`" @click="beginRenameKb(kb)">
+                  <button v-if="kb.canEdit" type="button" class="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-800" :aria-label="`重命名知识库 ${kb.name}`" @click="beginRenameKb(kb)">
                     <Pencil class="h-4 w-4" />
                   </button>
-                  <button v-if="false && kb.canEdit" type="button" class="rounded-md p-1.5 text-zinc-400 hover:bg-blue-50 hover:text-blue-600" :aria-label="`移动知识库 ${kb.name}`" @click="moveKb(kb)">
+                  <button v-if="kb.canEdit" type="button" class="rounded-md p-1.5 text-zinc-400 hover:bg-blue-50 hover:text-blue-600" :aria-label="`移动知识库 ${kb.name}`" @click="moveKb(kb)">
                     <Move class="h-4 w-4" />
                   </button>
                   <button v-if="kb.canEdit" type="button" class="rounded-md p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600" :aria-label="`删除知识库 ${kb.name}`" @click="deleteKb(kb)">
@@ -2358,53 +2478,139 @@ function addCandidateMember(name: string, dept: string) {
     <!-- 知识库设置弹窗 -->
     <Teleport to="body">
       <div v-if="settingsKbId" class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/40 px-4 py-8" @click.self="closeKbSettings">
-        <div class="flex h-[480px] w-[680px] overflow-hidden rounded-[28px] bg-white shadow-2xl ring-1 ring-zinc-200">
+        <div class="flex h-[520px] w-[760px] overflow-hidden rounded-[28px] bg-white shadow-2xl ring-1 ring-zinc-200">
           <div class="flex w-[200px] shrink-0 flex-col border-r border-zinc-100 p-3">
             <h3 class="px-3 py-2 text-sm font-semibold text-zinc-900">{{ activeSettingsKb?.name }}</h3>
             <div class="mt-3 space-y-1">
-              <button v-for="t in [{key:'members',label:'成员授权'},{key:'documents',label:'文档管理'},{key:'audit',label:'审计记录'}]" :key="t.key" type="button" class="w-full rounded-lg px-3 py-2 text-left text-sm" :class="settingsTab === t.key ? 'bg-blue-50 font-medium text-blue-700' : 'text-zinc-600 hover:bg-zinc-50'" @click="settingsTab = t.key as any">{{ t.label }}</button>
+              <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm" :class="settingsTab === 'members' ? 'bg-blue-50 font-medium text-blue-700' : 'text-zinc-600 hover:bg-zinc-50'" @click="settingsTab = 'members'">
+                <ShieldCheck class="h-4 w-4" />成员授权
+              </button>
+              <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm" :class="settingsTab === 'documents' ? 'bg-blue-50 font-medium text-blue-700' : 'text-zinc-600 hover:bg-zinc-50'" @click="settingsTab = 'documents'">
+                <FolderKanban class="h-4 w-4" />文档管理
+              </button>
+              <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm" :class="settingsTab === 'audit' ? 'bg-blue-50 font-medium text-blue-700' : 'text-zinc-600 hover:bg-zinc-50'" @click="settingsTab = 'audit'">
+                <History class="h-4 w-4" />审计记录
+              </button>
+            </div>
+            <div class="mt-auto rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-[11px] leading-relaxed text-zinc-500">
+              <div class="flex items-center gap-1 text-zinc-600"><ShieldCheck class="h-3.5 w-3.5 text-blue-500" />五级权限体系</div>
+              <p class="mt-1">OWNER · MANAGER · EDITOR · DOWNLOADER · READER</p>
             </div>
           </div>
           <div class="flex flex-1 flex-col overflow-hidden">
             <!-- 成员授权 -->
             <template v-if="settingsTab === 'members'">
-              <div class="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
+              <div class="flex flex-wrap items-center gap-2 border-b border-zinc-100 px-4 py-3">
                 <h4 class="text-sm font-semibold text-zinc-900">成员列表（{{ activeSettingsMembers.length }}）</h4>
-                <button type="button" class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700" @click="settingsAddMemberOpen = !settingsAddMemberOpen">添加成员</button>
-              </div>
-              <div class="relative flex items-center px-4 py-2">
-                <div class="flex flex-wrap gap-1.5">
-                  <button v-for="preset in permissionPresetOptions" :key="preset.key" type="button" class="rounded-md border border-zinc-200 bg-white px-2 py-1 text-[11px] font-medium text-zinc-500 hover:border-blue-200 hover:text-blue-600" @click="applyPermissionPreset(preset.key)">{{ preset.label }}</button>
-                </div>
-                <!-- 添加成员弹窗 -->
-                <div v-if="settingsAddMemberOpen" class="absolute right-0 top-12 z-10 w-[260px] overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xl">
-                  <div class="border-b border-zinc-100 p-2">
-                    <input v-model="settingsAddMemberSearch" class="h-8 w-full rounded-md border border-zinc-200 px-2.5 text-xs outline-none focus:border-blue-300" placeholder="搜索成员姓名" />
+                <div class="ml-auto flex items-center gap-2">
+                  <div class="relative">
+                    <Search class="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-300" />
+                    <input v-model="settingsMemberFilter" class="h-8 w-40 rounded-lg border border-zinc-200 pl-7 pr-2 text-xs outline-none focus:border-blue-300" placeholder="搜索成员/部门" />
                   </div>
-                  <div class="max-h-60 overflow-y-auto p-1">
-                    <button v-for="c in filteredCandidates" :key="c.name" type="button" class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs hover:bg-zinc-50" @click="addCandidateMember(c.name, c.dept)">
-                      <div class="flex h-6 w-6 items-center justify-center rounded-full bg-blue-50 text-[10px] font-medium text-blue-600">{{ c.name[0] }}</div>
-                      <div><div class="font-medium text-zinc-800">{{ c.name }}</div><div class="text-zinc-400">{{ c.dept }}</div></div>
-                    </button>
-                    <div v-if="filteredCandidates.length === 0" class="py-4 text-center text-xs text-zinc-400">无匹配成员</div>
-                  </div>
+                  <button type="button" class="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700" @click="settingsAddMemberOpen = !settingsAddMemberOpen"><Plus class="h-3.5 w-3.5" />添加成员</button>
                 </div>
               </div>
-              <div class="flex-1 overflow-auto p-4 pt-0">
-                <div class="space-y-1">
-                  <div v-for="member in activeSettingsMembers" :key="member.id" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-zinc-50">
-                    <div class="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-100 text-[11px] font-medium text-zinc-500">{{ member.name[0] }}</div>
-                    <div class="min-w-0 flex-1">
-                      <div class="truncate font-medium text-zinc-900 text-xs">{{ member.name }}</div>
-                      <div class="text-[11px] text-zinc-400">{{ member.scope }} · {{ member.department }}</div>
+              <div class="border-b border-zinc-100 bg-zinc-50/60 px-4 py-2">
+                <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
+                  <span class="mr-1 text-zinc-400">一键预设：</span>
+                  <button v-for="preset in permissionPresetOptions" :key="preset.key" type="button" class="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2 py-0.5 font-medium text-zinc-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700" @click="applyPermissionPreset(preset.key)">{{ preset.label }}</button>
+                </div>
+              </div>
+              <div class="flex min-h-0 flex-1">
+                <div class="flex-1 overflow-auto p-3">
+                  <table class="w-full text-left text-sm">
+                    <thead class="sticky top-0 z-[1] bg-white text-[11px] uppercase tracking-wide text-zinc-400">
+                      <tr class="border-b border-zinc-100">
+                        <th class="px-2 py-2 font-medium">成员</th>
+                        <th class="px-2 py-2 font-medium">部门 / 作用域</th>
+                        <th class="px-2 py-2 font-medium">角色</th>
+                        <th class="px-2 py-2 font-medium">加入时间</th>
+                        <th class="px-2 py-2 font-medium text-right">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-100">
+                      <tr v-for="member in filteredActiveSettingsMembers" :key="member.id" class="group transition hover:bg-zinc-50">
+                        <td class="px-2 py-2">
+                          <div class="flex items-center gap-2">
+                            <div class="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 text-[11px] font-semibold text-blue-600">{{ member.name[0] }}</div>
+                            <span class="truncate font-medium text-zinc-900">{{ member.name }}</span>
+                          </div>
+                        </td>
+                        <td class="px-2 py-2 text-xs">
+                          <div class="text-zinc-700">{{ member.department }}</div>
+                          <div class="text-[10px] text-zinc-400">{{ member.scope === '个人' ? '直接授权' : member.scope === '部门' ? '按部门授权' : member.scope }}</div>
+                        </td>
+                        <td class="px-2 py-2">
+                          <select :value="member.role" class="rounded-lg border border-zinc-200 px-2 py-1 text-xs outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100" @change="updatePermissionRole(member, ($event.target as HTMLSelectElement).value as PermissionRole)">
+                            <option value="OWNER">所有者</option><option value="MANAGER">管理员</option><option value="EDITOR">编辑者</option><option value="DOWNLOADER">下载者</option><option value="READER">查看者</option>
+                          </select>
+                        </td>
+                        <td class="px-2 py-2 text-xs text-zinc-500">{{ member.joinedAt?.slice(0, 10) }}</td>
+                        <td class="px-2 py-2 text-right">
+                          <button type="button" class="rounded-md p-1 text-zinc-300 opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100" :aria-label="'移除 ' + member.name" @click="deletePermissionMember(member)"><X class="h-3.5 w-3.5" /></button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <div v-if="filteredActiveSettingsMembers.length === 0" class="py-10 text-center text-xs text-zinc-400">暂无匹配成员</div>
+                </div>
+                <!-- 添加成员侧栏 -->
+                <Transition
+                  enter-active-class="transition duration-200 ease-out"
+                  enter-from-class="translate-x-4 opacity-0"
+                  enter-to-class="translate-x-0 opacity-100"
+                  leave-active-class="transition duration-150 ease-in"
+                  leave-from-class="translate-x-0 opacity-100"
+                  leave-to-class="translate-x-4 opacity-0"
+                >
+                  <aside v-if="settingsAddMemberOpen" class="flex w-[460px] shrink-0 flex-col border-l border-zinc-200 bg-white">
+                    <div class="flex items-center justify-between border-b border-zinc-100 px-3 py-2.5">
+                      <div class="text-sm font-semibold text-zinc-900">添加成员</div>
+                      <button type="button" class="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700" aria-label="关闭添加成员" @click="settingsAddMemberOpen = false"><X class="h-4 w-4" /></button>
                     </div>
-                    <select :value="member.role" class="rounded-lg border border-zinc-200 px-2 py-1 text-xs outline-none" @change="updatePermissionRole(member, ($event.target as HTMLSelectElement).value as PermissionRole)">
-                      <option value="OWNER">所有者</option><option value="MANAGER">管理员</option><option value="EDITOR">编辑者</option><option value="DOWNLOADER">下载者</option><option value="READER">查看者</option>
-                    </select>
-                    <button type="button" class="rounded p-1 text-zinc-300 hover:text-red-500" @click="deletePermissionMember(member)"><X class="h-3.5 w-3.5" /></button>
-                  </div>
-                  <div v-if="activeSettingsMembers.length === 0" class="py-8 text-center text-xs text-zinc-400">暂无成员，点击「添加成员」开始授权</div>
-                </div>
+                    <div class="border-b border-zinc-100 p-2">
+                      <div class="relative">
+                        <Search class="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-300" />
+                        <input v-model="settingsAddMemberSearch" class="h-9 w-full rounded-lg border border-zinc-200 pl-8 pr-3 text-xs outline-none focus:border-blue-300" placeholder="搜索成员姓名或部门" />
+                      </div>
+                    </div>
+                    <div class="grid min-h-0 flex-1 grid-cols-2">
+                      <div class="flex flex-col border-r border-zinc-100">
+                        <div class="border-b border-zinc-100 bg-zinc-50 px-3 py-1.5 text-[11px] font-medium text-zinc-500">部门候选</div>
+                        <div class="flex-1 overflow-auto p-1.5">
+                          <button v-for="dept in presetDepartments" :key="dept" type="button" class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs hover:bg-zinc-50" @click="settingsAddMemberDept = dept">
+                            <Folder class="h-3.5 w-3.5 text-zinc-400" />
+                            <span class="truncate text-zinc-700">{{ dept }}</span>
+                            <CheckSquare v-if="settingsAddMemberDept === dept" class="ml-auto h-3.5 w-3.5 text-blue-500" />
+                          </button>
+                        </div>
+                      </div>
+                      <div class="flex flex-col">
+                        <div class="border-b border-zinc-100 bg-zinc-50 px-3 py-1.5 text-[11px] font-medium text-zinc-500">已选成员（{{ settingsAddMemberSelected.length }}）</div>
+                        <div class="flex-1 overflow-auto p-1.5">
+                          <button v-for="c in filteredCandidatesForDept" :key="c.name" type="button" class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs hover:bg-zinc-50" @click="toggleAddCandidate(c)">
+                            <div class="flex h-6 w-6 items-center justify-center rounded-full bg-blue-50 text-[10px] font-medium text-blue-600">{{ c.name[0] }}</div>
+                            <span class="truncate text-zinc-800">{{ c.name }}</span>
+                            <CheckSquare v-if="settingsAddMemberSelected.some(s => s.name === c.name)" class="ml-auto h-3.5 w-3.5 text-blue-500" />
+                          </button>
+                          <div v-if="filteredCandidatesForDept.length === 0" class="py-6 text-center text-[11px] text-zinc-400">无匹配成员</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="flex items-center justify-between gap-2 border-t border-zinc-100 bg-zinc-50 px-3 py-2.5">
+                      <div class="flex items-center gap-1 text-xs">
+                        <label class="text-zinc-500">统一角色</label>
+                        <select v-model="settingsAddMemberRole" class="rounded-md border border-zinc-200 px-1.5 py-1 text-xs">
+                          <option value="EDITOR">编辑者</option><option value="MANAGER">管理员</option><option value="DOWNLOADER">下载者</option><option value="READER">查看者</option><option value="OWNER">所有者</option>
+                        </select>
+                      </div>
+                      <div class="flex items-center gap-1.5">
+                        <button type="button" class="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50" @click="settingsAddMemberOpen = false">取消</button>
+                        <button type="button" class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50" :disabled="settingsAddMemberSelected.length === 0" @click="confirmAddMembers">确认添加 ({{ settingsAddMemberSelected.length }})</button>
+                      </div>
+                    </div>
+                  </aside>
+                </Transition>
               </div>
             </template>
             <!-- 审计记录 -->
@@ -2448,7 +2654,7 @@ function addCandidateMember(name: string, dept: string) {
     </Teleport>
 
     <!-- 回收站面板 -->
-    <div v-if="activeKnowledgeTab === 'trash'" class="flex flex-1 flex-col overflow-hidden">
+    <div v-if="activeKnowledgeTab === 'trash'" class="flex flex-1 flex-col overflow-hidden" style="margin-left: clamp(286px,21vw,400px); transition: margin .3s;">
       <div class="flex items-center gap-3 border-b border-zinc-200 px-6 py-4">
         <button type="button" class="rounded-full p-1 text-zinc-400 hover:bg-zinc-100" @click="activeKnowledgeTab = 'assets'"><ChevronLeft class="h-5 w-5" /></button>
         <h2 class="text-base font-semibold text-zinc-900">回收站</h2>
@@ -2462,17 +2668,32 @@ function addCandidateMember(name: string, dept: string) {
           <Trash2 class="h-10 w-10" />
           <p class="mt-3 text-sm">当前空间回收站为空</p>
         </div>
+        <div class="flex flex-wrap items-center gap-2 border-b border-zinc-100 bg-zinc-50/60 px-6 py-2 text-xs">
+          <div class="flex items-center gap-1">
+            <Calendar class="h-3.5 w-3.5 text-zinc-400" />
+            <input v-model="recycleDateFrom" type="date" class="h-7 rounded-md border border-zinc-200 px-1.5 text-xs outline-none focus:border-blue-300" />
+            <span class="text-zinc-400">至</span>
+            <input v-model="recycleDateTo" type="date" class="h-7 rounded-md border border-zinc-200 px-1.5 text-xs outline-none focus:border-blue-300" />
+          </div>
+          <button type="button" class="rounded-md border border-zinc-200 bg-white px-2 py-0.5 text-[11px] text-zinc-600 hover:bg-zinc-50" @click="recycleDateFrom=''; recycleDateTo=''">重置</button>
+          <span class="ml-2 text-zinc-500">共 {{ filteredRecycleItems.length }} 项</span>
+          <span v-if="recycleItems.some(r => recycleIsExpired(r))" class="ml-2 inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700"><AlertTriangle class="h-3 w-3" />含 {{ recycleItems.filter(r => recycleIsExpired(r)).length }} 项即将过期</span>
+        </div>
         <div v-else class="divide-y divide-zinc-100">
           <div v-for="item in filteredRecycleItems" :key="item.id" class="flex items-center gap-4 px-6 py-3 text-sm hover:bg-zinc-50">
             <Folder v-if="item.type === 'folder'" class="h-5 w-5 text-blue-400" />
             <FileText v-else-if="item.type === 'file'" class="h-5 w-5 text-zinc-400" />
             <BookOpen v-else class="h-5 w-5 text-orange-400" />
             <div class="min-w-0 flex-1">
-              <div class="truncate font-medium text-zinc-900">{{ item.name }}</div>
+              <div class="flex items-center gap-2">
+                <span class="truncate font-medium text-zinc-900">{{ item.name }}</span>
+                <span v-if="recycleIsExpired(item)" class="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">逾期</span>
+                <span v-else class="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500">剩余 {{ recycleDaysLeft(item) }} 天</span>
+              </div>
               <div class="text-xs text-zinc-400">{{ item.detail }}</div>
             </div>
             <span class="text-xs text-zinc-400">{{ item.deletedAt?.slice(0,10) }}</span>
-            <button type="button" class="rounded-lg border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-100" @click="restoreRecycleItem(item)">恢复</button>
+            <button type="button" class="rounded-lg border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-600 enabled:hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50" :disabled="recycleIsExpired(item)" @click="restoreRecycleItem(item)">{{ recycleIsExpired(item) ? '已过期' : '恢复' }}</button>
             <button type="button" class="rounded-lg border border-rose-100 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-100" @click="purgeRecycleItem(item)">彻底删除</button>
           </div>
         </div>
