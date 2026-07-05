@@ -14,7 +14,7 @@ import {
   MoreVertical, Pencil, Quote, RotateCw,
   Calendar, History, Move, Plus, Search, Settings, ShieldCheck, Square, Star, Trash2, Upload, X,
 } from 'lucide-vue-next'
-import type { PermissionRole, PermissionEntry, SecurityLevel, TreeNode } from '@/types/knowledge'
+import { type PermissionRole, type PermissionEntry, type SecurityLevel, type TreeNode, getPermissionLabel } from '@/types/knowledge'
 
 interface QaMessage { id: number; role: 'user' | 'assistant'; content: string; citations?: string[]; thinking?: ThinkingStep[] }
 interface ThinkingStep { id: string; label: string; detail: string; status: 'pending' | 'running' | 'completed' | 'error'; icon: string; elapsed?: number; errorMsg?: string }
@@ -176,7 +176,7 @@ const activeTreeItemId = ref('')
 function getKbVisibilityIcon(kbId: string, space?: string): 'public' | 'dept' | 'personal' | 'custom' | null {
   if (space === 'personal') return null /* 个人空间不显示可见性图标 */
   const kb = knowledgeBases.find(k => k.id === kbId)
-  if (!kb) return 'VIEWER'
+  if (!kb) return 'public'
   if (kb.visibility.includes('全员')) return 'public'
   if (kb.visibility.includes('部门')) return 'dept'
   if (kb.visibility.includes('仅自己')) return 'personal'
@@ -189,7 +189,7 @@ function getKbDocCount(kbId: string): number {
 function getUserRole(kbId: string, space?: string): string {
   if (space === 'personal') return 'OWNER'
   const kb = knowledgeBases.find(k => k.id === kbId)
-  if (!kb) return 'VIEWER'
+  if (!kb) return 'public'
   if (kb.canEdit) return 'EDITOR'
   return 'VIEWER'
 }
@@ -1811,14 +1811,14 @@ function findKbById(kbId: string): KnowledgeBaseItem | undefined {
   return knowledgeBases.find(kb => kb.id === kbId)
 }
 function getPermissionBadge(kb?: KnowledgeBaseItem): { text: string; cls: string } | null {
-  if (!kb) return 'VIEWER'
+  if (!kb) return null
   const my = (nodePermissions[kb.id] ?? []).find(m => m.name === '当前用户' || m.name === '我')
   if (my) {
     const map: Record<string, { text: string; cls: string }> = {
       OWNER: { text: '所有者', cls: 'border-indigo-200 bg-indigo-50 text-indigo-700' },
       MANAGER: { text: '管理员', cls: 'border-blue-200 bg-blue-50 text-blue-700' },
       EDITOR: { text: '可编辑', cls: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
-      VIEWER: '部门',
+      VIEWER: { text: '可查看', cls: 'border-zinc-200 bg-zinc-50 text-zinc-500' },
     }
     return map[my.role] ?? null
   }
@@ -1986,11 +1986,11 @@ const fileParentKb = computed(() => {
 })
 
 function ensureFileMembers(docName: string) {
-  if (fileInheritedFromKb[docName] === undefined) fileInheritedFromKb[docName] = true
-  if (!filePermissionMembersByDoc[docName]) {
-    const kbId = fileParentKb.value?.id
-    const kbMembers = kbId ? (nodePermissions[kbId] ?? []) : []
-    filePermissionMembersByDoc[docName] = kbMembers.map(m => ({ ...m }))
+  fileInheritedFromKb[docName] = false
+  if (!filePermissionMembersByDoc[docName] || !filePermissionMembersByDoc[docName].length) {
+    filePermissionMembersByDoc[docName] = [
+      { id: docName + '-owner', name: '当前用户', scope: '个人', department: '技术部', role: 'OWNER', securityClearance: '机密', joinedAt: new Date().toISOString().slice(0, 10) },
+    ]
   }
 }
 
@@ -2095,7 +2095,17 @@ function closeFileSettings() {
   fileSettingsAddMemberOpen.value = false
 }
 
-function breakInheritanceAndCustomize() {
+function syncKbPermissions() {
+  if (!fileSettingsDoc.value) return
+  const docName = fileSettingsDoc.value.name
+  fileInheritedFromKb[docName] = true
+  const kbId = fileParentKb.value?.id
+  const kbMembers = kbId ? (nodePermissions[kbId] ?? []) : []
+  filePermissionMembersByDoc[docName] = kbMembers.map(m => ({ ...m }))
+  showFileActionToast('已同步知识库权限')
+}
+
+function switchToCustomPermissions() {
   if (!fileSettingsDoc.value) return
   const docName = fileSettingsDoc.value.name
   const kbId = fileParentKb.value?.id
@@ -2103,16 +2113,6 @@ function breakInheritanceAndCustomize() {
   filePermissionMembersByDoc[docName] = kbMembers.map(m => ({ ...m }))
   fileInheritedFromKb[docName] = false
   showFileActionToast('已切换为自定义权限')
-}
-
-function restoreInheritance() {
-  if (!fileSettingsDoc.value) return
-  const docName = fileSettingsDoc.value.name
-  fileInheritedFromKb[docName] = true
-  const kbId = fileParentKb.value?.id
-  const kbMembers = kbId ? (nodePermissions[kbId] ?? []) : []
-  filePermissionMembersByDoc[docName] = kbMembers.map(m => ({ ...m }))
-  showFileActionToast('已恢复继承知识库权限')
 }
 
 // ========== 回收站 ==========
@@ -3341,11 +3341,12 @@ onBeforeUnmount(() => {
                 <div v-if="uploadSecurityLevel === '部门'" class="mt-2 rounded-xl border border-zinc-200 bg-white p-2">
                   <div class="mb-1.5 text-[11px] font-medium text-zinc-600">选择部门</div>
                   <div class="max-h-32 space-y-1 overflow-y-auto">
-                    <label v-for="dept in orgTree.filter(n => n.type === 'dept')" :key="dept.id" class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-zinc-50">
-                      <input type="checkbox" :checked="uploadAllowedDepts.some(d => d.id === dept.id)" @change="toggleUploadDept(dept)" class="rounded border-zinc-300 text-blue-600" />
+                    <button v-for="dept in orgTree.filter(n => n.type === 'dept')" :key="dept.id" type="button" class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-zinc-50" @click="toggleUploadDept(dept)">
+                      <CheckSquare v-if="uploadAllowedDepts.some(d => d.id === dept.id)" class="h-4 w-4 shrink-0 text-blue-500" />
+                      <Square v-else class="h-4 w-4 shrink-0 text-zinc-300" />
                       <span class="text-zinc-700">{{ dept.name }}</span>
-                      <span class="ml-auto text-zinc-400">({{ dept.children?.length ?? 0 }}人)</span>
-                    </label>
+                      <span class="ml-auto text-zinc-400">({{ dept.children?.length ?? 0  }}人)</span>
+                    </button>
                   </div>
                 </div>
                 <p v-if="uploadSecurityLevel === '部门' && !uploadAllowedDepts.length" class="mt-1 text-[10px] text-amber-500">请至少选择一个部门，否则文件默认为"全员"可见</p>
@@ -3599,7 +3600,7 @@ onBeforeUnmount(() => {
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-zinc-100">
-                      <tr v-for="doc in docSettingsFilteredDocs" :key="doc.name" class="hover:bg-zinc-50 transition" :class="{ 'opacity-40': !isDocAccessible(doc) }">
+                      <tr v-for="doc in docSettingsFilteredDocs" :key="doc.name" class="cursor-pointer transition hover:bg-zinc-50" :class="{ 'opacity-40': !isDocAccessible(doc) }" @click="isDocAccessible(doc) && openFileSettings(doc)">
                         <td class="px-3 py-2.5"><button class="text-zinc-400 hover:text-blue-500" @click.stop="toggleFileSelect(doc.name)"><Square v-if="!selectedFileIds.includes(doc.name)" class="h-4 w-4" /><CheckSquare v-else class="h-4 w-4 text-blue-500" /></button></td>
                         <td class="px-3 py-2.5"><div class="flex items-center gap-2"><component :is="getFileIcon(doc.format)" class="h-4 w-4" :class="getIconColor(doc.format)" /><span class="truncate text-sm font-medium text-zinc-900">{{ doc.name }}</span></div></td>
                         <td class="px-3 py-2.5"><span class="rounded-full px-1.5 py-0.5 text-[10px] font-medium" :class="getDocSecurityClass(doc.securityLevel)">{{ getDocSecurityLabel(doc.securityLevel) }}</span></td>
@@ -3733,8 +3734,8 @@ onBeforeUnmount(() => {
                 <span v-if="fileSettingsDoc && fileInheritedFromKb[fileSettingsDoc.name]" class="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-600"><ShieldCheck class="h-3 w-3" />继承自知识库</span>
               </div>
               <div class="flex items-center gap-2">
-                <button v-if="fileSettingsDoc && fileInheritedFromKb[fileSettingsDoc.name]" type="button" class="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 transition hover:bg-zinc-50" @click="breakInheritanceAndCustomize">自定义权限</button>
-                <button v-else type="button" class="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100" @click="restoreInheritance">恢复继承</button>
+                <button v-if="fileSettingsDoc && fileInheritedFromKb[fileSettingsDoc.name]" type="button" class="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 transition hover:bg-zinc-50" @click="switchToCustomPermissions">自定义权限</button>
+                <button v-else type="button" class="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100" @click="syncKbPermissions">继承自知识库</button>
                 <button type="button" class="rounded-md p-1.5 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700" aria-label="关闭" @click="closeFileSettings"><X class="h-5 w-5" /></button>
               </div>
             </div>
@@ -3786,18 +3787,24 @@ onBeforeUnmount(() => {
                         <div class="text-[10px] text-zinc-400">{{ member.scope === '个人' ? '直接授权' : member.scope === '部门' ? '按部门授权' : member.scope }}</div>
                       </td>
                       <td class="px-3 py-2.5">
-                        <select :value="member.securityClearance ?? getDefaultClearance(member.role)" class="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100" @change="updateFileMemberClearance(member, ($event.target as HTMLSelectElement).value as SecurityLevel)">
+                        <template v-if="fileSettingsDoc && fileInheritedFromKb[fileSettingsDoc.name]">
+                          <span class="rounded-full px-1.5 py-0.5 text-[10px] font-medium" :class="getDocSecurityClass(member.securityClearance ?? getDefaultClearance(member.role))">{{ member.securityClearance ?? getDefaultClearance(member.role) }}</span>
+                        </template>
+                        <select v-else :value="member.securityClearance ?? getDefaultClearance(member.role)" class="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100" @change="updateFileMemberClearance(member, ($event.target as HTMLSelectElement).value as SecurityLevel)">
                           <option v-for="sl in SECURITY_LEVELS" :key="sl.value" :value="sl.value">{{ sl.label }}</option>
                         </select>
                       </td>
                       <td class="px-3 py-2.5">
-                        <select :value="member.role" class="rounded-lg border border-zinc-200 px-2 py-1 text-xs outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100" @change="updateFilePermissionRole(member, ($event.target as HTMLSelectElement).value as PermissionRole)">
+                        <template v-if="fileSettingsDoc && fileInheritedFromKb[fileSettingsDoc.name]">
+                          <span class="text-xs text-zinc-500">{{ getPermissionLabel(member.role) }}</span>
+                        </template>
+                        <select v-else :value="member.role" class="rounded-lg border border-zinc-200 px-2 py-1 text-xs outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100" @change="updateFilePermissionRole(member, ($event.target as HTMLSelectElement).value as PermissionRole)">
                           <option value="OWNER">所有者</option><option value="MANAGER">管理员</option><option value="EDITOR">编辑者</option><option value="VIEWER">查看者</option>
                         </select>
                       </td>
                       <td class="px-3 py-2.5 text-xs text-zinc-500">{{ member.joinedAt?.slice(0, 10) }}</td>
                       <td class="px-3 py-2.5 text-right">
-                        <button type="button" class="rounded-md p-1.5 text-zinc-300 opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100" :aria-label="'移除 ' + member.name" @click="deleteFilePermissionMember(member)"><X class="h-3.5 w-3.5" /></button>
+                        <button v-if="!(fileSettingsDoc && fileInheritedFromKb[fileSettingsDoc.name])" type="button" class="rounded-md p-1.5 text-zinc-300 opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100" :aria-label="'移除 ' + member.name" @click="deleteFilePermissionMember(member)"><X class="h-3.5 w-3.5" /></button>
                       </td>
                     </tr>
                   </tbody>
