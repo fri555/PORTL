@@ -609,10 +609,17 @@ const solutionCases: CaseItem[] = [
 const hasSessionAssets = computed(() => hasGeneratedAssets.value)
 const rightPanelVisible = computed(() => false)
 const sortedConversations = computed(() => [...conversations.value])
+const filteredConversations = computed(() => {
+  const q = conversationSearch.value.trim().toLowerCase()
+  if (!q) return sortedConversations.value
+  return sortedConversations.value.filter((item) =>
+    item.title.toLowerCase().includes(q) || item.mode.includes(q)
+  )
+})
 const sidebarConversationGroups = computed(() => [
-  { key: 'task' as const, label: '专家模式', items: sortedConversations.value.filter((item) => item.mode === '专家模式') },
-  { key: 'quick' as const, label: '日常办公', items: sortedConversations.value.filter((item) => item.mode === '日常办公') },
-  { key: 'schedule' as const, label: '定时任务', items: sortedConversations.value.filter((item) => item.mode === '定时任务') },
+  { key: 'task' as const, label: '专家模式', items: filteredConversations.value.filter((item) => item.mode === '专家模式') },
+  { key: 'quick' as const, label: '日常办公', items: filteredConversations.value.filter((item) => item.mode === '日常办公') },
+  { key: 'schedule' as const, label: '定时任务', items: filteredConversations.value.filter((item) => item.mode === '定时任务') },
 ].filter((group) => group.items.length))
 const historyBrowserConversations = computed(() => {
   const keyword = historyBrowserSearch.value.trim().toLowerCase()
@@ -1658,6 +1665,15 @@ onBeforeUnmount(() => {
               <span class="min-w-0 flex-1">历史会话</span>
             </button>
           </div>
+        </div>
+        <div class="border-b border-zinc-100 px-3 py-2">
+          <label class="flex h-8 items-center gap-2 rounded-lg bg-zinc-50 px-2.5 text-xs text-zinc-400 ring-1 ring-zinc-200/0 focus-within:ring-blue-300">
+            <Search class="h-3.5 w-3.5 shrink-0" />
+            <input v-model="conversationSearch" class="min-w-0 flex-1 bg-transparent outline-none placeholder:text-zinc-300" placeholder="搜索会话..." />
+            <button v-if="conversationSearch" type="button" class="rounded p-0.5 hover:bg-zinc-200" aria-label="清除搜索" @click="conversationSearch = ''">
+              <X class="h-3 w-3" />
+            </button>
+          </label>
         </div>
         <div class="flex-1 overflow-y-auto p-2">
           <div v-for="group in sidebarConversationGroups" :key="group.key" class="mb-4">
