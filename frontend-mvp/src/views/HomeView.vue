@@ -2263,6 +2263,15 @@ onBeforeUnmount(() => {
                   <button class="rounded-md p-1 text-zinc-400 opacity-0 transition hover:bg-zinc-100 hover:text-zinc-700 group-hover:opacity-100" :aria-label="`移除附件 ${file}`" @click="removeFile(index)"><X class="h-3 w-3" /></button>
                 </div>
               </div>
+              <div v-if="quotedMessageId" class="mb-2 flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs text-blue-700">
+                <Quote class="h-3.5 w-3.5 shrink-0" />
+                <span class="min-w-0 flex-1 truncate">
+                  正在引用：{{ messages.find(m => m.id === quotedMessageId)?.content.slice(0, 80) }}
+                </span>
+                <button type="button" class="rounded p-1 hover:bg-blue-100" aria-label="取消引用" @click="quotedMessageId = ''">
+                  <X class="h-3.5 w-3.5" />
+                </button>
+              </div>
             <div class="flex items-end gap-2">
               <div v-if="runMode === 'task' && selectedExpert" class="mb-1 inline-flex max-w-[160px] shrink-0 items-center gap-1.5 rounded-xl bg-violet-50 px-2.5 py-1.5 text-xs font-medium text-violet-700">
                 <Sparkles class="h-3.5 w-3.5 shrink-0" />
