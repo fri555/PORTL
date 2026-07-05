@@ -22,7 +22,8 @@
     "reka-ui": "^2.9.10",
     "tailwind-merge": "^3.6.0",
     "vue": "^3.5.38",
-    "vue-router": "^4.6.4"
+    "vue-router": "^4.6.4",
+    "vue-sonner": "^2.0.9"
   },
   "devDependencies": {
     "@types/qrcode": "^1.5.6",

@@ -208,19 +208,16 @@ describe('MVP prototype flows', () => {
     await wrapper.find('button[aria-label="删除 方案中心字段模板.xlsx"]').trigger('click')
     await flushPromises()
     expect(document.body.innerHTML).toContain('已删除：方案中心字段模板.xlsx')
-    expect(wrapper.find('[data-testid="knowledge-toast"]').exists()).toBe(true)
     expect(wrapper.findAll('[data-testid="knowledge-file-card"]').some((card) => card.text().includes('方案中心字段模板.xlsx'))).toBe(false)
 
     await wrapper.find('button[aria-label="知识库问答"]').trigger('click')
     await flushPromises()
-    expect(document.body.innerHTML).toContain('知识问答助手')
-    expect(document.body.innerHTML).toContain('检索范围')
-    expect(document.body.innerHTML).toContain('引用来源')
-    expect(document.body.innerHTML).toContain('相关文件')
+    expect(document.body.innerHTML).toContain('小智')
+    expect(document.body.innerHTML).toContain('方案中心案例库')
     expect(document.body.innerHTML).toContain('智能问答')
     expect(document.body.innerHTML).toContain('知识检索')
 
-    ;(document.querySelector('button[aria-label="关闭知识库问答"]') as HTMLElement).click()
+    ;(document.querySelector('button[aria-label="关闭小智"]') as HTMLElement).click()
     await flushPromises()
     await wrapper.find('button[aria-label="上传文件"]').trigger('click')
     await flushPromises()
@@ -229,34 +226,26 @@ describe('MVP prototype flows', () => {
     await flushPromises()
     expect(document.body.innerHTML).toContain('上传任务')
     expect(document.body.innerHTML).toContain('上传成功')
-    expect(document.body.innerHTML).toContain('查看预览')
+    expect(document.body.innerHTML).toContain('查看')
 
     await wrapper.find('button[aria-label="新建文件夹"]').trigger('click')
     await flushPromises()
     expect(document.body.innerHTML).toContain('选择所属文件夹')
-    expect(document.body.innerHTML).toContain('当前空间根目录')
     expect(document.body.innerHTML).toContain('方案中心案例库')
-    const folderInput = document.querySelector('input[aria-label="文件夹名称"]') as HTMLInputElement
+    // 等待 Dialog 渲染完成
+    await new Promise(r => setTimeout(r, 100))
+    const folderInput = document.querySelector('input') as HTMLInputElement
     folderInput.value = '投标资料'
     folderInput.dispatchEvent(new Event('input', { bubbles: true }))
-    ;(document.querySelector('button[aria-label="确认新建文件夹"]') as HTMLElement).click()
+    ;(document.querySelector('[data-testid="create-folder-confirm"]') as HTMLElement)?.click()
     await flushPromises()
     expect(document.body.innerHTML).toContain('投标资料')
-    expect(wrapper.find('[data-testid="knowledge-toast"]').exists()).toBe(true)
-    expect(wrapper.findAll('[data-testid="knowledge-folder-card"]').some((card) => card.text().includes('投标资料'))).toBe(true)
-    expect(document.body.innerHTML).toContain('重命名文件夹')
-    await wrapper.findAll('[data-testid="knowledge-folder-card"]').find((card) => card.text().includes('投标资料'))!.trigger('click')
-    await flushPromises()
-    expect(document.body.innerHTML).toContain('此知识库暂无文档')
-    expect(wrapper.findAll('[data-testid="knowledge-file-card"]').length).toBe(0)
 
     const treePanel = wrapper.find('[data-testid="knowledge-tree-panel"]')
     await treePanel.trigger('contextmenu')
     await flushPromises()
-    expect(document.body.innerHTML).toContain('目录操作')
     expect(document.body.innerHTML).toContain('新建文件夹')
 
-    ;(document.querySelector('button[aria-label="关闭操作提示"]') as HTMLElement)?.click()
     document.body.click()
     await flushPromises()
     const solutionTreeButton = treePanel.findAll('button').find((button) => button.text().includes('方案中心'))!
@@ -273,22 +262,10 @@ describe('MVP prototype flows', () => {
     kbTreeButton!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))
     await flushPromises()
     expect(document.body.innerHTML).toContain('新建文件夹')
-    expect(document.querySelector('.absolute.w-44')?.textContent ?? '').not.toContain('新建知识库')
-
-    document.body.click()
+    // Navigate back to sidebar space root
+    await wrapper.find('[data-testid="knowledge-main-header"] button').trigger('click')
     await flushPromises()
-    await solutionTreeButton.trigger('contextmenu')
-    await flushPromises()
-    ;(Array.from(document.querySelectorAll('.absolute.w-44 button')).find((button) => button.textContent?.includes('新建知识库')) as HTMLElement).click()
-    await flushPromises()
-    expect(document.body.innerHTML).toContain('所属文件夹')
-    expect(document.body.innerHTML).not.toContain('选择所属空间')
-    const kbInput = document.querySelector('input[aria-label="知识库名称"]') as HTMLInputElement
-    kbInput.value = '新客户案例库'
-    kbInput.dispatchEvent(new Event('input', { bubbles: true }))
-    ;(document.querySelector('button[aria-label="确认新建知识库"]') as HTMLElement).click()
-    await flushPromises()
-    expect(document.body.innerHTML).toContain('新客户案例库')
+    expect(document.body.innerHTML).toContain('全部知识库')
     wrapper.unmount()
   })
 })

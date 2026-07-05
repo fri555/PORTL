@@ -42,7 +42,9 @@ export interface SemanticEntity {
 
 // ─── 权限模型 ───
 
-export type PermissionRole = 'OWNER' | 'MANAGER' | 'EDITOR' | 'DOWNLOADER' | 'READER'
+export type PermissionRole = 'OWNER' | 'MANAGER' | 'EDITOR' | 'VIEWER'
+
+export type SecurityLevel = '全员' | '部门' | '秘密' | '机密'
 
 export interface PermissionEntry {
   id: string
@@ -50,6 +52,8 @@ export interface PermissionEntry {
   scope: string    // '部门' | '个人' | '系统'
   department: string
   role: PermissionRole
+  /** 安全许可等级，决定能查看什么密级的文件。默认从角色派生，管理员可手动调整。 */
+  securityClearance?: SecurityLevel
   joinedAt: string
 }
 
@@ -61,8 +65,7 @@ export function getPermissionLabel(role: PermissionRole): string {
     OWNER: '所有者',
     MANAGER: '管理员',
     EDITOR: '编辑者',
-    DOWNLOADER: '下载者',
-    READER: '查看者',
+    VIEWER: '查看者',
   }
   return map[role]
 }
@@ -73,8 +76,7 @@ export function getPermissionBadgeClass(role: PermissionRole): string {
     OWNER: 'border-indigo-200 bg-indigo-50 text-indigo-700',
     MANAGER: 'border-blue-200 bg-blue-50 text-blue-700',
     EDITOR: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-    DOWNLOADER: 'border-amber-200 bg-amber-50 text-amber-700',
-    READER: 'border-zinc-200 bg-zinc-50 text-zinc-500',
+    VIEWER: 'border-zinc-200 bg-zinc-50 text-zinc-500',
   }
   return map[role]
 }

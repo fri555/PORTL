@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { Toaster } from 'vue-sonner'
 import AppHeader from '@/components/common/AppHeader.vue'
 
 const route = useRoute()
@@ -8,6 +9,7 @@ const showLayout = computed(() => !route.path.startsWith('/auth'))
 </script>
 
 <template>
+  <Toaster richColors closeButton position="top-right" />
   <div v-if="showLayout" class="flex min-h-screen flex-col bg-muted/30">
     <AppHeader />
     <main class="flex-1">
