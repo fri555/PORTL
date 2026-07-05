@@ -17,7 +17,7 @@ import type { PermissionRole, PermissionEntry, SecurityLevel } from '@/types/kno
 interface QaMessage { id: number; role: 'user' | 'assistant'; content: string; citations?: string[]; thinking?: ThinkingStep[] }
 interface ThinkingStep { id: string; label: string; detail: string; status: 'pending' | 'running' | 'completed' | 'error'; icon: string; elapsed?: number; errorMsg?: string }
 interface KnowledgeBaseItem { id: string; name: string; docs: number; owner: string; department: string; visibility: string; space: 'public' | 'personal'; canEdit: boolean; isBuiltIn?: boolean; pinned?: boolean; recent: string; createdAt?: string; updatedAt?: string; permissionMode: 'independent'; permissions: PermissionEntry[] }
-interface DocItem { name: string; format: string; status: string; updatedAt: string; uploadedBy: string; size?: string; tags?: string[]; confidence?: number; securityLevel?: SecurityLevel; allowedDepts?: { id: string; name: string }[] }
+interface DocItem { name: string; format: string; status: string; updatedAt: string; uploadedBy: string; size?: string; tags?: string[]; confidence?: number; securityLevel?: SecurityLevel; allowedDepts?: { id: string; name: string }[]; summary?: string }
 interface TreeNode { id: string; label: string; type: 'folder' | 'file'; kbId?: string; docName?: string; isKnowledgeBase?: boolean; isBuiltIn?: boolean; children?: TreeNode[]; permissionMode?: 'inherit' | 'independent'; permissions?: PermissionEntry[] }
 interface FolderOption { id: string; label: string; depth: number; node?: TreeNode }
 interface RecycleItem { id: string; type: 'knowledgeBase' | 'folder' | 'file'; name: string; space: 'public' | 'personal'; kbId?: string; kbName?: string; parentId?: string; deletedAt: string; detail: string }
@@ -38,6 +38,14 @@ const createFolderParentId = ref('__root__')
 const expandedFolderSelectorIds = ref<string[]>([])
 const fileView = ref<'list' | 'grid'>('grid')
 const fileSearch = ref('')
+const fileSearchDebounced = ref('')
+let fileSearchTimer: ReturnType<typeof setTimeout> | null = null
+watch(fileSearch, (val) => {
+  if (fileSearchTimer) clearTimeout(fileSearchTimer)
+  fileSearchTimer = setTimeout(() => {
+    fileSearchDebounced.value = val
+  }, 300)
+})
 const fileActionModalOpen = ref(false)
 const fileActionType = ref<'move' | null>(null)
 const targetSearch = ref('')
@@ -127,6 +135,8 @@ function selectActiveSpace(space: 'public' | 'personal') {
   selectedFileIds.value = []
   previewDoc.value = null
   qaOpen.value = false
+  fileSearch.value = ''
+  fileSearchDebounced.value = ''
 }
 const filteredFileTree = computed(() =>
   fileTree
@@ -217,15 +227,15 @@ const knowledgeBases = reactive<KnowledgeBaseItem[]>([
 
 const allDocs = reactive<Record<string, DocItem[]>>({
   'kb-public-1': [
-    { name: '考勤管理制度_v3.pdf', format: 'PDF', status: '已索引', updatedAt: '2026-06-15', uploadedBy: '王管理员' },
-    { name: '员工手册2026版.docx', format: 'DOCX', status: '已索引', updatedAt: '2026-06-10', uploadedBy: '王管理员' },
+    { name: '考勤管理制度_v3.pdf', format: 'PDF', status: '已索引', updatedAt: '2026-06-15', uploadedBy: '王管理员', summary: '员工加班与休假需提前报备审批' },
+    { name: '员工手册2026版.docx', format: 'DOCX', status: '已索引', updatedAt: '2026-06-10', uploadedBy: '王管理员', summary: '员工手册相关条款含考勤薪酬福利等' },
   ],
   'kb-public-2': [
     { name: '商品数据字典.xlsx', format: 'XLSX', status: '已索引', updatedAt: '2026-06-01', uploadedBy: '李商品' },
   ],
   'kb-public-3': [
-    { name: '运动鞋团购成功案例.md', format: 'MD', status: '已索引', updatedAt: '2026-06-26', uploadedBy: '方案中心张明' },
-    { name: '团购通用预算池.xlsx', format: 'XLSX', status: '已索引', updatedAt: '2026-06-24', uploadedBy: '方案中心张明' },
+    { name: '运动鞋团购成功案例.md', format: 'MD', status: '已索引', updatedAt: '2026-06-26', uploadedBy: '方案中心张明', summary: '运动鞋团购成功案例覆盖客户沟通预算拆分SKU组合和门店现场快速响应话术' },
+    { name: '团购通用预算池.xlsx', format: 'XLSX', status: '已索引', updatedAt: '2026-06-24', uploadedBy: '方案中心张明', summary: '预算分档保守档优先控制预算均衡档兼顾品牌与数量品质档用于强调员工体验' },
     { name: '方案中心字段模板.xlsx', format: 'XLSX', status: '解析中', updatedAt: '2026-06-22', uploadedBy: '方案中心李娟' },
   ],
   'kb-public-4': [
@@ -462,10 +472,6 @@ const selectedKb = computed(() => knowledgeBases.find(kb => kb.id === selectedKb
 const rawDocs = computed(() => selectedKbId.value ? (allDocs[selectedKbId.value] ?? []) : [])
 const docs = computed(() => {
   if (!selectedKbId.value) return []
-  if (activeNode.value?.type === 'folder' && getNodeKbId(activeNode.value) === selectedKbId.value && !isKnowledgeBaseNode(activeNode.value)) {
-    const names = collectDocNames(activeNode.value.children ?? [])
-    return rawDocs.value.filter(doc => names.includes(doc.name))
-  }
   return rawDocs.value
 })
 const mainTitle = computed(() => selectedKb.value?.name ?? activeNode.value?.label ?? '知识中心')
@@ -526,22 +532,39 @@ function isDocAccessible(doc: DocItem): boolean {
 }
 
 const filteredDocs = computed(() => {
-  const q = fileSearch.value.trim().toLowerCase()
+  const q = fileSearchDebounced.value.trim().toLowerCase()
   if (!q) return docs.value
-  return docs.value.filter(d => {
+  const results = docs.value.filter(d => {
     if (d.name.toLowerCase().includes(q)) return true
     if (d.tags?.some(t => t.toLowerCase().includes(q))) return true
+    if (d.summary?.toLowerCase().includes(q)) return true
     return false
+  })
+  // 排序：文件名精确匹配 > 文件名包含 > 标签/摘要匹配 > 其他，同级按更新时间倒序
+  return results.sort((a, b) => {
+    const aName = a.name.toLowerCase()
+    const bName = b.name.toLowerCase()
+    const aNameExact = aName === q ? 3 : 0
+    const bNameExact = bName === q ? 3 : 0
+    if (aNameExact || bNameExact) return bNameExact - aNameExact
+    const aNameFuzzy = aName.includes(q) ? 2 : 0
+    const bNameFuzzy = bName.includes(q) ? 2 : 0
+    if (aNameFuzzy || bNameFuzzy) return bNameFuzzy - aNameFuzzy
+    const aTag = (a.tags?.some(t => t.toLowerCase().includes(q)) || a.summary?.toLowerCase().includes(q)) ? 1 : 0
+    const bTag = (b.tags?.some(t => t.toLowerCase().includes(q)) || b.summary?.toLowerCase().includes(q)) ? 1 : 0
+    if (aTag !== bTag) return bTag - aTag
+    return b.updatedAt.localeCompare(a.updatedAt)
   })
 })
 const visibleFolderNodes = computed(() => {
   const children = activeKbFolderNode.value?.children ?? []
-  const q = fileSearch.value.trim().toLowerCase()
+  const q = fileSearchDebounced.value.trim().toLowerCase()
   const folders = children.filter(node => node.type === 'folder')
   return q ? folders.filter(node => node.label.toLowerCase().includes(q)) : folders
 })
 const hasKnowledgeItems = computed(() => visibleFolderNodes.value.length > 0 || filteredDocs.value.length > 0)
 const fileCount = computed(() => visibleFolderNodes.value.length + filteredDocs.value.length)
+const fileSearchEmpty = computed(() => selectedKbId.value && fileSearchDebounced.value.trim() && !hasKnowledgeItems.value && rawDocs.value.length > 0)
 const folderOptions = computed<FolderOption[]>(() => [
   { id: '__root__', label: '知识库根目录', depth: 0 },
   ...collectFolderOptions(fileTree, 1),
@@ -559,6 +582,10 @@ const kbFolderOptions = computed<FolderOption[]>(() => {
     }
     return rows
   })
+})
+const fileSearchPlaceholder = computed(() => {
+  const kbName = selectedKb.value?.name
+  return kbName ? `在「${kbName}」中搜索...` : '搜索文件...'
 })
 const qaSources = computed(() => {
   const sourceDocs = filteredDocs.value.length ? filteredDocs.value : docs.value
@@ -580,8 +607,6 @@ const isThreeColumn = computed(() => qaOpen.value && previewTabs.value.length > 
 const shouldPreviewTakeOver = computed(() => previewTabs.value.length > 0 && !qaOpen.value)
 const activePreviewDoc = computed(() => previewTabs.value.find(doc => doc.name === activeRightTab.value) ?? previewDoc.value)
 const mainRightMargin = computed(() => {
-  // When only preview is open (no qa), main content is hidden — no margin needed
-  if (shouldPreviewTakeOver.value) return '0px'
   const parts = [
     ...(qaOpen.value ? [qaPanelWidth] : []),
     ...(previewTabs.value.length && !isThreeColumn.value ? [previewPanelWidth] : []),
@@ -660,6 +685,8 @@ function selectKb(id: string) {
   selectedKbId.value = id
   selectedFileIds.value = []
   previewDoc.value = null
+  fileSearch.value = ''
+  fileSearchDebounced.value = ''
   const node = findKbTreeNode(fileTree, id)
   if (node) activeTreeItemId.value = node.id
 }
@@ -668,6 +695,12 @@ function deselectKb() {
   selectedKbId.value = null
   activeTreeItemId.value = ''
   fileSearch.value = ''
+  fileSearchDebounced.value = ''
+}
+function searchAllKbs() {
+  const term = fileSearchDebounced.value
+  deselectKb()
+  kbSearch.value = term
 }
 function previewFileFromTree(row: TreeRow) {
   if (activeKnowledgeTab.value === 'trash') activeKnowledgeTab.value = 'assets'
@@ -2239,6 +2272,10 @@ function addCandidateMember(name: string, dept: string) {
   showFileActionToast('已添加授权：' + name)
   settingsAddMemberOpen.value = false
 }
+
+onBeforeUnmount(() => {
+  if (fileSearchTimer) clearTimeout(fileSearchTimer)
+})
 </script>
 
 
@@ -2493,8 +2530,7 @@ function addCandidateMember(name: string, dept: string) {
 
     <!-- Main -->
     <main
-      v-if="activeKnowledgeTab !== 'trash'"
-      v-show="!shouldPreviewTakeOver"
+      v-if="activeKnowledgeTab !== 'trash' && !shouldPreviewTakeOver"
       data-testid="knowledge-main-pane"
       class="flex min-w-0 flex-1 flex-col overflow-hidden transition-[margin] duration-300"
       :class="{ 'knowledge-main-pane--compact': rightPanelOpen }"
@@ -2536,7 +2572,10 @@ function addCandidateMember(name: string, dept: string) {
         <div class="ml-auto flex items-center justify-end gap-2">
           <div class="relative">
             <Search class="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-300" />
-            <input v-if="selectedKb" v-model="fileSearch" type="text" placeholder="搜索文件..." class="w-[clamp(180px,18vw,320px)] rounded-lg border border-zinc-200 py-2 pl-8 pr-3 text-xs text-zinc-600 placeholder:text-zinc-300 focus:border-blue-200 focus:outline-none" />
+            <template v-if="selectedKb">
+              <input v-model="fileSearch" type="text" :placeholder="fileSearchPlaceholder" class="w-[clamp(180px,18vw,320px)] rounded-lg border border-zinc-200 py-2 pl-8 pr-3 text-xs text-zinc-600 placeholder:text-zinc-300 focus:border-blue-200 focus:outline-none" />
+              <button v-if="fileSearch" type="button" class="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-zinc-300 hover:text-zinc-600" @click="fileSearch = ''; fileSearchDebounced = ''"><X class="h-3.5 w-3.5" /></button>
+            </template>
             <input v-else v-model="kbSearch" type="text" placeholder="搜索知识库..." class="w-[clamp(180px,18vw,320px)] rounded-lg border border-zinc-200 py-2 pl-8 pr-3 text-xs text-zinc-600 placeholder:text-zinc-300 focus:border-blue-200 focus:outline-none" />
           </div>
           <div class="inline-flex h-9 overflow-hidden rounded-lg border border-zinc-200 bg-white">
@@ -2683,10 +2722,20 @@ function addCandidateMember(name: string, dept: string) {
         </div>
 
         <!-- File list -->
-        <div v-if="selectedKb && !hasKnowledgeItems && !isThreeColumn" class="flex flex-col items-center justify-center py-24 text-center">
+        <div v-if="selectedKb && !hasKnowledgeItems && !isThreeColumn && !fileSearchEmpty" class="flex flex-col items-center justify-center py-24 text-center">
           <Database class="h-12 w-12 text-zinc-200" />
           <p class="mt-3 text-sm text-zinc-400">此知识库暂无文档</p>
           <button class="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-orange-500 px-4 py-2 text-xs font-medium text-white hover:bg-orange-600" @click="openUploadModal"><Upload class="h-3.5 w-3.5" />上传第一个文档</button>
+        </div>
+        <!-- 搜索无结果 + 全库搜索入口 -->
+        <div v-if="fileSearchEmpty" class="flex flex-col items-center justify-center py-20 text-center">
+          <Search class="h-10 w-10 text-zinc-200" />
+          <p class="mt-3 text-sm font-medium text-zinc-500">未在「{{ selectedKb?.name }}」中找到匹配的文件</p>
+          <p class="mt-1 text-xs text-zinc-400">尝试其他关键词，或搜索全部知识库</p>
+          <button type="button" class="mt-5 inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50" @click="searchAllKbs()">
+            <Search class="h-4 w-4 text-zinc-400" />
+            <span>在全部知识库中搜索「{{ fileSearchDebounced }}」</span>
+          </button>
         </div>
 
         <div v-if="selectedKb && fileView === 'list'" class="overflow-hidden rounded-xl border border-zinc-200 bg-white" v-show="!isThreeColumn">
