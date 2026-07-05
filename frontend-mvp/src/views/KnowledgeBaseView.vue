@@ -21,7 +21,7 @@ interface DocItem { name: string; format: string; status: string; updatedAt: str
 interface TreeNode { id: string; label: string; type: 'folder' | 'file'; kbId?: string; docName?: string; isKnowledgeBase?: boolean; isBuiltIn?: boolean; children?: TreeNode[]; permissionMode?: 'inherit' | 'independent'; permissions?: PermissionEntry[] }
 interface FolderOption { id: string; label: string; depth: number; node?: TreeNode }
 interface RecycleItem { id: string; type: 'knowledgeBase' | 'folder' | 'file'; name: string; space: 'public' | 'personal'; kbId?: string; kbName?: string; parentId?: string; deletedAt: string; detail: string }
-type UploadTaskStatus = 'uploading' | 'pending' | 'processing' | 'done' | 'reviewing' | 'upload_failed' | 'process_failed' | 'process_failed_permanent' | 'cancelled' | 'offline'
+type UploadTaskStatus = 'pending' | 'uploading' | 'processing' | 'done' | 'reviewing' | 'failed' | 'upload_failed' | 'process_failed' | 'process_failed_permanent' | 'cancelled' | 'offline'
 interface TreeRow { id: string; node: TreeNode; depth: number; kbId?: string }
 
 const sidebarVisible = ref(true)
@@ -85,8 +85,36 @@ function getTagStyle(tagName: string): string {
   const found = predefinedTags.find(t => t.name === tagName)
   return found?.color ?? 'bg-zinc-100 text-zinc-600'
 }
-interface UploadTaskItem { id: string; name: string; status: UploadTaskStatus; progress: number; message?: string; doc?: DocItem }
+interface UploadTaskItem {
+  id: string
+  name: string
+  status: UploadTaskStatus
+  progress: number
+  size?: string              // 文件大小展示
+  message?: string           // hover/辅助说明
+  qualityWarning?: boolean   // OCR质量预警
+  quickUpload?: boolean      // SHA256 极速上传标记
+  doc?: DocItem
+}
 const uploadTasks = ref<UploadTaskItem[]>([])
+const uploadAdvancedOpen = ref(false) // 上传弹窗"高级设置"折叠
+const showAllTasks = ref(false)       // 任务面板折叠/展开
+const taskDoneCount = computed(() => uploadTasks.value.filter(t =>
+  t.status === 'done' || t.status === 'reviewing'
+).length)
+const taskTotalCount = computed(() => uploadTasks.value.length)
+const hiddenTasksCount = computed(() => Math.max(0, uploadTasks.value.length - 4))
+const visibleTasks = computed(() => {
+  if (uploadTasks.value.length <= 4 || showAllTasks.value) return uploadTasks.value
+  return uploadTasks.value.slice(0, 4)
+})
+const allDone = computed(() => uploadTasks.value.length > 0 &&
+  uploadTasks.value.every(t =>
+    ['done', 'reviewing', 'failed', 'upload_failed', 'process_failed', 'process_failed_permanent', 'cancelled', 'offline'].includes(t.status)
+  ))
+const hasPendingTasks = computed(() =>
+  uploadTasks.value.some(t => t.status === 'pending' || t.status === 'uploading')
+)
 const expandedTreeIds = ref<string[]>(['kb-node-public-1', 'kb-node-public-3', 'kb-node-public-3-folder-tuan'])
 
 // ========== 权限状态 ==========
@@ -868,7 +896,7 @@ const uploadDragOver = ref(false)
 function handleUploadFiles(event: Event) {
   const files = Array.from((event.target as HTMLInputElement).files ?? [])
   uploadFileErrors.value = []
-  const MAX_SIZE = 20 * 1024 * 1024 // 20MB
+  const MAX_SIZE = 100 * 1024 * 1024 // 100MB
   const allowed = new Set(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'png', 'jpg', 'jpeg'])
   const selected: string[] = []
   files.forEach((file) => {
@@ -878,7 +906,11 @@ function handleUploadFiles(event: Event) {
       return
     }
     if (file.size > MAX_SIZE) {
-      uploadFileErrors.value.push(`「${file.name}」超过 20MB 限制`)
+      uploadFileErrors.value.push(`「${file.name}」超过 100MB 限制`)
+      return
+    }
+    if (file.size === 0) {
+      uploadFileErrors.value.push(`「${file.name}」为空文件`)
       return
     }
     if (selected.includes(file.name)) {
@@ -887,19 +919,83 @@ function handleUploadFiles(event: Event) {
     }
     selected.push(file.name)
   })
-  if (selected.length > 30) {
-    uploadFileErrors.value.push('单次最多上传 30 个文件，已截取前 30 个')
-    selected.splice(30)
+  if (selected.length > 50) {
+    uploadFileErrors.value.push('单次最多上传 50 个文件，已截取前 50 个')
+    selected.splice(50)
   }
   uploadFileNames.value = selected
 }
+function handleUploadDrop(event: DragEvent) {
+  uploadDragOver.value = false
+  const files = Array.from(event.dataTransfer?.files ?? [])
+  if (!files.length) return
+  // 复用 handleUploadFiles 的校验逻辑
+  uploadFileErrors.value = []
+  const allowed = new Set(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'png', 'jpg', 'jpeg'])
+  const selected: string[] = []
+  files.forEach((file) => {
+    const ext = file.name.split('.').pop()?.toLowerCase()
+    if (!ext || !allowed.has(ext)) {
+      uploadFileErrors.value.push(`「${file.name}」格式不支持（支持: PDF/Word/Excel/PPT/TXT/PNG/JPG）`)
+      return
+    }
+    if (file.size > 100 * 1024 * 1024) {
+      uploadFileErrors.value.push(`「${file.name}」超过 100MB 限制`)
+      return
+    }
+    if (file.size === 0) {
+      uploadFileErrors.value.push(`「${file.name}」为空文件`)
+      return
+    }
+    if (selected.includes(file.name)) {
+      uploadFileErrors.value.push(`「${file.name}」重复选择`)
+      return
+    }
+    selected.push(file.name)
+  })
+  if (selected.length > 50) {
+    uploadFileErrors.value.push('单次最多上传 50 个文件，已截取前 50 个')
+    selected.splice(50)
+  }
+  uploadFileNames.value = selected
+}
+function humanFileSize(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB']
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${units[i]}`
+}
+
 function confirmUpload() {
   const names = uploadFileNames.value.length ? uploadFileNames.value : ['方案补充资料.pdf', '客户需求表.xlsx']
   const space = selectedKb.value?.space ?? 'public'
-  const tasks = names.map((name, index) => {
+  const tags = [...uploadTags.value]
+  const securityLevel = uploadSecurityLevel.value
+  const allowedDepts = uploadSecurityLevel.value === '部门' ? [...uploadAllowedDepts.value] : undefined
+  let doneCount = 0
+  const tasks: UploadTaskItem[] = names.map((name, index) => {
     const format = (name.split('.').pop() || 'PDF').toUpperCase()
-    const doc: DocItem = { name, format, status: space === 'public' ? '待审核' : '已索引', updatedAt: '刚刚', uploadedBy: '当前用户', tags: uploadTags.value.length ? [...uploadTags.value] : undefined, securityLevel: uploadSecurityLevel.value, allowedDepts: uploadSecurityLevel.value === '部门' ? [...uploadAllowedDepts.value] : undefined }
-    if (selectedKbId.value) {
+    const baseName = name.replace(/\.[^.]+$/, '')
+    const size = humanFileSize(Math.floor(Math.random() * 10 * 1024 * 1024) + 512 * 1024) // mock 512K~10M
+    const taskId = `upload-${Date.now()}-${index}`
+    let doc: DocItem | undefined
+
+    // 根据文件名特征决定终态（仅 mock 演示用）
+    const simulateFailure = baseName.includes('失败') || baseName.includes('error')
+    const simulateParseError = baseName.includes('解析错误') || baseName.includes('parse-error')
+    const simulateDuplicate = baseName.includes('重复') || baseName.includes('duplicate')
+    const simulateEncrypted = baseName.includes('加密') || baseName.includes('encrypted')
+    const simulateLowQuality = baseName.includes('低质') || baseName.includes('lowq')
+
+    // 正常文件才写入 allDocs
+    if (!simulateFailure && !simulateParseError && !simulateEncrypted && selectedKbId.value) {
+      doc = {
+        name, format,
+        status: space === 'public' ? '待审核' : simulateLowQuality ? '已索引(低质)' : '已索引',
+        updatedAt: '刚刚', uploadedBy: '当前用户',
+        tags: tags.length ? tags : undefined,
+        securityLevel, allowedDepts,
+      }
       allDocs[selectedKbId.value] = [doc, ...(allDocs[selectedKbId.value] ?? [])]
       const targetNode = activeNode.value?.type === 'folder' && activeNode.value.kbId === selectedKbId.value
         ? activeNode.value
@@ -908,22 +1004,197 @@ function confirmUpload() {
         targetNode.children = targetNode.children ?? []
         targetNode.children.unshift({
           id: `file-upload-${Date.now()}-${index}`,
-          label: name,
-          type: 'file',
-          kbId: selectedKbId.value,
-          docName: name,
+          label: name, type: 'file', kbId: selectedKbId.value, docName: name,
         })
         expandedTreeIds.value = [...new Set([...expandedTreeIds.value, targetNode.id])]
       }
+      doneCount++
     }
-    return { id: `upload-${Date.now()}-${index}`, name, status: space === 'public' ? 'reviewing' as const : 'done' as const, progress: 100, doc }
+
+    // 创建 task 并设置 size
+    const task: UploadTaskItem = {
+      id: taskId, name, size,
+      status: 'pending', progress: 0, doc,
+      qualityWarning: simulateLowQuality,
+      quickUpload: simulateDuplicate,
+    }
+    if (simulateDuplicate) task.message = '检测到知识库内已有相同文件，已极速完成处理'
+    if (simulateLowQuality) task.message = 'OCR 识别质量偏低（< 0.8），检索效果可能受影响'
+
+    // 异步状态机模拟
+    const statusSequence: { status: UploadTaskStatus; progress: number; delay: number }[] = []
+    if (simulateDuplicate) {
+      // 极速上传：uploading → done (跳过 processing)
+      statusSequence.push(
+        { status: 'uploading', progress: 20, delay: 200 },
+        { status: 'uploading', progress: 60, delay: 400 },
+        { status: 'done', progress: 100, delay: 700 },
+      )
+    } else if (simulateFailure) {
+      // 上传失败
+      statusSequence.push(
+        { status: 'uploading', progress: 15, delay: 400 * index },
+        { status: 'uploading', progress: 35, delay: 700 * index + 300 },
+        { status: 'uploading', progress: 55, delay: 900 * index + 600 },
+        { status: 'failed', progress: 60, delay: 1100 * index + 900 },
+      )
+    } else if (simulateParseError || simulateEncrypted) {
+      // 解析失败
+      statusSequence.push(
+        { status: 'uploading', progress: 20, delay: 400 * index },
+        { status: 'uploading', progress: 50, delay: 700 * index + 300 },
+        { status: 'uploading', progress: 75, delay: 900 * index + 600 },
+        { status: 'processing', progress: 85, delay: 1100 * index + 900 },
+        { status: 'processing', progress: 92, delay: 1300 * index + 1100 },
+        { status: 'process_failed', progress: 95, delay: 1500 * index + 1300 },
+      )
+    } else if (space === 'public') {
+      // 公共空间：uploading → processing → reviewing
+      statusSequence.push(
+        { status: 'uploading', progress: 15, delay: 400 * index },
+        { status: 'uploading', progress: 35, delay: 700 * index + 250 },
+        { status: 'uploading', progress: 60, delay: 1000 * index + 500 },
+        { status: 'processing', progress: 80, delay: 1300 * index + 800 },
+        { status: 'processing', progress: 92, delay: 1600 * index + 1100 },
+        { status: 'reviewing', progress: 100, delay: 1900 * index + 1400 },
+      )
+    } else {
+      // 个人空间正常：uploading → processing → done
+      const hasWarning = simulateLowQuality
+      statusSequence.push(
+        { status: 'uploading', progress: 15, delay: 400 * index },
+        { status: 'uploading', progress: 40, delay: 700 * index + 250 },
+        { status: 'uploading', progress: 65, delay: 1000 * index + 500 },
+        { status: 'processing', progress: 80, delay: 1300 * index + 800 },
+        { status: 'processing', progress: 92, delay: 1600 * index + 1100 },
+        { status: 'done', progress: 100, delay: 1900 * index + 1400 },
+      )
+    }
+
+    statusSequence.forEach(({ status, progress, delay }) => {
+      setTimeout(() => {
+        const t = uploadTasks.value.find(u => u.id === taskId)
+        if (t && t.status !== 'cancelled') {
+          t.status = status
+          t.progress = progress
+        }
+      }, delay)
+    })
+
+    // 自动清理已完成：所有终态后 10s 面板消失（如果没有新任务）
+    const terminalDelay = statusSequence.reduce((max, s) => Math.max(max, s.delay), 0) + 2000
+    setTimeout(() => {
+      const allTerminal = uploadTasks.value.every(t =>
+        ['done', 'reviewing', 'failed', 'upload_failed', 'process_failed', 'process_failed_permanent', 'cancelled', 'offline'].includes(t.status)
+      )
+      if (allTerminal) {
+        setTimeout(() => {
+          if (uploadTasks.value.every(t => !['pending', 'uploading', 'processing'].includes(t.status))) {
+            // 保持展示但用户可手动关闭
+          }
+        }, 10000)
+      }
+    }, terminalDelay + 100)
+
+    return task
   })
-  uploadTasks.value = [...tasks, ...uploadTasks.value].slice(0, 4)
+
+  uploadTasks.value = [...tasks, ...uploadTasks.value]
+  // kb.docs 计数联动
+  if (selectedKb.value && doneCount > 0) {
+    selectedKb.value.docs += doneCount
+  }
+  showAllTasks.value = false
   uploadModalOpen.value = false
   uploadFileNames.value = []
+  uploadTags.value = []
+  uploadAdvancedOpen.value = false
 }
 function dismissUploadTask(id: string) {
   uploadTasks.value = uploadTasks.value.filter(task => task.id !== id)
+}
+function cancelUploadTask(id: string) {
+  const task = uploadTasks.value.find(t => t.id === id)
+  if (task && (task.status === 'pending' || task.status === 'uploading')) {
+    task.status = 'cancelled'
+    task.message = '用户已取消上传'
+  }
+}
+function cancelAllUploadTasks() {
+  uploadTasks.value.forEach(t => {
+    if (t.status === 'pending' || t.status === 'uploading') {
+      t.status = 'cancelled'
+      t.message = '用户已取消上传'
+    }
+  })
+}
+function retryUploadTask(id: string) {
+  const task = uploadTasks.value.find(t => t.id === id)
+  if (!task) return
+  const space = selectedKb.value?.space ?? 'public'
+  const isDuplicate = task.quickUpload
+  const isLowQuality = task.qualityWarning
+  const baseName = task.name.replace(/\.[^.]+$/, '')
+
+  task.status = 'pending'
+  task.progress = 0
+  task.message = undefined
+  task.qualityWarning = isLowQuality
+  task.quickUpload = isDuplicate
+
+  const statusSequence: { status: UploadTaskStatus; progress: number; delay: number }[] = []
+  if (isDuplicate) {
+    statusSequence.push(
+      { status: 'uploading', progress: 20, delay: 200 },
+      { status: 'uploading', progress: 60, delay: 400 },
+      { status: 'done', progress: 100, delay: 700 },
+    )
+  } else if (space === 'public') {
+    statusSequence.push(
+      { status: 'uploading', progress: 15, delay: 300 },
+      { status: 'uploading', progress: 45, delay: 600 },
+      { status: 'processing', progress: 80, delay: 1000 },
+      { status: 'processing', progress: 92, delay: 1300 },
+      { status: 'reviewing', progress: 100, delay: 1600 },
+    )
+  } else {
+    statusSequence.push(
+      { status: 'uploading', progress: 15, delay: 300 },
+      { status: 'uploading', progress: 45, delay: 600 },
+      { status: 'processing', progress: 80, delay: 1000 },
+      { status: 'processing', progress: 92, delay: 1300 },
+      { status: 'done', progress: 100, delay: 1600 },
+    )
+  }
+
+  statusSequence.forEach(({ status, progress, delay }) => {
+    setTimeout(() => {
+      const t = uploadTasks.value.find(u => u.id === id)
+      if (t && t.status !== 'cancelled') {
+        t.status = status
+        t.progress = progress
+      }
+    }, delay)
+  })
+}
+function statusTextClass(status: UploadTaskStatus): string {
+  if (status === 'done') return 'text-emerald-600'
+  if (status === 'reviewing') return 'text-amber-600'
+  if (status === 'cancelled') return 'text-zinc-400'
+  if (['failed', 'upload_failed', 'process_failed', 'process_failed_permanent'].includes(status)) return 'text-rose-600'
+  return 'text-blue-600'
+}
+function statusTextLabel(task: UploadTaskItem): string {
+  if (task.status === 'pending') return '排队中'
+  if (task.status === 'uploading') return '上传中'
+  if (task.status === 'processing') return '处理中'
+  if (task.status === 'done') return task.qualityWarning ? '已完成 (低质)' : '已完成 ✅'
+  if (task.status === 'reviewing') return '待审核 ⏳'
+  if (task.status === 'failed' || task.status === 'upload_failed') return '上传失败 ❌'
+  if (task.status === 'process_failed' || task.status === 'process_failed_permanent') return '处理失败 ❌'
+  if (task.status === 'cancelled') return '已取消 ➖'
+  if (task.status === 'offline') return '离线'
+  return '上传中'
 }
 function getFileIcon(f: string) { if (f === 'XLSX') return FileSpreadsheet; if (f === 'DOCX' || f === 'MD' || f === 'PDF') return FileText; return File }
 function getIconColor(f: string) { if (f === 'XLSX') return 'text-emerald-500 bg-emerald-50'; if (f === 'DOCX') return 'text-blue-500 bg-blue-50'; if (f === 'PDF') return 'text-red-500 bg-red-50'; if (f === 'MD') return 'text-violet-500 bg-violet-50'; return 'text-zinc-500 bg-zinc-50' }
@@ -2850,36 +3121,73 @@ function addCandidateMember(name: string, dept: string) {
 
     <!-- Floating upload tasks -->
     <Teleport to="body">
-      <div v-if="uploadTasks.length" class="fixed bottom-5 right-5 z-[60] w-[min(420px,calc(100vw-2rem))] rounded-2xl border border-zinc-200 bg-white p-4 shadow-2xl shadow-zinc-300/50">
-        <div class="mb-3 flex items-center justify-between gap-3">
+      <div v-if="uploadTasks.length" class="fixed bottom-5 right-5 z-[60] flex w-[min(420px,calc(100vw-2rem))] max-h-[calc(100vh-8rem)] flex-col rounded-2xl border border-zinc-200 bg-white shadow-2xl shadow-zinc-300/50">
+        <!-- 标题栏（固定） -->
+        <div class="flex items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3">
           <div class="flex items-center gap-2 text-sm font-semibold text-zinc-900">
             <Upload class="h-4 w-4 text-blue-600" />
-            任务运行中
+            📤 文件上传 — {{ taskDoneCount }}成功 / {{ taskTotalCount }}总数
           </div>
-          <button type="button" class="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700" aria-label="关闭上传任务" @click="uploadTasks = []">
-            <X class="h-4 w-4" />
-          </button>
+          <div class="flex items-center gap-1">
+            <button v-if="hasPendingTasks" type="button" class="rounded-md px-2 py-1 text-[11px] font-medium text-zinc-500 hover:bg-zinc-100" @click="cancelAllUploadTasks">全部取消</button>
+            <button type="button" class="rounded-md p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700" aria-label="关闭上传面板" @click="uploadTasks = []"><X class="h-4 w-4" /></button>
+          </div>
         </div>
-        <div class="space-y-2">
-          <div v-for="task in uploadTasks" :key="task.id" class="rounded-xl bg-zinc-50 px-3 py-2">
-            <div class="flex items-center gap-2 text-xs">
-              <FileText class="h-4 w-4 shrink-0 text-blue-500" />
-              <span class="min-w-0 flex-1 truncate font-medium text-zinc-800">{{ task.name }}</span>
-              <span class="text-zinc-400">{{ task.progress }}%</span>
-              <button type="button" class="rounded-md p-0.5 text-zinc-400 hover:bg-white hover:text-zinc-700" :aria-label="`关闭任务 ${task.name}`" @click="dismissUploadTask(task.id)">
-                <X class="h-3.5 w-3.5" />
-              </button>
-            </div>
-            <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-white">
-              <div class="h-full rounded-full" :class="task.status === 'upload_failed' || task.status === 'process_failed' ? 'bg-rose-500' : task.status === 'reviewing' ? 'bg-amber-500' : 'bg-blue-500'" :style="{ width: `${task.progress}%` }" />
-            </div>
-            <div class="mt-2 flex items-center justify-between gap-2 text-[11px]">
-              <span class="font-medium" :class="task.status === 'done' ? 'text-emerald-600' : task.status === 'reviewing' ? 'text-amber-600' : task.status === 'upload_failed' || task.status === 'process_failed' ? 'text-rose-600' : 'text-blue-600'">
-                {{ task.status === 'done' ? '上传成功' : task.status === 'reviewing' ? '上传成功 · 待人工审核' : task.status === 'upload_failed' || task.status === 'process_failed' ? '上传失败' : '上传中' }}
+        <!-- 任务列表（可滚动） -->
+        <div class="flex-1 space-y-1.5 overflow-y-auto px-3 py-2">
+          <div v-for="task in visibleTasks" :key="task.id" class="rounded-lg bg-zinc-50 px-3 py-2 text-xs">
+            <div class="flex items-center gap-2">
+              <!-- 图标 -->
+              <span class="shrink-0 text-sm">
+                <span v-if="task.status === 'done'">🟢</span>
+                <span v-else-if="task.status === 'reviewing'">🟡</span>
+                <span v-else-if="task.status === 'failed' || task.status === 'upload_failed' || task.status === 'process_failed' || task.status === 'process_failed_permanent'">❌</span>
+                <span v-else-if="task.status === 'cancelled'">➖</span>
+                <span v-else>🔵</span>
               </span>
-              <button v-if="task.doc" type="button" class="rounded-md px-2 py-1 text-blue-600 hover:bg-white" @click="openPreview(task.doc)">查看</button>
+              <!-- 文件名 -->
+              <span class="min-w-0 flex-1 truncate font-medium text-zinc-800" :title="task.name">{{ task.name }}</span>
+              <!-- 文件大小 -->
+              <span v-if="task.size" class="shrink-0 text-zinc-400">{{ task.size }}</span>
+              <!-- 进度 -->
+              <span class="shrink-0 tabular-nums text-zinc-400">{{ task.progress }}%</span>
+              <!-- 操作按钮 -->
+              <button v-if="task.status === 'pending' || task.status === 'uploading'" type="button" class="shrink-0 rounded-md px-1.5 py-0.5 text-zinc-500 hover:bg-white hover:text-red-600" @click="cancelUploadTask(task.id)" title="取消上传">取消</button>
+              <button v-else-if="task.status === 'failed' || task.status === 'upload_failed'" type="button" class="shrink-0 rounded-md px-1.5 py-0.5 text-blue-600 hover:bg-white" @click="retryUploadTask(task.id)" title="重新上传">重新上传</button>
+              <button v-else-if="task.status === 'process_failed' || task.status === 'process_failed_permanent'" type="button" class="shrink-0 rounded-md px-1.5 py-0.5 text-blue-600 hover:bg-white" @click="retryUploadTask(task.id)" title="手动重试">手动重试</button>
+              <button v-else-if="task.status === 'cancelled' || (task.status === 'done' && task.quickUpload)" type="button" class="shrink-0 rounded-md px-1.5 py-0.5 text-blue-600 hover:bg-white" @click="retryUploadTask(task.id)" title="重新处理">重新处理</button>
+              <button v-else type="button" class="shrink-0 rounded-md p-0.5 text-zinc-400 hover:bg-white hover:text-zinc-700" :aria-label="`关闭任务 ${task.name}`" @click="dismissUploadTask(task.id)"><X class="h-3.5 w-3.5" /></button>
             </div>
+            <!-- 进度条 -->
+            <div class="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white">
+              <div
+                class="h-full rounded-full transition-all duration-500"
+                :class="task.status === 'failed' || task.status === 'upload_failed' || task.status === 'process_failed' || task.status === 'process_failed_permanent' ? 'bg-rose-500' : task.status === 'reviewing' ? 'bg-amber-500' : task.status === 'cancelled' ? 'bg-zinc-300' : task.status === 'done' && task.qualityWarning ? 'bg-amber-400' : 'bg-blue-500'"
+                :style="{ width: `${task.progress}%` }"
+              />
+            </div>
+            <!-- 状态文字 -->
+            <div class="mt-1 flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <span class="font-medium" :class="statusTextClass(task.status)">
+                  {{ statusTextLabel(task) }}
+                </span>
+                <!-- 极速上传标注 -->
+                <span v-if="task.status === 'done' && task.quickUpload" class="rounded bg-zinc-200/70 px-1.5 py-0.5 text-[10px] text-zinc-500" title="检测到知识库内已有相同文件，已极速完成处理">⚡ 极速上传</span>
+                <!-- 质量预警 -->
+                <span v-if="task.status === 'done' && task.qualityWarning" class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-600" title="OCR 识别质量偏低，检索效果可能受影响">⚠️ 质量预警</span>
+              </div>
+              <button v-if="task.doc" type="button" class="rounded-md px-2 py-0.5 text-blue-600 hover:bg-white" @click="openPreview(task.doc)">查看</button>
+            </div>
+            <!-- 辅助消息 -->
+            <div v-if="task.message && task.status !== 'pending' && task.status !== 'uploading' && task.status !== 'processing'" class="mt-1 text-[10px] text-zinc-400 italic">{{ task.message }}</div>
           </div>
+        </div>
+        <!-- 折叠/展开入口（固定底部） -->
+        <div v-if="hiddenTasksCount > 0" class="border-t border-zinc-100 px-4 py-2 text-center">
+          <button type="button" class="text-xs font-medium text-blue-600 hover:text-blue-700" @click="showAllTasks = !showAllTasks">
+            {{ showAllTasks ? `↑ 收起（展示前4个）` : `→ 展开全部（${hiddenTasksCount}个任务隐藏）` }}
+          </button>
         </div>
       </div>
     </Teleport>
@@ -2888,68 +3196,99 @@ function addCandidateMember(name: string, dept: string) {
     <Dialog v-model:open="uploadModalOpen">
       <DialogContent class="max-w-lg">
         <DialogHeader>
-          <DialogTitle>上传文件</DialogTitle>
+          <DialogTitle>上传文件{{ selectedKb ? ` - ${selectedKb.name}` : '' }}</DialogTitle>
           <DialogDescription>{{ selectedKb ? `上传到 ${selectedKb.name}` : '请先选择知识库，或上传后再移动归档' }}</DialogDescription>
         </DialogHeader>
         <div class="space-y-4 py-2">
-          <label class="flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-4 py-6 text-center transition hover:border-blue-300 hover:bg-blue-50/50">
-            <Upload class="h-8 w-8 text-blue-500" />
-            <span class="mt-3 text-sm font-medium text-zinc-800">选择文件</span>
-            <span class="mt-1 text-xs text-zinc-400">支持 PDF、Word、Excel、PPT、TXT、PNG、JPG，单个文件 20MB 内</span>
+          <!-- 拖拽上传 -->
+          <label
+            class="flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-6 text-center transition"
+            :class="uploadDragOver ? 'border-blue-400 bg-blue-50' : 'border-zinc-300 bg-zinc-50 hover:border-blue-300 hover:bg-blue-50/50'"
+            @dragover.prevent="uploadDragOver = true"
+            @dragleave.prevent="uploadDragOver = false"
+            @drop.prevent="handleUploadDrop($event)"
+          >
+            <Upload class="h-8 w-8" :class="uploadDragOver ? 'text-blue-600' : 'text-blue-500'" />
+            <span class="mt-3 text-sm font-medium" :class="uploadDragOver ? 'text-blue-700' : 'text-zinc-800'">{{ uploadDragOver ? '松开以上传' : '点击选择文件或将文件拖拽到此处' }}</span>
+            <span class="mt-1 text-xs text-zinc-400">支持 PDF、Word、Excel、PPT、TXT、PNG、JPG，单个文件 100MB 内</span>
             <input class="hidden" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg" @change="handleUploadFiles" />
           </label>
-          <div v-if="uploadFileNames.length" class="space-y-1 rounded-lg border border-zinc-200 bg-white p-2">
-            <div v-for="name in uploadFileNames" :key="name" class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-zinc-600">
-              <File class="h-3.5 w-3.5 text-zinc-400" />
-              <span class="min-w-0 flex-1 truncate">{{ name }}</span>
+          <!-- 校验错误提示 -->
+          <div v-if="uploadFileErrors.length" class="space-y-1 rounded-lg border border-rose-200 bg-rose-50 p-2">
+            <div v-for="(err, i) in uploadFileErrors" :key="i" class="flex items-start gap-1.5 text-[11px] text-rose-600">
+              <span>⚠️</span>
+              <span>{{ err }}</span>
             </div>
           </div>
-          <!-- 标签选择 -->
-          <div class="space-y-3">
-            <div>
-              <div class="mb-2 flex items-center justify-between">
-                <span class="text-xs font-medium text-zinc-600">标签</span>
-                <button type="button" class="text-xs text-blue-500 hover:text-blue-700" @click="uploadShowTagPicker = !uploadShowTagPicker">{{ uploadShowTagPicker ? '收起' : '+ 自定义标签' }}</button>
-              </div>
-              <div class="flex flex-wrap gap-1.5">
-                <button v-for="tag in predefinedTags" :key="tag.name" type="button" class="rounded-md border px-2 py-0.5 text-[11px] font-medium transition" :class="uploadTags.includes(tag.name) ? tag.color + ' border-current' : 'border-zinc-200 text-zinc-400 hover:border-zinc-300'" @click="toggleUploadTag(tag.name)">{{ tag.name }}</button>
-              </div>
-              <div v-if="uploadShowTagPicker" class="mt-2 flex items-center gap-2">
-                <Input v-model="uploadCustomTagName" placeholder="标签名称" class="flex-1" @keydown.enter.prevent="addCustomTag" />
-                <input v-model="uploadCustomTagColor" type="color" class="h-8 w-8 cursor-pointer rounded border border-zinc-200" />
-                <Button variant="secondary" size="sm" @click="addCustomTag">添加</Button>
-              </div>
+          <!-- 候选文件列表 -->
+          <div v-if="uploadFileNames.length" class="space-y-1 rounded-lg border border-zinc-200 bg-white p-2">
+            <div v-for="name in uploadFileNames" :key="name" class="group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50">
+              <File class="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+              <span class="min-w-0 flex-1 truncate">{{ name }}</span>
+              <span class="shrink-0 text-zinc-400">{{ humanFileSize(Math.floor(Math.random() * 10 * 1024 * 1024) + 512 * 1024) }}</span>
+              <span class="rounded bg-blue-50 px-1 py-0.5 text-[10px] font-medium text-blue-600">待上传</span>
+              <button type="button" class="shrink-0 rounded p-0.5 text-zinc-300 opacity-0 transition hover:text-red-500 group-hover:opacity-100" aria-label="移除文件" @click="uploadFileNames = uploadFileNames.filter(n => n !== name)"><X class="h-3 w-3" /></button>
             </div>
-            <div>
-              <div class="mb-2 flex items-center justify-between">
-                <span class="text-xs font-medium text-zinc-600">密级</span>
-                <span class="text-[10px] text-zinc-400">标注文件敏感程度</span>
-              </div>
-              <div class="flex gap-2">
-                <button v-for="sl in SECURITY_LEVELS" :key="sl.value" type="button"
-                  class="flex-1 rounded-md border px-3 py-1.5 text-xs font-medium transition"
-                  :class="uploadSecurityLevel === sl.value ? sl.activeClass : 'border-zinc-200 text-zinc-400 hover:border-zinc-300 hover:text-zinc-600'"
-                  :title="sl.bizDesc"
-                  @click="uploadSecurityLevel = sl.value">
-                  {{ sl.label }}
-                </button>
-              </div>
-              <div v-if="uploadSecurityLevel === '部门'" class="mt-2 rounded-xl border border-zinc-200 bg-zinc-50 p-2">
-                <div class="mb-1.5 text-[11px] font-medium text-zinc-600">选择部门</div>
-                <div class="max-h-32 space-y-1 overflow-y-auto">
-                  <label v-for="dept in orgTree.filter(n => n.type === 'dept')" :key="dept.id" class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-white">
-                    <input type="checkbox" :checked="uploadAllowedDepts.some(d => d.id === dept.id)" @change="toggleUploadDept(dept)" class="rounded border-zinc-300 text-blue-600" />
-                    <span class="text-zinc-700">{{ dept.name }}</span>
-                    <span class="ml-auto text-zinc-400">({{ dept.children?.length ?? 0  }}人)</span>
-                  </label>
+          </div>
+          <!-- 空文件提示 -->
+          <div v-if="!uploadFileNames.length && !uploadFileErrors.length" class="rounded-lg border border-dashed border-zinc-200 py-6 text-center text-xs text-zinc-400">
+            请先选择或拖拽文件
+          </div>
+          <!-- 高级设置（折叠） -->
+          <div>
+            <button type="button" class="flex w-full items-center gap-1.5 text-xs font-medium text-zinc-600 hover:text-zinc-900" @click="uploadAdvancedOpen = !uploadAdvancedOpen">
+              <ChevronDown v-if="uploadAdvancedOpen" class="h-3.5 w-3.5" />
+              <ChevronRight v-else class="h-3.5 w-3.5" />
+              高级设置
+            </button>
+            <div v-if="uploadAdvancedOpen" class="mt-2 space-y-3 rounded-lg border border-zinc-100 bg-zinc-50 p-3">
+              <!-- 标签选择 -->
+              <div>
+                <div class="mb-2 flex items-center justify-between">
+                  <span class="text-xs font-medium text-zinc-600">标签</span>
+                  <button type="button" class="text-xs text-blue-500 hover:text-blue-700" @click="uploadShowTagPicker = !uploadShowTagPicker">{{ uploadShowTagPicker ? '收起' : '+ 自定义标签' }}</button>
+                </div>
+                <div class="flex flex-wrap gap-1.5">
+                  <button v-for="tag in predefinedTags" :key="tag.name" type="button" class="rounded-md border px-2 py-0.5 text-[11px] font-medium transition" :class="uploadTags.includes(tag.name) ? tag.color + ' border-current' : 'border-zinc-200 text-zinc-400 hover:border-zinc-300'" @click="toggleUploadTag(tag.name)">{{ tag.name }}</button>
+                </div>
+                <div v-if="uploadShowTagPicker" class="mt-2 flex items-center gap-2">
+                  <Input v-model="uploadCustomTagName" placeholder="标签名称" class="flex-1" @keydown.enter.prevent="addCustomTag" />
+                  <input v-model="uploadCustomTagColor" type="color" class="h-8 w-8 cursor-pointer rounded border border-zinc-200" />
+                  <Button variant="secondary" size="sm" @click="addCustomTag">添加</Button>
                 </div>
               </div>
-              <p v-if="uploadSecurityLevel === '部门' && !uploadAllowedDepts.length" class="mt-1 text-[10px] text-amber-500">请至少选择一个部门，否则文件默认为"全员"可见</p>
+              <!-- 密级选择 -->
+              <div>
+                <div class="mb-2 flex items-center justify-between">
+                  <span class="text-xs font-medium text-zinc-600">密级</span>
+                  <span class="text-[10px] text-zinc-400">标注文件敏感程度</span>
+                </div>
+                <div class="flex gap-2">
+                  <button v-for="sl in SECURITY_LEVELS" :key="sl.value" type="button"
+                    class="flex-1 rounded-md border px-3 py-1.5 text-xs font-medium transition"
+                    :class="uploadSecurityLevel === sl.value ? sl.activeClass : 'border-zinc-200 text-zinc-400 hover:border-zinc-300 hover:text-zinc-600'"
+                    :title="sl.bizDesc"
+                    @click="uploadSecurityLevel = sl.value">
+                    {{ sl.label }}
+                  </button>
+                </div>
+                <div v-if="uploadSecurityLevel === '部门'" class="mt-2 rounded-xl border border-zinc-200 bg-white p-2">
+                  <div class="mb-1.5 text-[11px] font-medium text-zinc-600">选择部门</div>
+                  <div class="max-h-32 space-y-1 overflow-y-auto">
+                    <label v-for="dept in orgTree.filter(n => n.type === 'dept')" :key="dept.id" class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-zinc-50">
+                      <input type="checkbox" :checked="uploadAllowedDepts.some(d => d.id === dept.id)" @change="toggleUploadDept(dept)" class="rounded border-zinc-300 text-blue-600" />
+                      <span class="text-zinc-700">{{ dept.name }}</span>
+                      <span class="ml-auto text-zinc-400">({{ dept.children?.length ?? 0 }}人)</span>
+                    </label>
+                  </div>
+                </div>
+                <p v-if="uploadSecurityLevel === '部门' && !uploadAllowedDepts.length" class="mt-1 text-[10px] text-amber-500">请至少选择一个部门，否则文件默认为"全员"可见</p>
+              </div>
             </div>
           </div>
           <div class="flex items-center justify-end gap-2 pt-2">
             <Button variant="outline" @click="uploadModalOpen = false">取消</Button>
-            <Button aria-label="确认上传文件" @click="confirmUpload">确认上传</Button>
+            <Button aria-label="确认上传文件" :disabled="uploadFileNames.length === 0" @click="confirmUpload">确认上传</Button>
           </div>
         </div>
       </DialogContent>
