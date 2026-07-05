@@ -2500,15 +2500,9 @@ function addCandidateMember(name: string, dept: string) {
           <div class="flex flex-1 flex-col overflow-hidden">
             <!-- 成员授权 -->
             <template v-if="settingsTab === 'members'">
-              <div class="flex flex-wrap items-center gap-2 border-b border-zinc-100 px-4 py-3">
+              <div class="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
                 <h4 class="text-sm font-semibold text-zinc-900">成员列表（{{ activeSettingsMembers.length }}）</h4>
-                <div class="ml-auto flex items-center gap-2">
-                  <div class="relative">
-                    <Search class="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-300" />
-                    <input v-model="settingsMemberFilter" class="h-8 w-40 rounded-lg border border-zinc-200 pl-7 pr-2 text-xs outline-none focus:border-blue-300" placeholder="搜索成员/部门" />
-                  </div>
-                  <button type="button" class="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700" @click="settingsAddMemberOpen = !settingsAddMemberOpen"><Plus class="h-3.5 w-3.5" />添加成员</button>
-                </div>
+                <button type="button" class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700" @click="settingsAddMemberOpen = !settingsAddMemberOpen">添加成员</button>
               </div>
               <div class="border-b border-zinc-100 bg-zinc-50/60 px-4 py-2">
                 <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
@@ -2664,39 +2658,43 @@ function addCandidateMember(name: string, dept: string) {
         </div>
       </div>
       <div class="flex-1 overflow-auto">
-        <div v-if="filteredRecycleItems.length === 0" class="flex flex-col items-center justify-center py-20 text-zinc-400">
-          <Trash2 class="h-10 w-10" />
-          <p class="mt-3 text-sm">当前空间回收站为空</p>
-        </div>
-        <div class="flex flex-wrap items-center gap-2 border-b border-zinc-100 bg-zinc-50/60 px-6 py-2 text-xs">
-          <div class="flex items-center gap-1">
-            <Calendar class="h-3.5 w-3.5 text-zinc-400" />
-            <input v-model="recycleDateFrom" type="date" class="h-7 rounded-md border border-zinc-200 px-1.5 text-xs outline-none focus:border-blue-300" />
-            <span class="text-zinc-400">至</span>
-            <input v-model="recycleDateTo" type="date" class="h-7 rounded-md border border-zinc-200 px-1.5 text-xs outline-none focus:border-blue-300" />
+        <template v-if="filteredRecycleItems.length === 0">
+          <div class="flex flex-col items-center justify-center py-20 text-zinc-400">
+            <Trash2 class="h-10 w-10" />
+            <p class="mt-3 text-sm">当前空间回收站为空</p>
           </div>
-          <button type="button" class="rounded-md border border-zinc-200 bg-white px-2 py-0.5 text-[11px] text-zinc-600 hover:bg-zinc-50" @click="recycleDateFrom=''; recycleDateTo=''">重置</button>
-          <span class="ml-2 text-zinc-500">共 {{ filteredRecycleItems.length }} 项</span>
-          <span v-if="recycleItems.some(r => recycleIsExpired(r))" class="ml-2 inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700"><AlertTriangle class="h-3 w-3" />含 {{ recycleItems.filter(r => recycleIsExpired(r)).length }} 项即将过期</span>
-        </div>
-        <div v-else class="divide-y divide-zinc-100">
-          <div v-for="item in filteredRecycleItems" :key="item.id" class="flex items-center gap-4 px-6 py-3 text-sm hover:bg-zinc-50">
-            <Folder v-if="item.type === 'folder'" class="h-5 w-5 text-blue-400" />
-            <FileText v-else-if="item.type === 'file'" class="h-5 w-5 text-zinc-400" />
-            <BookOpen v-else class="h-5 w-5 text-orange-400" />
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-2">
-                <span class="truncate font-medium text-zinc-900">{{ item.name }}</span>
-                <span v-if="recycleIsExpired(item)" class="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">逾期</span>
-                <span v-else class="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500">剩余 {{ recycleDaysLeft(item) }} 天</span>
-              </div>
-              <div class="text-xs text-zinc-400">{{ item.detail }}</div>
+        </template>
+        <template v-else>
+          <div class="sticky top-0 z-[1] flex flex-wrap items-center gap-2 border-b border-zinc-100 bg-zinc-50/90 px-6 py-2 text-xs backdrop-blur">
+            <div class="flex items-center gap-1">
+              <Calendar class="h-3.5 w-3.5 text-zinc-400" />
+              <input v-model="recycleDateFrom" type="date" class="h-7 rounded-md border border-zinc-200 px-1.5 text-xs outline-none focus:border-blue-300" />
+              <span class="text-zinc-400">至</span>
+              <input v-model="recycleDateTo" type="date" class="h-7 rounded-md border border-zinc-200 px-1.5 text-xs outline-none focus:border-blue-300" />
             </div>
-            <span class="text-xs text-zinc-400">{{ item.deletedAt?.slice(0,10) }}</span>
-            <button type="button" class="rounded-lg border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-600 enabled:hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50" :disabled="recycleIsExpired(item)" @click="restoreRecycleItem(item)">{{ recycleIsExpired(item) ? '已过期' : '恢复' }}</button>
-            <button type="button" class="rounded-lg border border-rose-100 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-100" @click="purgeRecycleItem(item)">彻底删除</button>
+            <button type="button" class="rounded-md border border-zinc-200 bg-white px-2 py-0.5 text-[11px] text-zinc-600 hover:bg-zinc-50" @click="recycleDateFrom=''; recycleDateTo=''">重置</button>
+            <span class="ml-2 text-zinc-500">共 {{ filteredRecycleItems.length }} 项</span>
+            <span v-if="recycleItems.some(r => recycleIsExpired(r))" class="ml-2 inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700"><AlertTriangle class="h-3 w-3" />含 {{ recycleItems.filter(r => recycleIsExpired(r)).length }} 项即将过期</span>
           </div>
-        </div>
+          <div class="divide-y divide-zinc-100">
+            <div v-for="item in filteredRecycleItems" :key="item.id" class="flex items-center gap-4 px-6 py-3 text-sm hover:bg-zinc-50">
+              <Folder v-if="item.type === 'folder'" class="h-5 w-5 text-blue-400" />
+              <FileText v-else-if="item.type === 'file'" class="h-5 w-5 text-zinc-400" />
+              <BookOpen v-else class="h-5 w-5 text-orange-400" />
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="truncate font-medium text-zinc-900">{{ item.name }}</span>
+                  <span v-if="recycleIsExpired(item)" class="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">逾期</span>
+                  <span v-else class="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500">剩余 {{ recycleDaysLeft(item) }} 天</span>
+                </div>
+                <div class="text-xs text-zinc-400">{{ item.detail }}</div>
+              </div>
+              <span class="text-xs text-zinc-400">{{ item.deletedAt?.slice(0,10) }}</span>
+              <button type="button" class="rounded-lg border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-600 enabled:hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50" :disabled="recycleIsExpired(item)" @click="restoreRecycleItem(item)">{{ recycleIsExpired(item) ? '已过期' : '恢复' }}</button>
+              <button type="button" class="rounded-lg border border-rose-100 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-100" @click="purgeRecycleItem(item)">彻底删除</button>
+            </div>
+          </div>
+        </template>
       </div>
     </div>
 
