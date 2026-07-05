@@ -2475,73 +2475,116 @@ function addCandidateMember(name: string, dept: string) {
       </div>
     </Teleport>
 
-    <!-- 知识库设置弹窗 -->
+    <!-- 知识库设置弹窗（重构后：左右布局，像素级还原原型） -->
     <Teleport to="body">
       <div v-if="settingsKbId" class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/40 px-4 py-8" @click.self="closeKbSettings">
-        <div class="flex h-[520px] w-[760px] overflow-hidden rounded-[28px] bg-white shadow-2xl ring-1 ring-zinc-200">
-          <div class="flex w-[200px] shrink-0 flex-col border-r border-zinc-100 p-3">
-            <h3 class="px-3 py-2 text-sm font-semibold text-zinc-900">{{ activeSettingsKb?.name }}</h3>
-            <div class="mt-3 space-y-1">
-              <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm" :class="settingsTab === 'members' ? 'bg-blue-50 font-medium text-blue-700' : 'text-zinc-600 hover:bg-zinc-50'" @click="settingsTab = 'members'">
-                <ShieldCheck class="h-4 w-4" />成员授权
-              </button>
-              <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm" :class="settingsTab === 'documents' ? 'bg-blue-50 font-medium text-blue-700' : 'text-zinc-600 hover:bg-zinc-50'" @click="settingsTab = 'documents'">
-                <FolderKanban class="h-4 w-4" />文档管理
-              </button>
-              <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm" :class="settingsTab === 'audit' ? 'bg-blue-50 font-medium text-blue-700' : 'text-zinc-600 hover:bg-zinc-50'" @click="settingsTab = 'audit'">
-                <History class="h-4 w-4" />审计记录
-              </button>
+        <div class="flex h-[660px] w-[1100px] overflow-hidden rounded-[28px] bg-white shadow-2xl ring-1 ring-zinc-200">
+          <!-- 左侧：知识库基础信息 + 纵向 tab -->
+          <div class="flex w-[280px] shrink-0 flex-col border-r border-zinc-100 bg-zinc-50/40">
+            <div class="border-b border-zinc-100 px-5 py-4">
+              <h3 class="truncate text-[15px] font-semibold text-zinc-900">{{ activeSettingsKb?.name ?? '知识库设置' }}</h3>
+              <p class="mt-1 line-clamp-2 text-xs leading-relaxed text-zinc-500">知识库成员与权限统一管理入口，支持按成员/部门批量配置。</p>
+              <div class="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-zinc-400">
+                <span class="inline-flex items-center gap-1"><BookOpen class="h-3 w-3" />{{ activeSettingsKb?.docs ?? 0 }} 篇文档</span>
+                <span class="inline-flex items-center gap-1"><FileSpreadsheet class="h-3 w-3" />{{ activeSettingsMembers.length }} 位成员</span>
+              </div>
             </div>
-            <div class="mt-auto rounded-xl border border-zinc-100 bg-zinc-50 p-3 text-[11px] leading-relaxed text-zinc-500">
-              <div class="flex items-center gap-1 text-zinc-600"><ShieldCheck class="h-3.5 w-3.5 text-blue-500" />五级权限体系</div>
-              <p class="mt-1">OWNER · MANAGER · EDITOR · DOWNLOADER · READER</p>
+            <nav class="flex-1 space-y-1 px-3 py-3">
+              <button type="button" class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[13px] transition" :class="settingsTab === 'members' ? 'bg-white font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-200' : 'text-zinc-600 hover:bg-zinc-100'" @click="settingsTab = 'members'">
+                <ShieldCheck class="h-4 w-4" :class="settingsTab === 'members' ? 'text-blue-600' : 'text-zinc-400'" />成员授权
+              </button>
+              <button type="button" class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[13px] transition" :class="settingsTab === 'documents' ? 'bg-white font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-200' : 'text-zinc-600 hover:bg-zinc-100'" @click="settingsTab = 'documents'">
+                <FolderKanban class="h-4 w-4" :class="settingsTab === 'documents' ? 'text-blue-600' : 'text-zinc-400'" />文档管理
+              </button>
+              <button type="button" class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[13px] transition" :class="settingsTab === 'audit' ? 'bg-white font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-200' : 'text-zinc-600 hover:bg-zinc-100'" @click="settingsTab = 'audit'">
+                <History class="h-4 w-4" :class="settingsTab === 'audit' ? 'text-blue-600' : 'text-zinc-400'" />审计记录
+              </button>
+            </nav>
+            <div class="border-t border-zinc-100 px-5 py-4">
+              <div class="rounded-xl border border-blue-100 bg-blue-50/60 p-3 text-[11px] leading-relaxed">
+                <div class="flex items-center gap-1 font-medium text-blue-700"><ShieldCheck class="h-3.5 w-3.5" />五级权限体系</div>
+                <p class="mt-1 text-[10px] text-blue-600/80">OWNER · MANAGER · EDITOR · DOWNLOADER · READER</p>
+              </div>
             </div>
           </div>
-          <div class="flex flex-1 flex-col overflow-hidden">
+
+          <!-- 右侧：内容区 -->
+          <div class="relative flex flex-1 flex-col overflow-hidden">
+            <!-- 顶部 bar：标题 + 关闭按钮 -->
+            <div class="flex items-center justify-between border-b border-zinc-100 px-6 py-4">
+              <h2 class="text-base font-semibold text-zinc-900">知识库设置</h2>
+              <button type="button" class="rounded-md p-1.5 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700" aria-label="关闭" @click="closeKbSettings"><X class="h-5 w-5" /></button>
+            </div>
+
+            <!-- 中间 tab 切换 -->
+            <div class="flex items-center gap-6 border-b border-zinc-100 bg-zinc-50/40 px-6">
+              <button type="button" class="relative py-3 text-[13px] font-medium transition" :class="settingsTab === 'members' ? 'text-blue-600' : 'text-zinc-500 hover:text-zinc-800'" @click="settingsTab = 'members'">
+                成员授权
+                <span v-if="settingsTab === 'members'" class="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-blue-600"></span>
+              </button>
+              <button type="button" class="relative py-3 text-[13px] font-medium transition" :class="settingsTab === 'documents' ? 'text-blue-600' : 'text-zinc-500 hover:text-zinc-800'" @click="settingsTab = 'documents'">
+                文档管理
+                <span v-if="settingsTab === 'documents'" class="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-blue-600"></span>
+              </button>
+              <button type="button" class="relative py-3 text-[13px] font-medium transition" :class="settingsTab === 'audit' ? 'text-blue-600' : 'text-zinc-500 hover:text-zinc-800'" @click="settingsTab = 'audit'">
+                审计记录
+                <span v-if="settingsTab === 'audit'" class="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-blue-600"></span>
+              </button>
+            </div>
+
             <!-- 成员授权 -->
             <template v-if="settingsTab === 'members'">
-              <div class="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
-                <h4 class="text-sm font-semibold text-zinc-900">成员列表（{{ activeSettingsMembers.length }}）</h4>
-                <button type="button" class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700" @click="settingsAddMemberOpen = !settingsAddMemberOpen">添加成员</button>
+              <div class="flex items-center justify-between border-b border-zinc-100 px-6 py-3">
+                <div class="flex items-center gap-3">
+                  <h4 class="text-sm font-semibold text-zinc-900">成员授权</h4>
+                  <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600">{{ activeSettingsMembers.length }} 人</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <div class="relative">
+                    <Search class="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-300" />
+                    <input v-model="settingsMemberFilter" placeholder="搜索成员姓名" class="h-8 w-44 rounded-lg border border-zinc-200 pl-8 pr-3 text-xs outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100" />
+                  </div>
+                  <button type="button" class="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-blue-700" @click="settingsAddMemberOpen = !settingsAddMemberOpen"><Plus class="h-3.5 w-3.5" />添加成员</button>
+                </div>
               </div>
-              <div class="border-b border-zinc-100 bg-zinc-50/60 px-4 py-2">
+              <div class="border-b border-zinc-100 bg-zinc-50/60 px-6 py-2.5">
                 <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
-                  <span class="mr-1 text-zinc-400">一键预设：</span>
-                  <button v-for="preset in permissionPresetOptions" :key="preset.key" type="button" class="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2 py-0.5 font-medium text-zinc-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700" @click="applyPermissionPreset(preset.key)">{{ preset.label }}</button>
+                  <span class="mr-1 text-zinc-500">一键预设：</span>
+                  <button v-for="preset in permissionPresetOptions" :key="preset.key" type="button" class="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2.5 py-1 font-medium text-zinc-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700" @click="applyPermissionPreset(preset.key)">{{ preset.label }}</button>
                 </div>
               </div>
               <div class="flex min-h-0 flex-1">
-                <div class="flex-1 overflow-auto p-3">
+                <div class="flex-1 overflow-auto px-6 py-3">
                   <table class="w-full text-left text-sm">
                     <thead class="sticky top-0 z-[1] bg-white text-[11px] uppercase tracking-wide text-zinc-400">
                       <tr class="border-b border-zinc-100">
-                        <th class="px-2 py-2 font-medium">成员</th>
-                        <th class="px-2 py-2 font-medium">部门 / 作用域</th>
-                        <th class="px-2 py-2 font-medium">角色</th>
-                        <th class="px-2 py-2 font-medium">加入时间</th>
-                        <th class="px-2 py-2 font-medium text-right">操作</th>
+                        <th class="px-3 py-2 font-medium">成员</th>
+                        <th class="px-3 py-2 font-medium">部门</th>
+                        <th class="px-3 py-2 font-medium">权限</th>
+                        <th class="px-3 py-2 font-medium">加入时间</th>
+                        <th class="px-3 py-2 font-medium text-right">操作</th>
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-zinc-100">
-                      <tr v-for="member in filteredActiveSettingsMembers" :key="member.id" class="group transition hover:bg-zinc-50">
-                        <td class="px-2 py-2">
-                          <div class="flex items-center gap-2">
-                            <div class="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 text-[11px] font-semibold text-blue-600">{{ member.name[0] }}</div>
+                      <tr v-for="member in filteredActiveSettingsMembers" :key="member.id" class="group transition odd:bg-white even:bg-zinc-50/50 hover:bg-blue-50/40">
+                        <td class="px-3 py-2.5">
+                          <div class="flex items-center gap-2.5">
+                            <div class="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 text-[11px] font-semibold text-blue-600">{{ member.name[0] }}</div>
                             <span class="truncate font-medium text-zinc-900">{{ member.name }}</span>
                           </div>
                         </td>
-                        <td class="px-2 py-2 text-xs">
+                        <td class="px-3 py-2.5 text-xs">
                           <div class="text-zinc-700">{{ member.department }}</div>
                           <div class="text-[10px] text-zinc-400">{{ member.scope === '个人' ? '直接授权' : member.scope === '部门' ? '按部门授权' : member.scope }}</div>
                         </td>
-                        <td class="px-2 py-2">
+                        <td class="px-3 py-2.5">
                           <select :value="member.role" class="rounded-lg border border-zinc-200 px-2 py-1 text-xs outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100" @change="updatePermissionRole(member, ($event.target as HTMLSelectElement).value as PermissionRole)">
                             <option value="OWNER">所有者</option><option value="MANAGER">管理员</option><option value="EDITOR">编辑者</option><option value="DOWNLOADER">下载者</option><option value="READER">查看者</option>
                           </select>
                         </td>
-                        <td class="px-2 py-2 text-xs text-zinc-500">{{ member.joinedAt?.slice(0, 10) }}</td>
-                        <td class="px-2 py-2 text-right">
-                          <button type="button" class="rounded-md p-1 text-zinc-300 opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100" :aria-label="'移除 ' + member.name" @click="deletePermissionMember(member)"><X class="h-3.5 w-3.5" /></button>
+                        <td class="px-3 py-2.5 text-xs text-zinc-500">{{ member.joinedAt?.slice(0, 10) }}</td>
+                        <td class="px-3 py-2.5 text-right">
+                          <button type="button" class="rounded-md p-1.5 text-zinc-300 opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100" :aria-label="'移除 ' + member.name" @click="deletePermissionMember(member)"><X class="h-3.5 w-3.5" /></button>
                         </td>
                       </tr>
                     </tbody>
@@ -2549,20 +2592,13 @@ function addCandidateMember(name: string, dept: string) {
                   <div v-if="filteredActiveSettingsMembers.length === 0" class="py-10 text-center text-xs text-zinc-400">暂无匹配成员</div>
                 </div>
                 <!-- 添加成员侧栏 -->
-                <Transition
-                  enter-active-class="transition duration-200 ease-out"
-                  enter-from-class="translate-x-4 opacity-0"
-                  enter-to-class="translate-x-0 opacity-100"
-                  leave-active-class="transition duration-150 ease-in"
-                  leave-from-class="translate-x-0 opacity-100"
-                  leave-to-class="translate-x-4 opacity-0"
-                >
-                  <aside v-if="settingsAddMemberOpen" class="flex w-[460px] shrink-0 flex-col border-l border-zinc-200 bg-white">
-                    <div class="flex items-center justify-between border-b border-zinc-100 px-3 py-2.5">
+                <Transition enter-active-class="transition duration-200 ease-out" enter-from-class="translate-x-4 opacity-0" enter-to-class="translate-x-0 opacity-100" leave-active-class="transition duration-150 ease-in" leave-from-class="translate-x-0 opacity-100" leave-to-class="translate-x-4 opacity-0">
+                  <aside v-if="settingsAddMemberOpen" class="flex w-[420px] shrink-0 flex-col border-l border-zinc-200 bg-white">
+                    <div class="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
                       <div class="text-sm font-semibold text-zinc-900">添加成员</div>
-                      <button type="button" class="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700" aria-label="关闭添加成员" @click="settingsAddMemberOpen = false"><X class="h-4 w-4" /></button>
+                      <button type="button" class="rounded-md p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700" aria-label="关闭添加成员" @click="settingsAddMemberOpen = false"><X class="h-4 w-4" /></button>
                     </div>
-                    <div class="border-b border-zinc-100 p-2">
+                    <div class="border-b border-zinc-100 p-3">
                       <div class="relative">
                         <Search class="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-300" />
                         <input v-model="settingsAddMemberSearch" class="h-9 w-full rounded-lg border border-zinc-200 pl-8 pr-3 text-xs outline-none focus:border-blue-300" placeholder="搜索成员姓名或部门" />
@@ -2570,9 +2606,9 @@ function addCandidateMember(name: string, dept: string) {
                     </div>
                     <div class="grid min-h-0 flex-1 grid-cols-2">
                       <div class="flex flex-col border-r border-zinc-100">
-                        <div class="border-b border-zinc-100 bg-zinc-50 px-3 py-1.5 text-[11px] font-medium text-zinc-500">部门候选</div>
-                        <div class="flex-1 overflow-auto p-1.5">
-                          <button v-for="dept in presetDepartments" :key="dept" type="button" class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs hover:bg-zinc-50" @click="settingsAddMemberDept = dept">
+                        <div class="border-b border-zinc-100 bg-zinc-50 px-3 py-2 text-[11px] font-medium text-zinc-500">部门候选</div>
+                        <div class="flex-1 overflow-auto p-2">
+                          <button v-for="dept in presetDepartments" :key="dept" type="button" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs hover:bg-zinc-50" @click="settingsAddMemberDept = dept">
                             <Folder class="h-3.5 w-3.5 text-zinc-400" />
                             <span class="truncate text-zinc-700">{{ dept }}</span>
                             <CheckSquare v-if="settingsAddMemberDept === dept" class="ml-auto h-3.5 w-3.5 text-blue-500" />
@@ -2580,9 +2616,9 @@ function addCandidateMember(name: string, dept: string) {
                         </div>
                       </div>
                       <div class="flex flex-col">
-                        <div class="border-b border-zinc-100 bg-zinc-50 px-3 py-1.5 text-[11px] font-medium text-zinc-500">已选成员（{{ settingsAddMemberSelected.length }}）</div>
-                        <div class="flex-1 overflow-auto p-1.5">
-                          <button v-for="c in filteredCandidatesForDept" :key="c.name" type="button" class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs hover:bg-zinc-50" @click="toggleAddCandidate(c)">
+                        <div class="border-b border-zinc-100 bg-zinc-50 px-3 py-2 text-[11px] font-medium text-zinc-500">已选成员（{{ settingsAddMemberSelected.length }}）</div>
+                        <div class="flex-1 overflow-auto p-2">
+                          <button v-for="c in filteredCandidatesForDept" :key="c.name" type="button" class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs hover:bg-zinc-50" @click="toggleAddCandidate(c)">
                             <div class="flex h-6 w-6 items-center justify-center rounded-full bg-blue-50 text-[10px] font-medium text-blue-600">{{ c.name[0] }}</div>
                             <span class="truncate text-zinc-800">{{ c.name }}</span>
                             <CheckSquare v-if="settingsAddMemberSelected.some(s => s.name === c.name)" class="ml-auto h-3.5 w-3.5 text-blue-500" />
@@ -2591,14 +2627,14 @@ function addCandidateMember(name: string, dept: string) {
                         </div>
                       </div>
                     </div>
-                    <div class="flex items-center justify-between gap-2 border-t border-zinc-100 bg-zinc-50 px-3 py-2.5">
-                      <div class="flex items-center gap-1 text-xs">
+                    <div class="flex items-center justify-between gap-2 border-t border-zinc-100 bg-zinc-50 px-4 py-3">
+                      <div class="flex items-center gap-1.5 text-xs">
                         <label class="text-zinc-500">统一角色</label>
-                        <select v-model="settingsAddMemberRole" class="rounded-md border border-zinc-200 px-1.5 py-1 text-xs">
+                        <select v-model="settingsAddMemberRole" class="rounded-md border border-zinc-200 px-2 py-1 text-xs">
                           <option value="EDITOR">编辑者</option><option value="MANAGER">管理员</option><option value="DOWNLOADER">下载者</option><option value="READER">查看者</option><option value="OWNER">所有者</option>
                         </select>
                       </div>
-                      <div class="flex items-center gap-1.5">
+                      <div class="flex items-center gap-2">
                         <button type="button" class="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50" @click="settingsAddMemberOpen = false">取消</button>
                         <button type="button" class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50" :disabled="settingsAddMemberSelected.length === 0" @click="confirmAddMembers">确认添加 ({{ settingsAddMemberSelected.length }})</button>
                       </div>
@@ -2609,7 +2645,7 @@ function addCandidateMember(name: string, dept: string) {
             </template>
             <!-- 审计记录 -->
             <template v-else-if="settingsTab === 'audit'">
-              <div class="flex items-center gap-2 border-b border-zinc-100 px-4 py-3">
+              <div class="flex items-center gap-2 border-b border-zinc-100 px-6 py-3">
                 <input v-model="auditDateFrom" type="date" class="w-32 rounded-md border border-zinc-200 px-2 py-1 text-xs outline-none" title="起始" />
                 <span class="text-xs text-zinc-400">~</span>
                 <input v-model="auditDateTo" type="date" class="w-32 rounded-md border border-zinc-200 px-2 py-1 text-xs outline-none" title="截止" />
@@ -2623,9 +2659,9 @@ function addCandidateMember(name: string, dept: string) {
                 <input v-model="auditFilterUser" class="w-24 rounded-md border border-zinc-200 px-2 py-1 text-xs outline-none" placeholder="用户" />
                 <button type="button" class="rounded-md border border-zinc-200 px-2 py-1 text-xs text-zinc-500 hover:bg-zinc-50" @click="exportAuditLog">导出</button>
               </div>
-              <div class="flex-1 overflow-auto p-4">
+              <div class="flex-1 overflow-auto p-6">
                 <div class="space-y-2">
-                  <div v-for="(log, i) in filteredAuditLogs" :key="i" class="flex items-center gap-3 rounded-lg border border-zinc-100 px-3 py-2 text-xs">
+                  <div v-for="(log, i) in filteredAuditLogs" :key="i" class="flex items-center gap-3 rounded-lg border border-zinc-100 px-3 py-2.5 text-xs">
                     <div class="h-2 w-2 rounded-full" :class="log.sensitive ? 'bg-red-400' : 'bg-zinc-300'"></div>
                     <span class="font-medium text-zinc-800">{{ log.user }}</span>
                     <span class="text-zinc-500">{{ log.action }}</span>
@@ -2637,11 +2673,8 @@ function addCandidateMember(name: string, dept: string) {
             </template>
             <!-- 文档管理 -->
             <template v-else>
-              <div class="flex-1 p-4 text-center text-xs text-zinc-400">文档管理</div>
+              <div class="flex-1 p-6 text-center text-xs text-zinc-400">文档管理</div>
             </template>
-            <div class="flex items-center justify-end border-t border-zinc-100 px-4 py-3">
-              <button type="button" class="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50" @click="closeKbSettings">关闭</button>
-            </div>
           </div>
         </div>
       </div>
