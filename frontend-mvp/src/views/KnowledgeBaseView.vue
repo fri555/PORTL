@@ -3220,14 +3220,20 @@ function addCandidateMember(name: string, dept: string) {
               <span>{{ err }}</span>
             </div>
           </div>
-          <!-- 候选文件列表 -->
-          <div v-if="uploadFileNames.length" class="space-y-1 rounded-lg border border-zinc-200 bg-white p-2">
-            <div v-for="name in uploadFileNames" :key="name" class="group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50">
-              <File class="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-              <span class="min-w-0 flex-1 truncate">{{ name }}</span>
-              <span class="shrink-0 text-zinc-400">{{ humanFileSize(Math.floor(Math.random() * 10 * 1024 * 1024) + 512 * 1024) }}</span>
-              <span class="rounded bg-blue-50 px-1 py-0.5 text-[10px] font-medium text-blue-600">待上传</span>
-              <button type="button" class="shrink-0 rounded p-0.5 text-zinc-300 opacity-0 transition hover:text-red-500 group-hover:opacity-100" aria-label="移除文件" @click="uploadFileNames = uploadFileNames.filter(n => n !== name)"><X class="h-3 w-3" /></button>
+          <!-- 候选文件列表（带高度限制） -->
+          <div>
+            <div v-if="uploadFileNames.length" class="mb-1 flex items-center justify-between">
+              <span class="text-xs font-medium text-zinc-600">已选 {{ uploadFileNames.length }} 个文件</span>
+              <button v-if="uploadFileNames.length > 0" type="button" class="text-xs text-zinc-400 hover:text-red-500" @click="uploadFileNames = []">清空全部</button>
+            </div>
+            <div v-if="uploadFileNames.length" class="max-h-60 space-y-1 overflow-y-auto rounded-lg border border-zinc-200 bg-white p-2">
+              <div v-for="name in uploadFileNames" :key="name" class="group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50">
+                <File class="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                <span class="min-w-0 flex-1 truncate">{{ name }}</span>
+                <span class="shrink-0 text-zinc-400">{{ humanFileSize(Math.floor(Math.random() * 10 * 1024 * 1024) + 512 * 1024) }}</span>
+                <span class="rounded bg-blue-50 px-1 py-0.5 text-[10px] font-medium text-blue-600">待上传</span>
+                <button type="button" class="shrink-0 rounded p-0.5 text-zinc-300 opacity-0 transition hover:text-red-500 group-hover:opacity-100" aria-label="移除文件" @click="uploadFileNames = uploadFileNames.filter(n => n !== name)"><X class="h-3 w-3" /></button>
+              </div>
             </div>
           </div>
           <!-- 空文件提示 -->
