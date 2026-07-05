@@ -1430,7 +1430,6 @@ async function saveAndResendUserMessage(message: Message) {
 
 function quoteAnswer(message: Message) {
   quotedMessageId.value = message.id
-  query.value = `引用上一条回答继续：${message.content.slice(0, 60)}...`
   nextTick(() => composer.value?.focus())
 }
 
@@ -2149,7 +2148,7 @@ onBeforeUnmount(() => {
                     </div>
                   </div>
                 </div>
-                <div v-if="message.role === 'user' && editingUserMessageId === message.id" class="flex w-full items-center gap-4 py-1">
+                <div v-if="message.role === 'user' && editingUserMessageId === message.id" class="rounded-2xl bg-zinc-100 px-4 py-3 shadow-sm">
                   <button
                     type="button"
                     class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900"
