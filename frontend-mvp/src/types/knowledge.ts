@@ -72,6 +72,73 @@ export interface TreeNode {
   permissions?: PermissionEntry[]
 }
 
+// ─── 知识中心 UI 类型 ───
+
+export interface DocItem {
+  name: string
+  format: string
+  status: string
+  updatedAt: string
+  uploadedBy: string
+  size?: string
+  tags?: string[]
+  confidence?: number
+  summary?: string
+}
+
+export type UploadTaskStatus =
+  | 'uploading'
+  | 'pending'
+  | 'processing'
+  | 'done'
+  | 'reviewing'
+  | 'upload_failed'
+  | 'process_failed'
+  | 'cancelled'
+  | 'offline'
+
+export interface UploadTaskItem {
+  id: string
+  name: string
+  status: string
+  progress: number
+  doc?: DocItem
+}
+
+export interface QaMessage {
+  id: number
+  role: 'user' | 'assistant'
+  content: string
+  citations?: string[]
+}
+
+export interface FolderOption {
+  id: string
+  label: string
+  depth: number
+  node?: TreeNode
+}
+
+export interface TreeRow {
+  id: string
+  node: TreeNode
+  depth: number
+  kbId?: string
+}
+
+export interface KnowledgeBaseItem {
+  id: string
+  name: string
+  docs: number
+  owner: string
+  department: string
+  visibility: string
+  space: 'public' | 'personal'
+  canEdit: boolean
+  pinned?: boolean
+  recent: string
+}
+
 /** 获取权限条目的中文 label */
 export function getPermissionLabel(role: PermissionRole): string {
   const map: Record<PermissionRole, string> = {
