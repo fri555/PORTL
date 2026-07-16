@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import HomeView from '@/views/HomeView.vue'
 
@@ -10,11 +10,18 @@ const routes = [
   { path: '/dashboards', redirect: '/knowledge' },
   { path: '/knowledge', name: 'knowledge', component: () => import('@/views/KnowledgeBaseView.vue'), meta: { title: '知识中心' } },
   { path: '/admin/feedback', name: 'admin-feedback', component: () => import('@/views/FeedbackAdminView.vue'), meta: { title: '建议箱' } },
+  { path: '/admin/governance', name: 'ai-governance', component: () => import('@/views/AIGovernanceView.vue'), meta: { title: 'AI 治理中心' } },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 
+const useHashHistory = import.meta.env.VITE_ROUTER_MODE
+  ? import.meta.env.VITE_ROUTER_MODE === 'hash'
+  : import.meta.env.PROD
+
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: useHashHistory
+    ? createWebHashHistory(import.meta.env.BASE_URL)
+    : createWebHistory(import.meta.env.BASE_URL),
   routes,
   scrollBehavior() {
     return { top: 0 }

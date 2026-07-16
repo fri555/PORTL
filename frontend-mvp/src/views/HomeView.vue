@@ -5,9 +5,7 @@ import {
   ArrowUp,
   Bot,
   BarChart3,
-  Bell,
   BookOpen,
-  CalendarDays,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
@@ -22,7 +20,6 @@ import {
   Folder,
   Globe2,
   History,
- LayoutGrid,
  Link2,
  Loader2,
   MoreHorizontal,
@@ -42,8 +39,7 @@ import {
 } from 'lucide-vue-next'
 import { useAppStore } from '@/stores/app'
 
-type RunMode = 'quick' | 'task' | 'schedule'
-type ScheduleCycle = 'once' | 'daily' | 'workday' | 'weekly' | 'monthly' | 'cron'
+type RunMode = 'quick' | 'task'
 type Message = {
   id: string
   role: 'user' | 'assistant'
@@ -65,11 +61,11 @@ type ConversationItem = {
   id: string
   title: string
   time: string
-  mode: '日常办公' | '专家模式' | '定时任务'
+  mode: '日常办公' | '专家模式'
   pinned: boolean
  status: 'running' | 'completed' | 'failed' | 'cancelled'
 }
-type IntentRoute = 'greeting' | 'office-rag' | 'expert-task' | 'schedule-task'
+type IntentRoute = 'greeting' | 'office-rag' | 'expert-task'
 type CaseItem = {
   title: string
   icon?: unknown
@@ -77,13 +73,6 @@ type CaseItem = {
   prompt: string
   bubble?: string
   kb?: string
-  schedule?: Partial<{
-    cycle: ScheduleCycle
-    date: string
-    time: string
-    weekday: string
-    monthDay: string
-  }>
 }
 type GeneratedArtifact = {
   name: string
@@ -102,6 +91,7 @@ type ExpertAgent = {
   desc: string
   level: string
   accent: string
+  emoji?: string
   avatarUrl?: string
   prompts: CaseItem[]
 }
@@ -127,13 +117,10 @@ const query = ref('')
 const runMode = ref<RunMode>('quick')
 const webSearchEnabled = ref(true)
 const selectedAgent = ref('allround')
-const scheduleCycle = ref<ScheduleCycle>('daily')
-const scheduleDate = ref('2026-07-02')
-const scheduleTime = ref('09:00')
-const scheduleWeekday = ref('周一')
-const scheduleMonthDay = ref('1号')
-const scheduleCron = ref('0 9 * * *')
-const activeCaseCategory = ref('精选案例')
+// 专家 / 案例 3×3 分页（最多 9 条/页）
+const EXPERT_PAGE_SIZE = 9
+const expertPage = ref(1)
+const casePage = ref(1)
 const showRecommendations = ref(true)
 const modeMenuOpen = ref(false)
 const agentMenuOpen = ref(false)
@@ -328,7 +315,6 @@ const conversations = ref<ConversationItem[]>([
   { id: 'conv-3', title: '考勤制度问答', time: '周二', mode: '日常办公', pinned: true, status: 'failed' },
   { id: 'conv-4', title: '门店需求字段表', time: '06-18', mode: '专家模式', pinned: false, status: 'completed' },
   { id: 'conv-5', title: '行业动态简报', time: '刚刚', mode: '日常办公', pinned: false, status: 'running' },
- { id: 'conv-6', title: '每日方案池监控', time: '明早4:00', mode: '定时任务', pinned: false, status: 'running' },
   { id: 'conv-7', title: 'Q3营销策划方案', time: '06-30', mode: '专家模式', pinned: false, status: 'cancelled' },
 ])
 
@@ -338,120 +324,217 @@ const officeAgents = [
 
 const expertAgents: ExpertAgent[] = [
   {
-    value: 'solution',
-    label: '组货专家',
-    role: '方案落地专家',
-    desc: '匹配方案池、组织组货清单、生成客户交付物',
+    value: 'xuanpin',
+    label: '选品王',
+    role: '商品选品专家',
+    desc: '基于销售数据、库存与趋势，为不同渠道推荐选品组合',
     level: 'P7',
-    accent: 'from-orange-500 to-amber-400',
-    avatarUrl: expertAvatarUrls.solution,
+    accent: '#ff5530',
+    emoji: '🛒',
     prompts: [
-      {
-        title: 'B2B线下团购方案',
-        desc: '预算10万，运动鞋类目，输出三档组合。',
-        prompt: '帮我给B2B线下客户出一版团购方案。已知：总预算10万，偏运动鞋类目，客户在门店等待，需要先给一版可沟通初稿。请先列出必须追问字段，再按保守档、均衡档、品质档输出组货方案。',
-        bubble: '10万预算团购方案',
-        kb: '方案中心案例库',
-      },
-      {
-        title: '门店需求采集',
-        desc: '把客户口述需求整理成标准字段。',
-        prompt: '请把门店客户的团购需求整理成标准字段表。字段包括客户类型、数量、预算范围、活动场景、品类需求、品牌偏好、交付时间、风险备注。',
-        bubble: '门店需求字段表',
-        kb: '方案中心字段模板',
-      },
-      {
-        title: '成功案例复用',
-        desc: '匹配案例池并给出引用依据。',
-        prompt: '请基于方案中心成功案例池，帮我匹配适合运动鞋团购的相似案例，并说明适用条件、引用依据和可复用话术。',
-        bubble: '匹配相似成功案例',
-        kb: '成功案例池',
-      },
-      { title: '预算分档', desc: '按预算拆三档方案。', prompt: '请按保守档、均衡档、品质档拆解一版团购预算分档，并标注每档适用客户。', bubble: '预算三档拆解', kb: '团购预算池' },
-      { title: '客户话术', desc: '生成现场沟通话术。', prompt: '请把当前团购方案整理成门店可直接沟通的话术，包含开场、推荐理由和异议回应。', bubble: '门店沟通话术', kb: '销售话术库' },
-      { title: '导出清单', desc: '生成可导出字段清单。', prompt: '请把团购方案整理成可导出的 Excel 字段清单，包含品类、数量、价格带、推荐理由和风险备注。', bubble: '导出 Excel 清单', kb: '方案清单模板' },
+      { title: 'B2C爆品推荐', desc: '根据上月B2C渠道销售数据，推荐5个本季度潜力爆品组合，并说明选品逻辑', prompt: '根据上月B2C渠道销售数据，推荐5个本季度潜力爆品组合，并说明选品逻辑', bubble: 'B2C爆品推荐', kb: '选品知识库' },
+      { title: '门店清货调拨', desc: '线下门店A库存周转超过60天，给出清货与跨店调拨的选品建议', prompt: '线下门店A库存周转超过60天，给出清货与跨店调拨的选品建议', bubble: '门店清货调拨', kb: '选品知识库' },
+      { title: '得物渠道选品', desc: '为新开拓的得物渠道做一份运动户外品类选品清单，区分引流款与利润款', prompt: '为新开拓的得物渠道做一份运动户外品类选品清单，区分引流款与利润款', bubble: '得物渠道选品', kb: '选品知识库' },
+      { title: '夏日场景选品', desc: '结合夏季销售趋势，推荐3款适合泳池/沙滩场景的鞋服配组合', prompt: '结合夏季销售趋势，推荐3款适合泳池/沙滩场景的鞋服配组合', bubble: '夏日场景选品', kb: '选品知识库' },
+      { title: '断货替代选品', desc: '某爆品突然断货，给出3个替代选品并对比转化预期', prompt: '某爆品突然断货，给出3个替代选品并对比转化预期', bubble: '断货替代选品', kb: '选品知识库' },
+      { title: 'Z世代选品', desc: '针对Z世代客群，输出一批高颜值、强社交属性的选品方向', prompt: '针对Z世代客群，输出一批高颜值、强社交属性的选品方向', bubble: 'Z世代选品', kb: '选品知识库' },
+      { title: '双11清仓选品', desc: '双11前梳理全年滞销TOP20 SKU，给出清仓选品与捆绑建议', prompt: '双11前梳理全年滞销TOP20 SKU，给出清仓选品与捆绑建议', bubble: '双11清仓选品', kb: '选品知识库' },
+      { title: '竞品选品缺口', desc: '分析竞品上新节奏，给出本季度我方应跟进的选品缺口', prompt: '分析竞品上新节奏，给出本季度我方应跟进的选品缺口', bubble: '竞品选品缺口', kb: '选品知识库' },
+      { title: '会员日复购组合', desc: '为会员日策划一份高复购的选品组合，提升客单价', prompt: '为会员日策划一份高复购的选品组合，提升客单价', bubble: '会员日复购组合', kb: '选品知识库' },
+      { title: '补货优先级', desc: '依据库存深度与动销率，输出下周补货优先级清单', prompt: '依据库存深度与动销率，输出下周补货优先级清单', bubble: '补货优先级', kb: '选品知识库' },
     ],
   },
   {
-    value: 'analysis',
-    label: '分析专家',
-    role: '经营分析专家',
-    desc: '拆解业务指标、定位变化原因、输出经营诊断',
+    value: 'daigou',
+    label: '带货一姐',
+    role: '智能导购专家',
+    desc: '7×24h解答商品问题，根据用户画像做个性化推荐',
     level: 'P6',
-    accent: 'from-blue-500 to-cyan-400',
-    avatarUrl: expertAvatarUrls.analysis,
+    accent: '#ea5ec1',
+    emoji: '💁‍♀️',
     prompts: [
-      { title: '经营周报诊断', desc: '定位指标波动和后续动作。', prompt: '帮我分析本周经营周报，重点看销售额、毛利、转化率变化，并输出原因假设和下周动作。', bubble: '本周经营周报诊断', kb: '经营分析知识库' },
-      { title: '客户分层洞察', desc: '按行业、规模、预算拆分机会。', prompt: '请把客户线索按行业、规模、预算和成交概率做分层，并给出优先跟进建议。', bubble: '客户分层机会分析', kb: '客户线索库' },
-      { title: '毛利波动分析', desc: '分析毛利变化原因。', prompt: '请分析本月毛利波动，拆解品类、客户、价格带三个维度，并给出改善建议。', bubble: '毛利波动原因拆解', kb: '经营分析知识库' },
-      { title: '转化漏斗', desc: '定位转化漏斗卡点。', prompt: '请基于销售漏斗数据找出转化率下降的关键节点，并输出下一步验证动作。', bubble: '转化漏斗卡点定位', kb: '销售漏斗看板' },
-      { title: '预算使用', desc: '检查预算使用效率。', prompt: '请分析当前预算使用效率，判断哪些项目投入产出不合理，并给出优先级建议。', bubble: '预算使用效率分析', kb: '预算台账' },
+      { title: '通勤跑鞋推荐', desc: '用户想买一双适合通勤、预算500以内的跑步鞋，帮我做个性化推荐并说明卖点', prompt: '用户想买一双适合通勤、预算500以内的跑步鞋，帮我做个性化推荐并说明卖点', bubble: '通勤跑鞋推荐', kb: '导购话术库' },
+      { title: '宝妈导购话术', desc: '生成一段面向宝妈群体的儿童运动服导购话术，突出安全与透气', prompt: '生成一段面向宝妈群体的儿童运动服导购话术，突出安全与透气', bubble: '宝妈导购话术', kb: '导购话术库' },
+      { title: 'B2B询盘对比', desc: '针对B2B客户批量询盘，输出标准商品参数对比表与推荐结论', prompt: '针对B2B客户批量询盘，输出标准商品参数对比表与推荐结论', bubble: 'B2B询盘对比', kb: '导购话术库' },
+      { title: '跑鞋对比决策', desc: '用户犹豫两款跑鞋，生成对比话术帮助决策', prompt: '用户犹豫两款跑鞋，生成对比话术帮助决策', bubble: '跑鞋对比决策', kb: '导购话术库' },
+      { title: '直播高频问答', desc: '为直播间观众设计3组高频问答话术，覆盖尺码与材质', prompt: '为直播间观众设计3组高频问答话术，覆盖尺码与材质', bubble: '直播高频问答', kb: '导购话术库' },
+      { title: '个性化复购', desc: '基于用户历史浏览，生成个性化复购推荐理由', prompt: '基于用户历史浏览，生成个性化复购推荐理由', bubble: '个性化复购', kb: '导购话术库' },
+      { title: '新客引导提问', desc: '新客首单转化低，给出引导式提问话术挖掘真实需求', prompt: '新客首单转化低，给出引导式提问话术挖掘真实需求', bubble: '新客引导提问', kb: '导购话术库' },
+      { title: '大促紧迫感', desc: '大促期间生成限时紧迫感话术，但不夸大宣传', prompt: '大促期间生成限时紧迫感话术，但不夸大宣传', bubble: '大促紧迫感', kb: '导购话术库' },
+      { title: '专业概念科普', desc: '针对运动小白，用通俗语言解释缓震/支撑等专业概念', prompt: '针对运动小白，用通俗语言解释缓震/支撑等专业概念', bubble: '专业概念科普', kb: '导购话术库' },
+      { title: '退换货挽留', desc: '输出一套退换货场景的友好挽留话术', prompt: '输出一套退换货场景的友好挽留话术', bubble: '退换货挽留', kb: '导购话术库' },
     ],
   },
   {
-    value: 'marketing',
-    label: '营销大师',
-    role: '内容增长专家',
-    desc: '生成活动方案、营销话术和传播素材框架',
+    value: 'lvyue',
+    label: '飞毛腿',
+    role: '库存与履约专家',
+    desc: '实时查询库存、推荐最近发货仓、预估配送时间',
+    level: 'P6',
+    accent: '#1456f0',
+    emoji: '🏃‍♀️',
+    prompts: [
+      { title: '就近发货仓', desc: '查询上海仓运动鞋SKU的实时库存，并推荐离杭州收件人最近的发货仓', prompt: '查询上海仓运动鞋SKU的实时库存，并推荐离杭州收件人最近的发货仓', bubble: '就近发货仓', kb: 'WMS库存' },
+      { title: '门店调拨预估', desc: '广州门店某款卫衣缺货，给出周边可调拨门店与预计送达时间', prompt: '广州门店某款卫衣缺货，给出周边可调拨门店与预计送达时间', bubble: '门店调拨预估', kb: 'WMS库存' },
+      { title: '履约时效预估', desc: '结合在途物流状态，预估这批订单的履约时效并标注风险单', prompt: '结合在途物流状态，预估这批订单的履约时效并标注风险单', bubble: '履约时效预估', kb: 'WMS库存' },
+      { title: '大促铺货', desc: '大促期间预估各仓承压，给出前置铺货建议', prompt: '大促期间预估各仓承压，给出前置铺货建议', bubble: '大促铺货', kb: 'WMS库存' },
+      { title: '全国库存调拨', desc: '查询某SKU全国库存分布，输出可调拨方案', prompt: '查询某SKU全国库存分布，输出可调拨方案', bubble: '全国库存调拨', kb: 'WMS库存' },
+      { title: '精准送达', desc: '用户催单，给出基于LBS的精准预计送达时间', prompt: '用户催单，给出基于LBS的精准预计送达时间', bubble: '精准送达', kb: 'WMS库存' },
+      { title: '跨境清关补救', desc: '跨境订单清关延误，给出履约补救与沟通口径', prompt: '跨境订单清关延误，给出履约补救与沟通口径', bubble: '跨境清关补救', kb: 'WMS库存' },
+      { title: '自动调拨规则', desc: '门店调拨审批慢，梳理自动化调拨规则建议', prompt: '门店调拨审批慢，梳理自动化调拨规则建议', bubble: '自动调拨规则', kb: 'WMS库存' },
+      { title: '前置仓优化', desc: '根据退货率高的区域，建议前置仓布局优化', prompt: '根据退货率高的区域，建议前置仓布局优化', bubble: '前置仓优化', kb: 'WMS库存' },
+      { title: '双11履约预案', desc: '生成双11履约保障预案，含峰值分流', prompt: '生成双11履约保障预案，含峰值分流', bubble: '双11履约预案', kb: 'WMS库存' },
+    ],
+  },
+  {
+    value: 'yingxiao',
+    label: '点子王',
+    role: '营销策略专家',
+    desc: '策划促销方案、匹配用户可用的优惠、生成营销素材',
     level: 'P7',
-    accent: 'from-fuchsia-500 to-rose-400',
-    avatarUrl: expertAvatarUrls.marketing,
+    accent: '#a855f7',
+    emoji: '💡',
     prompts: [
-      { title: '新品活动策划', desc: '活动节奏、权益、传播内容。', prompt: '帮我设计一版新品上市营销方案，包含活动主题、用户权益、渠道节奏和核心文案。', bubble: '新品上市活动方案', kb: '营销活动模板库' },
-      { title: '客户邀约话术', desc: '多渠道邀约和异议处理。', prompt: '请生成一组客户邀约话术，分别适用于钉钉、电话和面谈场景，并补充常见异议回应。', bubble: '客户邀约话术', kb: '销售话术库' },
-      { title: '私域推文', desc: '生成社群传播素材。', prompt: '请为这次活动生成一组私域社群推文，包含标题、正文和行动按钮文案。', bubble: '私域社群推文', kb: '内容素材库' },
-      { title: '活动复盘', desc: '输出活动复盘框架。', prompt: '请帮我设计活动复盘框架，包含目标达成、渠道表现、用户反馈和下次优化。', bubble: '活动复盘框架', kb: '营销复盘模板' },
+      { title: '618促销方案', desc: '为618大促设计一套满减+会员专享的促销方案，并匹配不同用户分群', prompt: '为618大促设计一套满减+会员专享的促销方案，并匹配不同用户分群', bubble: '618促销方案', kb: '营销策略库' },
+      { title: '朋友圈素材', desc: '生成3套朋友圈投放素材文案，分别对应新品、清仓、会员日', prompt: '生成3套朋友圈投放素材文案，分别对应新品、清仓、会员日', bubble: '朋友圈素材', kb: '营销策略库' },
+      { title: 'B2B返利政策', desc: '针对B2B大客户设计阶梯式返利激励政策，输出规则与测算表', prompt: '针对B2B大客户设计阶梯式返利激励政策，输出规则与测算表', bubble: 'B2B返利政策', kb: '营销策略库' },
+      { title: '新品上市活动', desc: '为新产品上市策划主题营销活动，含节奏与权益', prompt: '为新产品上市策划主题营销活动，含节奏与权益', bubble: '新品上市活动', kb: '营销策略库' },
+      { title: '私域裂变', desc: '设计私域社群裂变活动，给出邀请机制与奖品', prompt: '设计私域社群裂变活动，给出邀请机制与奖品', bubble: '私域裂变', kb: '营销策略库' },
+      { title: '节日营销日历', desc: '输出一份节日营销日历，覆盖关键节点', prompt: '输出一份节日营销日历，覆盖关键节点', bubble: '节日营销日历', kb: '营销策略库' },
+      { title: '流失用户召回', desc: '针对流失用户设计召回方案与权益', prompt: '针对流失用户设计召回方案与权益', bubble: '流失用户召回', kb: '营销策略库' },
+      { title: '门店开业引流', desc: '生成门店开业引流活动方案', prompt: '生成门店开业引流活动方案', bubble: '门店开业引流', kb: '营销策略库' },
+      { title: 'KOL合作分成', desc: '为KOL合作设计分成与内容方向', prompt: '为KOL合作设计分成与内容方向', bubble: 'KOL合作分成', kb: '营销策略库' },
+      { title: '大促复盘', desc: '输出大促复盘框架与下阶段优化', prompt: '输出大促复盘框架与下阶段优化', bubble: '大促复盘', kb: '营销策略库' },
     ],
   },
   {
-    value: 'design',
-    label: '高级设计师',
-    role: '视觉设计专家',
-    desc: '整理设计需求、输出视觉方向和页面结构建议',
+    value: 'jieyou',
+    label: '解忧姐',
+    role: '客服与售后专家',
+    desc: '处理退换货、保固咨询、安抚情绪、简化售后流程',
     level: 'P6',
-    accent: 'from-violet-500 to-indigo-400',
+    accent: '#ff5530',
+    emoji: '🛟',
     prompts: [
-      { title: '方案页视觉优化', desc: '重构页面信息层级和风格。', prompt: '请帮我优化一版方案页视觉结构，要求更商务、更清晰，输出版式层级、视觉关键词和模块顺序。', bubble: '方案页视觉优化', kb: '品牌设计规范' },
-      { title: 'PPT视觉方向', desc: '生成汇报型PPT设计建议。', prompt: '帮我给客户方案PPT设定视觉方向，包含封面、目录、方案页、报价页和结束页建议。', bubble: 'PPT视觉方向', kb: 'PPT模板库' },
-      { title: '页面信息层级', desc: '整理页面主次关系。', prompt: '请重排这个页面的信息层级，让客户先看到结论、价值和关键数据。', bubble: '页面信息层级调整', kb: '设计规范库' },
-      { title: '视觉关键词', desc: '提炼视觉方向。', prompt: '请基于商务、科技、可信三个关键词，输出一组视觉设计方向建议。', bubble: '商务科技视觉方向', kb: '品牌设计规范' },
+      { title: '情绪激动安抚', desc: '用户收到鞋子开胶要求退货，情绪激动，帮我起草一段安抚并给出处理方案', prompt: '用户收到鞋子开胶要求退货，情绪激动，帮我起草一段安抚并给出处理方案', bubble: '情绪激动安抚', kb: '售后知识库' },
+      { title: '保固FAQ', desc: '整理常见保固咨询的FAQ话术，覆盖运动鞋开胶、衣物褪色等情形', prompt: '整理常见保固咨询的FAQ话术，覆盖运动鞋开胶、衣物褪色等情形', bubble: '保固FAQ', kb: '售后知识库' },
+      { title: '退换货指引', desc: '把这条退换货流程简化成3步图文指引，降低人工客服介入率', prompt: '把这条退换货流程简化成3步图文指引，降低人工客服介入率', bubble: '退换货指引', kb: '售后知识库' },
+      { title: '尺码不符换货', desc: '用户投诉尺码不符，给出换货引导与防错提示', prompt: '用户投诉尺码不符，给出换货引导与防错提示', bubble: '尺码不符换货', kb: '售后知识库' },
+      { title: '满意度回访', desc: '生成售后满意度回访话术', prompt: '生成售后满意度回访话术', bubble: '满意度回访', kb: '售后知识库' },
+      { title: '批量质量问题', desc: '针对批量质量问题，起草统一公告与补偿方案', prompt: '针对批量质量问题，起草统一公告与补偿方案', bubble: '批量质量问题', kb: '售后知识库' },
+      { title: '加急处理', desc: '用户要求加急处理，给出优先级与时效承诺话术', prompt: '用户要求加急处理，给出优先级与时效承诺话术', bubble: '加急处理', kb: '售后知识库' },
+      { title: '运费责任界定', desc: '整理退换货运费责任界定规则', prompt: '整理退换货运费责任界定规则', bubble: '运费责任界定', kb: '售后知识库' },
+      { title: '情绪降级', desc: '设计情绪识别后的降级话术', prompt: '设计情绪识别后的降级话术', bubble: '情绪降级', kb: '售后知识库' },
+      { title: '售后周报', desc: '输出售后数据周报结构', prompt: '输出售后数据周报结构', bubble: '售后周报', kb: '售后知识库' },
     ],
   },
   {
-    value: 'ops',
-    label: '运营策略师',
-    role: '流程运营专家',
-    desc: '梳理协同流程、负责人、节点和风险预案',
-    level: 'P5',
-    accent: 'from-emerald-500 to-lime-400',
+    value: 'shuju',
+    label: '大表姐',
+    role: '数据分析专家',
+    desc: '输出经营报表、诊断异常指标（如转化率下降原因）',
+    level: 'P7',
+    accent: '#ea5ec1',
+    emoji: '📊',
     prompts: [
-      { title: '交付排期拆解', desc: '拆任务、排负责人和里程碑。', prompt: '帮我把这个客户交付任务拆成排期计划，包含负责人、截止时间、风险点和验收标准。', bubble: '交付排期拆解', kb: '项目管理模板库' },
-      { title: '风险预案', desc: '识别风险和应对。', prompt: '请识别这个项目可能出现的交付风险，并给出预案、负责人和触发条件。', bubble: '项目风险预案', kb: '项目管理模板库' },
-      { title: '验收标准', desc: '生成验收口径。', prompt: '请把当前任务整理成可执行的验收标准，包含交付物、质量要求和确认方式。', bubble: '交付验收标准', kb: '项目验收模板' },
+      { title: '经营周报', desc: '输出上周经营数据报告，覆盖GMV、转化率、客单价与环比', prompt: '输出上周经营数据报告，覆盖GMV、转化率、客单价与环比', bubble: '经营周报', kb: '经营分析库' },
+      { title: '转化归因', desc: '本周转化率环比下降15%，帮我做归因分析并列出可能原因优先级', prompt: '本周转化率环比下降15%，帮我做归因分析并列出可能原因优先级', bubble: '转化归因', kb: '经营分析库' },
+      { title: '复盘看板', desc: '搭建一个运营复盘看板结构，包含核心指标与下钻维度', prompt: '搭建一个运营复盘看板结构，包含核心指标与下钻维度', bubble: '复盘看板', kb: '经营分析库' },
+      { title: '渠道ROI', desc: '分析各渠道ROI，给出预算再分配建议', prompt: '分析各渠道ROI，给出预算再分配建议', bubble: '渠道ROI', kb: '经营分析库' },
+      { title: '会员留存', desc: '输出会员留存分析报告，定位流失节点', prompt: '输出会员留存分析报告，定位流失节点', bubble: '会员留存', kb: '经营分析库' },
+      { title: '同期对比', desc: '对比去年同期，输出增长归因', prompt: '对比去年同期，输出增长归因', bubble: '同期对比', kb: '经营分析库' },
+      { title: '滞销预警', desc: '监控库存周转，预警滞销风险', prompt: '监控库存周转，预警滞销风险', bubble: '滞销预警', kb: '经营分析库' },
+      { title: '驾驶舱指标', desc: '生成月度经营驾驶舱指标定义', prompt: '生成月度经营驾驶舱指标定义', bubble: '驾驶舱指标', kb: '经营分析库' },
+      { title: '客单价提升', desc: '分析客单价结构，给出提升建议', prompt: '分析客单价结构，给出提升建议', bubble: '客单价提升', kb: '经营分析库' },
+      { title: '活动复盘', desc: '输出活动的投入产出复盘', prompt: '输出活动的投入产出复盘', bubble: '活动复盘', kb: '经营分析库' },
     ],
   },
   {
-    value: 'soon',
-    label: '敬请期待',
-    role: '更多专家',
-    desc: '更多行业专家正在接入',
-    level: '--',
-    accent: 'from-zinc-300 to-zinc-200',
-    prompts: [],
+    value: 'b2b',
+    label: '大客户一哥',
+    role: 'B2B客户经理专家',
+    desc: '协助处理大客户询价、合同条款、账期查询等B端专属事务',
+    level: 'P7',
+    accent: '#1456f0',
+    emoji: '💼',
+    prompts: [
+      { title: '询价响应模板', desc: '帮我对A级客户做一份询价响应模板，含阶梯报价与账期方案', prompt: '帮我对A级客户做一份询价响应模板，含阶梯报价与账期方案', bubble: '询价响应模板', kb: 'B2B客户库' },
+      { title: '授信评估', desc: '查询某大客户的历史交易与回款记录，评估本次授信额度', prompt: '查询某大客户的历史交易与回款记录，评估本次授信额度', bubble: '授信评估', kb: 'B2B客户库' },
+      { title: '经销合同', desc: '起草一份标准经销合同的核心条款说明，突出账期与退换政策', prompt: '起草一份标准经销合同的核心条款说明，突出账期与退换政策', bubble: '经销合同', kb: 'B2B客户库' },
+      { title: '年度框架协议', desc: '为大客户定制年度框架协议要点', prompt: '为大客户定制年度框架协议要点', bubble: '年度框架协议', kb: 'B2B客户库' },
+      { title: '客户分级', desc: '评估客户分级规则，给出调整建议', prompt: '评估客户分级规则，给出调整建议', bubble: '客户分级', kb: 'B2B客户库' },
+      { title: '季度回顾', desc: '生成大客户季度回顾报告结构', prompt: '生成大客户季度回顾报告结构', bubble: '季度回顾', kb: 'B2B客户库' },
+      { title: '丢单挽回', desc: '针对丢单客户做竞品对比与挽回方案', prompt: '针对丢单客户做竞品对比与挽回方案', bubble: '丢单挽回', kb: 'B2B客户库' },
+      { title: '专属权益', desc: '设计大客户专属权益体系', prompt: '设计大客户专属权益体系', bubble: '专属权益', kb: 'B2B客户库' },
+      { title: '授信审批优化', desc: '输出授信审批流程优化建议', prompt: '输出授信审批流程优化建议', bubble: '授信审批优化', kb: 'B2B客户库' },
+      { title: '合同风险清单', desc: '整理合同风险条款检查清单', prompt: '整理合同风险条款检查清单', bubble: '合同风险清单', kb: 'B2B客户库' },
+    ],
+  },
+  {
+    value: 'zhibo',
+    label: '操盘手',
+    role: '直播运营专家',
+    desc: '覆盖直播前中后全链路：策划排品、实时场控、数据复盘',
+    level: 'P6',
+    accent: '#a855f7',
+    emoji: '🎬',
+    prompts: [
+      { title: '排品节奏', desc: '为一场2小时的运动鞋品牌自播设计排品节奏与秒杀节点', prompt: '为一场2小时的运动鞋品牌自播设计排品节奏与秒杀节点', bubble: '排品节奏', kb: '直播运营库' },
+      { title: '弹幕互动', desc: '直播中弹幕集中问尺码，给我一套即时互动话术与转粉钩子', prompt: '直播中弹幕集中问尺码，给我一套即时互动话术与转粉钩子', bubble: '弹幕互动', kb: '直播运营库' },
+      { title: '直播复盘', desc: '根据昨晚直播数据生成复盘报告，指出停留与转化的薄弱环节', prompt: '根据昨晚直播数据生成复盘报告，指出停留与转化的薄弱环节', bubble: '直播复盘', kb: '直播运营库' },
+      { title: '预热短视频', desc: '设计直播前预热短视频脚本', prompt: '设计直播前预热短视频脚本', bubble: '预热短视频', kb: '直播运营库' },
+      { title: '达人合作', desc: '规划达人合作直播的分工与利益分配', prompt: '规划达人合作直播的分工与利益分配', bubble: '达人合作', kb: '直播运营库' },
+      { title: '中控SOP', desc: '生成直播中控台操作SOP', prompt: '生成直播中控台操作SOP', bubble: '中控SOP', kb: '直播运营库' },
+      { title: '福袋互动', desc: '针对低转化时段设计福袋互动方案', prompt: '针对低转化时段设计福袋互动方案', bubble: '福袋互动', kb: '直播运营库' },
+      { title: '大促排期', desc: '输出大促直播排期与人员排班', prompt: '输出大促直播排期与人员排班', bubble: '大促排期', kb: '直播运营库' },
+      { title: '话术库', desc: '设计直播话术库，覆盖开场/卖点/逼单', prompt: '设计直播话术库，覆盖开场/卖点/逼单', bubble: '话术库', kb: '直播运营库' },
+      { title: '数据看板', desc: '生成直播数据看板指标定义', prompt: '生成直播数据看板指标定义', bubble: '数据看板', kb: '直播运营库' },
+    ],
+  },
+  {
+    value: 'toufang',
+    label: '老王',
+    role: '流量投放专家',
+    desc: '监控多平台投放计划的ROI、消耗节奏，预警异常波动并给出调优建议',
+    level: 'P6',
+    accent: '#ff5530',
+    emoji: '📈',
+    prompts: [
+      { title: '投放ROI看板', desc: '汇总抖音+小红书本周投放ROI看板，标注消耗异常的计划', prompt: '汇总抖音+小红书本周投放ROI看板，标注消耗异常的计划', bubble: '投放ROI看板', kb: '投放数据台' },
+      { title: '转化诊断', desc: '某计划CTR正常但转化骤降，帮我诊断并给出调价与素材建议', prompt: '某计划CTR正常但转化骤降，帮我诊断并给出调价与素材建议', bubble: '转化诊断', kb: '投放数据台' },
+      { title: '大促调优', desc: '大促当天高频调优节奏怎么排，给出分时段预算分配方案', prompt: '大促当天高频调优节奏怎么排，给出分时段预算分配方案', bubble: '大促调优', kb: '投放数据台' },
+      { title: '预算倾斜', desc: '分析各平台CPA，给出预算倾斜建议', prompt: '分析各平台CPA，给出预算倾斜建议', bubble: '预算倾斜', kb: '投放数据台' },
+      { title: '冷启动出价', desc: '新计划冷启动期如何设置出价与定向', prompt: '新计划冷启动期如何设置出价与定向', bubble: '冷启动出价', kb: '投放数据台' },
+      { title: '创意衰退', desc: '诊断创意衰退，给出迭代方向', prompt: '诊断创意衰退，给出迭代方向', bubble: '创意衰退', kb: '投放数据台' },
+      { title: '投放日报', desc: '生成投放日报结构', prompt: '生成投放日报结构', bubble: '投放日报', kb: '投放数据台' },
+      { title: '计划优化', desc: '针对ROI低于阈值的计划给出暂停/优化建议', prompt: '针对ROI低于阈值的计划给出暂停/优化建议', bubble: '计划优化', kb: '投放数据台' },
+      { title: 'A/B测试', desc: '设计A/B测试方案对比素材', prompt: '设计A/B测试方案对比素材', bubble: 'A/B测试', kb: '投放数据台' },
+      { title: '月度复盘', desc: '输出月度投放复盘与下月规划', prompt: '输出月度投放复盘与下月规划', bubble: '月度复盘', kb: '投放数据台' },
+    ],
+  },
+  {
+    value: 'hegui',
+    label: '老纠',
+    role: '质量合规专家',
+    desc: '监控商品质量与合规风险，建立质检标准与售后责任界定',
+    level: 'P7',
+    accent: '#ea5ec1',
+    emoji: '🔍',
+    prompts: [
+      { title: '质检标准', desc: '为新上架运动鞋建立质检标准清单，覆盖开胶、脱线等常见缺陷', prompt: '为新上架运动鞋建立质检标准清单，覆盖开胶、脱线等常见缺陷', bubble: '质检标准', kb: '质量合规库' },
+      { title: '文案合规', desc: '审查一批新品宣传文案，标注可能违规的夸大用语', prompt: '审查一批新品宣传文案，标注可能违规的夸大用语', bubble: '文案合规', kb: '质量合规库' },
+      { title: '召回责任', desc: '某批次服装检出pH值超标，给出召回与责任界定流程', prompt: '某批次服装检出pH值超标，给出召回与责任界定流程', bubble: '召回责任', kb: '质量合规库' },
+      { title: '售后责任', desc: '建立售后质量问题责任界定规则，区分厂家与物流', prompt: '建立售后质量问题责任界定规则，区分厂家与物流', bubble: '售后责任', kb: '质量合规库' },
+      { title: '合规自查', desc: '针对平台合规新规，输出商品信息自查清单', prompt: '针对平台合规新规，输出商品信息自查清单', bubble: '合规自查', kb: '质量合规库' },
+      { title: '质量评分卡', desc: '生成供应商质量评分卡模板', prompt: '生成供应商质量评分卡模板', bubble: '质量评分卡', kb: '质量合规库' },
+      { title: '客诉根因', desc: '某SKU客诉集中，给出根因分析与整改建议', prompt: '某SKU客诉集中，给出根因分析与整改建议', bubble: '客诉根因', kb: '质量合规库' },
+      { title: '合同合规', desc: '审查经销合同条款的合规风险', prompt: '审查经销合同条款的合规风险', bubble: '合同合规', kb: '质量合规库' },
+      { title: '风险预警', desc: '输出月度质量合规风险预警报告结构', prompt: '输出月度质量合规风险预警报告结构', bubble: '风险预警', kb: '质量合规库' },
+      { title: '闭环SOP', desc: '设计质量问题闭环处理SOP', prompt: '设计质量问题闭环处理SOP', bubble: '闭环SOP', kb: '质量合规库' },
+    ],
   },
 ]
 
-const scheduleCycles = [
-  { value: 'once', label: '不重复' },
-  { value: 'daily', label: '每天' },
-  { value: 'workday', label: '工作日' },
-  { value: 'weekly', label: '每周' },
-  { value: 'monthly', label: '每月' },
-  { value: 'cron', label: '自定义 Cron' },
-] as const
-const weekdayOptions = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-const monthDayOptions = Array.from({ length: 28 }, (_, index) => `${index + 1}号`)
-const scheduleTimeOptions = ['04:00', '08:00', '09:00', '12:00', '18:00', '21:00']
 const generatedArtifactCards: GeneratedArtifact[] = [
   {
     name: 'B2B团购组货清单.xlsx',
@@ -509,100 +592,28 @@ const generatedArtifactCards: GeneratedArtifact[] = [
   },
 ]
 
-const quickCases: CaseItem[] = [
+// 日常办公模式「快捷指令区」（PRD P0-4）：生成钉钉待办 / 生成需求草稿 / 封装成技能（提示词预填）
+const quickInstructionCases: CaseItem[] = [
   {
-    title: 'AI复合型岗位趋势',
-    icon: BarChart3,
-    desc: '生成趋势洞察和岗位能力框架',
-    prompt: '帮我整理一份AI复合型岗位趋势分析，包含岗位变化、能力要求和企业落地建议。',
-    kb: '组织发展知识库',
-  },
-  {
-    title: '品牌调研报告',
-    icon: Globe2,
-    desc: '汇总竞品信息和市场机会',
-    prompt: '帮我生成一份品牌调研报告，包含竞品动态、用户偏好和可执行建议。',
-    kb: '调研资料库',
-  },
-  {
-    title: '名单双表格',
-    icon: FileSpreadsheet,
-    desc: '把名单整理成可筛选表格',
-    prompt: '帮我把名单信息整理成表格，字段包括姓名、部门、角色、联系方式和跟进状态。',
-    kb: '办公模板库',
-  },
-  {
-    title: '查知识库',
-    icon: Database,
-    desc: '查制度、流程、产品资料',
-    prompt: '小马帮我查知识库里的考勤规定，并标出引用来源。',
-    kb: '集团制度知识库',
-  },
-  {
-    title: '客诉分析报告',
-    icon: FileText,
-    desc: '把材料整理成结构化内容',
-    prompt: '请把这批客诉材料整理成一份分析报告，包含问题分类、影响范围、根因假设和后续动作。',
-    kb: '客诉与经营分析知识库',
-  },
-  {
-    title: '搜行业动态',
-    icon: Globe2,
-    desc: '联网搜索并汇总重点',
-    prompt: '小马搜一下最新的行业动态，整理成3条对方案中心有用的信息。',
-    kb: '外部公开资料',
-  },
-  {
-    title: '生成分析报告',
-    icon: FileText,
-    desc: '把材料整理成结构化内容',
-    prompt: '小马生成一份分析报告，包含背景、关键发现、建议动作。',
-    kb: '经营分析知识库',
-  },
-]
-
-const dingtalkCases: CaseItem[] = [
-  {
-    title: '定日程',
-    icon: CalendarDays,
-    desc: '安排会议并同步日程',
-    prompt: '帮我在明天下午3点安排一场方案评审会，时长1小时，参会人：张明、李娟。',
-    kb: '钉钉办公助手',
-  },
-  {
-    title: '创建AI表格',
-    icon: FileSpreadsheet,
-    desc: '把清单整理成结构化表格',
-    prompt: '将方案中的SPU/SKU清单转为AI表格结构，字段包含品类、数量、价格带、推荐理由。',
-    kb: '钉钉AI表格模板',
-  },
-  {
-    title: '创建待办',
+    title: '生成钉钉待办',
     icon: CheckCircle2,
-    desc: '沉淀执行项与负责人',
-    prompt: '将方案执行步骤生成钉钉待办清单，每项设置负责人和截止时间。',
+    desc: '把任务一键沉淀为钉钉待办清单',
+    prompt: '帮我把以下任务生成钉钉待办清单，每项标注负责人和截止时间：',
     kb: '钉钉待办规则',
   },
-]
-
-const solutionCases: CaseItem[] = [
   {
-    title: 'B2B线下团购方案',
-    desc: '预算10万，运动鞋类目，输出三档组合。',
-    prompt: '帮我给B2B线下客户出一版团购方案。已知：总预算10万，偏运动鞋类目，客户在门店等待，需要先给一版可沟通初稿。请先列出必须追问字段，再按保守档、均衡档、品质档输出组货方案。',
-    kb: '方案中心案例库',
+    title: '生成需求草稿',
+    icon: FileText,
+    desc: '按模板快速产出结构化需求',
+    prompt: '帮我写一份需求草稿，包含背景、目标、范围、关键流程和验收标准。',
+    kb: '需求模板库',
   },
   {
-    title: '门店需求采集',
-    desc: '把客户口述需求整理成标准字段。',
-    prompt: '请把门店客户的团购需求整理成标准字段表。字段包括客户类型、数量、预算范围、活动场景、品类需求、品牌偏好、交付时间、风险备注。',
-    kb: '方案中心字段模板',
-  },
-  {
-    title: '成功案例复用',
-    desc: '匹配案例池并给出引用依据。',
-    prompt: '请基于方案中心成功案例池，帮我匹配适合运动鞋团购的相似案例，并说明适用条件、引用依据和可复用话术。',
-    kb: '成功案例池',
+    title: '封装成技能',
+    icon: Sparkles,
+    desc: '把重复流程沉淀为可复用技能',
+    prompt: '把这段工作流程封装成一个可复用的技能，说明触发条件、输入和产出。',
+    kb: '技能模板库',
   },
 ]
 
@@ -619,7 +630,6 @@ const filteredConversations = computed(() => {
 const sidebarConversationGroups = computed(() => [
   { key: 'task' as const, label: '专家模式', items: filteredConversations.value.filter((item) => item.mode === '专家模式') },
   { key: 'quick' as const, label: '日常办公', items: filteredConversations.value.filter((item) => item.mode === '日常办公') },
-  { key: 'schedule' as const, label: '定时任务', items: filteredConversations.value.filter((item) => item.mode === '定时任务') },
 ].filter((group) => group.items.length))
 const historyBrowserConversations = computed(() => {
   const keyword = historyBrowserSearch.value.trim().toLowerCase()
@@ -627,7 +637,6 @@ const historyBrowserConversations = computed(() => {
     const modeMatched = historyBrowserModeFilter.value === 'all'
       || (historyBrowserModeFilter.value === 'quick' && item.mode === '日常办公')
       || (historyBrowserModeFilter.value === 'task' && item.mode === '专家模式')
-      || (historyBrowserModeFilter.value === 'schedule' && item.mode === '定时任务')
     if (!modeMatched) return false
     if (!keyword) return true
     return `${item.title}${item.mode}${item.time}${getConversationDetail(item)}${getConversationStatusLabel(item.status)}`.toLowerCase().includes(keyword)
@@ -636,7 +645,27 @@ const historyBrowserConversations = computed(() => {
 const currentAgentOptions = computed(() => (runMode.value === 'task' ? expertAgents : officeAgents))
 const currentAgentLabel = computed(() => currentAgentOptions.value.find((agent) => agent.value === selectedAgent.value)?.label ?? '')
 const selectedExpert = computed(() => expertAgents.find((agent) => agent.value === selectedAgent.value && agent.value !== 'soon') ?? null)
-const featuredExpertAgents = computed(() => expertAgents.filter((agent) => agent.value !== 'soon').slice(0, 3))
+const featuredExpertAgents = computed(() => expertAgents.filter((agent) => agent.value !== 'soon'))
+const pagedExperts = computed(() => {
+  const start = (expertPage.value - 1) * EXPERT_PAGE_SIZE
+  return featuredExpertAgents.value.slice(start, start + EXPERT_PAGE_SIZE)
+})
+const expertTotalPages = computed(() => Math.max(1, Math.ceil(featuredExpertAgents.value.length / EXPERT_PAGE_SIZE)))
+const pagedCases = computed(() => {
+  if (!selectedExpert.value) return []
+  const start = (casePage.value - 1) * EXPERT_PAGE_SIZE
+  return selectedExpert.value.prompts.slice(start, start + EXPERT_PAGE_SIZE)
+})
+const caseTotalPages = computed(() =>
+  selectedExpert.value ? Math.max(1, Math.ceil(selectedExpert.value.prompts.length / EXPERT_PAGE_SIZE)) : 1,
+)
+watch(selectedExpert, () => {
+  casePage.value = 1
+})
+watch(runMode, () => {
+  expertPage.value = 1
+  casePage.value = 1
+})
 const needsExpertSelection = computed(() => runMode.value === 'task' && !selectedExpert.value)
 const canSend = computed(() =>
   !isThinking.value
@@ -645,54 +674,23 @@ const canSend = computed(() =>
 )
 const currentAgentDescription = computed(() => {
   if (runMode.value === 'task') return selectedExpert.value?.desc ?? '先选择一个专家，小马会把任务交给合适的专家执行。'
-  if (runMode.value === 'schedule') return '定时任务用于周期性执行检索、提醒、日报、知识库更新等固定动作。'
   return '全能助手擅长处理日常办公、知识查询、资料整理和轻量协同任务。'
 })
 const visibleCases = computed<CaseItem[]>(() => {
   if (runMode.value === 'task') return selectedExpert.value?.prompts ?? []
-  if (runMode.value === 'schedule') return [
-    { title: '每日方案池监控', icon: CalendarDays, desc: '每天 09:00 检查新增方案和过期字段', prompt: '每天早上9点检查方案中心是否有新增或过期字段，并生成一段摘要提醒我。', kb: '方案中心', schedule: { cycle: 'daily', time: '09:00' } },
-    { title: '每周经营简报', icon: FileText, desc: '每周一 09:00 生成经营摘要', prompt: '每周一上午9点汇总上周经营数据、重点风险和建议动作，输出一份简报。', kb: '经营分析知识库', schedule: { cycle: 'weekly', weekday: '周一', time: '09:00' } },
-    { title: '工作日待办巡检', icon: CheckCircle2, desc: '工作日 18:00 提醒未完成任务', prompt: '每个工作日下午6点检查我未完成的钉钉待办，并按优先级提醒。', kb: '钉钉待办', schedule: { cycle: 'workday', time: '18:00' } },
-    { title: '单次客户提醒', icon: Bell, desc: '2026-07-02 14:41 提醒客户跟进', prompt: '在指定时间提醒我跟进客户团购方案，并附上上次沟通要点。', kb: '客户跟进记录', schedule: { cycle: 'once', date: '2026-07-02', time: '14:41' } },
-  ]
-  if (selectedAgent.value === 'allround') {
-    if (activeCaseCategory.value === '咨询调研') return quickCases.filter((item) => item.title === '品牌调研报告' || item.title === '搜行业动态')
-    if (activeCaseCategory.value === 'office办公') return [...dingtalkCases, quickCases.find((item) => item.title === '名单双表格')].filter(Boolean) as CaseItem[]
-    if (activeCaseCategory.value === '应用开发') return [{ title: '应用需求拆解', icon: LayoutGrid, desc: '把想法拆成页面和接口清单', prompt: '帮我把一个内部工具需求拆成页面、字段、交互和接口清单。', kb: '应用开发模板库' }]
-    return [
-      quickCases.find((item) => item.title === '查知识库'),
-      quickCases.find((item) => item.title === '客诉分析报告'),
-      dingtalkCases.find((item) => item.title === '定日程'),
-    ].filter(Boolean) as CaseItem[]
-  }
-  return [
-    quickCases.find((item) => item.title === '查知识库'),
-    quickCases.find((item) => item.title === '客诉分析报告'),
-    dingtalkCases.find((item) => item.title === '定日程'),
-  ].filter(Boolean) as CaseItem[]
+  return quickInstructionCases
 })
 const artifactPreviewVisible = computed(() => Boolean(activeArtifactPreview.value))
 const placeholder = computed(() => {
   if (runMode.value === 'task' && !selectedExpert.value) return '请在下方选择合适的专家，小马会把任务托付给他/她高效完成'
   if (runMode.value === 'task') return `${selectedExpert.value?.label ?? '专家'}已就绪，说说具体任务目标吧`
-  if (runMode.value === 'schedule') return '描述要周期执行的任务，例如每天早上生成方案池更新摘要'
   return '小马在线，随时向我提问或上传文件...'
 })
 const modeLabel = computed(() => {
   if (runMode.value === 'task') return '专家模式'
-  if (runMode.value === 'schedule') return '定时任务'
   return '日常办公'
 })
 const agentSelectLabel = computed(() => runMode.value === 'task' ? '专家' : '助手')
-const scheduleCycleLabel = computed(() => scheduleCycles.find((item) => item.value === scheduleCycle.value)?.label ?? '每天')
-const scheduleSummary = computed(() => {
-  if (scheduleCycle.value === 'cron') return `Cron：${scheduleCron.value}`
-  if (scheduleCycle.value === 'once') return `${scheduleDate.value} ${scheduleTime.value}`
-  if (scheduleCycle.value === 'weekly') return `${scheduleCycleLabel.value} ${scheduleWeekday.value} ${scheduleTime.value}`
-  if (scheduleCycle.value === 'monthly') return `${scheduleCycleLabel.value} ${scheduleMonthDay.value} ${scheduleTime.value}`
-  return `${scheduleCycleLabel.value} ${scheduleTime.value}`
-})
 const chatTitle = computed(() => activeConversationTitle.value || '新会话')
 const contextPercent = computed(() => {
   const messageText = messages.value.reduce((total, message) => total + message.content.length, 0)
@@ -787,7 +785,6 @@ const filteredAttachmentItems = computed(() => {
 function selectMode(mode: RunMode) {
   runMode.value = mode
   selectedAgent.value = mode === 'task' ? '' : 'allround'
-  activeCaseCategory.value = '精选案例'
   showRecommendations.value = true
   modeMenuOpen.value = false
   agentMenuOpen.value = false
@@ -795,7 +792,6 @@ function selectMode(mode: RunMode) {
 function selectAgent(agentValue: string) {
   if (agentValue.startsWith('soon')) return
   selectedAgent.value = agentValue
-  activeCaseCategory.value = '精选案例'
   showRecommendations.value = true
   agentMenuOpen.value = false
 }
@@ -806,20 +802,6 @@ function clearSelectedExpert() {
   query.value = ''
   activeReference.value = null
   showRecommendations.value = true
-}
-
-function updateScheduleCycle(value: ScheduleCycle) {
-  scheduleCycle.value = value
-  if (!scheduleTimeOptions.includes(scheduleTime.value)) scheduleTime.value = '09:00'
-}
-
-function applySchedulePreset(item: CaseItem) {
-  if (!item.schedule) return
-  if (item.schedule.cycle) scheduleCycle.value = item.schedule.cycle
-  if (item.schedule.date) scheduleDate.value = item.schedule.date
-  if (item.schedule.time) scheduleTime.value = item.schedule.time
-  if (item.schedule.weekday) scheduleWeekday.value = item.schedule.weekday
-  if (item.schedule.monthDay) scheduleMonthDay.value = item.schedule.monthDay
 }
 
 function updateComposerGlow(event: PointerEvent) {
@@ -836,7 +818,7 @@ function resetComposerGlow(event: PointerEvent) {
 }
 
 function createReferenceFromCase(item: CaseItem, mode: RunMode): ActiveReference {
-  const nextMode = mode === 'task' ? '专家模式' : mode === 'schedule' ? '定时任务' : '日常办公'
+  const nextMode = mode === 'task' ? '专家模式' : '日常办公'
   const agent = currentAgentOptions.value.find((option) => option.value === selectedAgent.value)?.label
     ?? (mode === 'task' ? '未选择专家' : '全能助手')
   return {
@@ -854,7 +836,6 @@ async function fillPrompt(item: CaseItem | string, mode: RunMode = runMode.value
     query.value = item
   } else {
     query.value = item.prompt
-    if (mode === 'schedule') applySchedulePreset(item)
   }
   await nextTick()
   resizeComposer()
@@ -949,7 +930,6 @@ function getConversationDetail(item: ConversationItem) {
     if (item.title.includes('门店')) return '把门店客户口述需求整理为标准字段，便于后续进入组货专家流程。'
     return '复杂专项任务，包含任务理解、计划拆解、工具调用和最终方案整合。'
   }
-  if (item.mode === '定时任务') return '周期性自动化任务，用于监控方案池、提醒待办或生成固定简报。'
   if (item.title.includes('考勤')) return '围绕集团考勤制度进行轻量问答，未触发复杂专家流程。'
   return '日常办公对话，适合资料整理、知识库查询、联网检索和轻量协同。'
 }
@@ -1061,7 +1041,6 @@ function delay(ms: number) {
 }
 
 function classifyIntent(content: string, hasFiles = false): IntentRoute {
-  if (runMode.value === 'schedule') return 'schedule-task'
   const normalized = content.trim().replace(/[!！。.\s]/g, '')
   const greetingPatterns = ['你好', '您好', '嗨', 'hi', 'hello', '哈喽', '在吗', '谢谢', '感谢', '再见', '拜拜', '你是谁']
   if (!hasFiles && greetingPatterns.some((item) => normalized.toLowerCase() === item.toLowerCase())) {
@@ -1081,7 +1060,6 @@ function classifyIntent(content: string, hasFiles = false): IntentRoute {
 
 function getGenerationEvents(route: IntentRoute) {
   if (route === 'greeting') return greetingProcessEvents
-  if (route === 'schedule-task') return quickProcessEvents
   return route === 'expert-task' ? solutionProcessEvents : quickProcessEvents
 }
 
@@ -1097,17 +1075,6 @@ function getGenerationChunks(route: IntentRoute, prompt = '') {
       '1. 已整理出当前问题的关键结论，并优先参考内部知识库内容。\n',
       '2. 相关制度、案例或外部背景会在引用区保留来源，方便继续追溯。\n',
       '3. 如果后续需要导出文件、创建待办或跨系统执行，可以切换到专家模式继续处理。',
-    ]
-  }
-  if (route === 'schedule-task') {
-    return [
-      '## 定时任务已安排\n\n',
-      `### 执行周期\n${scheduleSummary.value}\n\n`,
-      '### 任务内容\n',
-      `${prompt || '按当前设置周期执行提醒与资料整理。'}\n\n`,
-      '### 后续管理\n',
-      '- 可在左侧栏「自动化」中查看状态、暂停任务或立即启动。\n',
-      '- 执行结果会沉淀到对应会话，涉及文件的产物会以文件卡片展示在对话中。',
     ]
   }
   return [
@@ -1191,7 +1158,6 @@ function runningEvent(event: ProcessEvent): ProcessEvent {
 
 function summarizeDraftTitle(content: string) {
   if (classifyIntent(content) === 'greeting') return '轻量问候'
-  if (runMode.value === 'schedule') return '定时任务安排'
   if (content.includes('团购')) return 'B2B团购组货方案'
   if (content.includes('考勤')) return '考勤制度问答'
   if (content.includes('待办')) return '钉钉待办创建'
@@ -1760,10 +1726,10 @@ onBeforeUnmount(() => {
 
           <div data-testid="hero-composer" class="composer-shell mx-auto min-h-[112px] w-full max-w-[800px] rounded-[24px] border border-[#e5e5e5] bg-white p-4 shadow-[0_24px_20px_-28px_rgba(0,0,0,0.16)]" @pointermove="updateComposerGlow" @pointerleave="resetComposerGlow">
             <div class="flex items-start gap-2 px-2">
-              <div v-if="runMode === 'task' && selectedExpert" class="mt-2 inline-flex max-w-[180px] shrink-0 items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-1.5 text-sm font-medium text-violet-700">
+              <div v-if="runMode === 'task' && selectedExpert" class="mt-2 inline-flex max-w-[180px] shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-medium" :style="{ borderColor: (selectedExpert.accent || '#0a0a0a') + '40', backgroundColor: (selectedExpert.accent || '#0a0a0a') + '12', color: selectedExpert.accent || '#0a0a0a' }">
                 <Sparkles class="h-3.5 w-3.5 shrink-0" />
                 <span class="truncate">{{ selectedExpert.label }}</span>
-                <button type="button" class="rounded-md p-0.5 hover:bg-violet-100" aria-label="移除已选专家" @click="clearSelectedExpert">
+                <button type="button" class="rounded-md p-0.5 hover:bg-black/5" aria-label="移除已选专家" @click="clearSelectedExpert">
                   <X class="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -1798,7 +1764,7 @@ onBeforeUnmount(() => {
 
 
             <div class="flex flex-wrap items-center gap-2 border-t border-transparent px-2 pt-3">
-              <div v-if="runMode !== 'schedule'" class="relative">
+              <div class="relative">
                 <button
                   class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
                   aria-label="添加附件"
@@ -1833,7 +1799,7 @@ onBeforeUnmount(() => {
                 >
                   <Zap v-if="runMode === 'quick'" class="h-3.5 w-3.5" />
                   <Bot v-else-if="runMode === 'task'" class="h-3.5 w-3.5" />
-                  <CalendarDays v-else class="h-3.5 w-3.5" />
+                  <Bot v-else class="h-3.5 w-3.5" />
                   {{ modeLabel }}
                   <ChevronDown class="h-3.5 w-3.5" />
                 </button>
@@ -1844,30 +1810,23 @@ onBeforeUnmount(() => {
                       <span class="block text-sm font-medium text-zinc-900">日常办公</span>
                       <span class="block text-xs leading-5 text-zinc-400">适合日常轻度办公任务</span>
                     </span>
-                    <CheckCircle2 v-if="runMode === 'quick'" class="mt-0.5 h-4 w-4 text-blue-600" />
+                    <CheckCircle2 v-if="runMode === 'quick'" class="mt-0.5 h-4 w-4 text-[#0a0a0a]" />
                   </button>
                   <button type="button" data-testid="mode-option-task" class="flex w-full items-start gap-2 rounded-xl px-3 py-2.5 text-left hover:bg-zinc-50" @click.stop="selectMode('task')">
-                    <Bot class="mt-0.5 h-4 w-4 text-violet-600" />
+                    <Bot class="mt-0.5 h-4 w-4 text-[#0a0a0a]" />
                     <span class="min-w-0 flex-1">
                       <span class="block text-sm font-medium text-zinc-900">专家模式</span>
                       <span class="block text-xs leading-5 text-zinc-400">处理复杂的专项类任务</span>
                     </span>
-                    <CheckCircle2 v-if="runMode === 'task'" class="mt-0.5 h-4 w-4 text-blue-600" />
-                  </button>
-                  <button type="button" data-testid="mode-option-schedule" class="flex w-full items-start gap-2 rounded-xl px-3 py-2.5 text-left hover:bg-zinc-50" @click.stop="selectMode('schedule')">
-                    <CalendarDays class="mt-0.5 h-4 w-4 text-blue-600" />
-                    <span class="min-w-0 flex-1">
-                      <span class="block text-sm font-medium text-zinc-900">定时任务</span>
-                      <span class="block text-xs leading-5 text-zinc-400">设置周期性自动化任务</span>
-                    </span>
-                    <CheckCircle2 v-if="runMode === 'schedule'" class="mt-0.5 h-4 w-4 text-blue-600" />
+                    <CheckCircle2 v-if="runMode === 'task'" class="mt-0.5 h-4 w-4 text-[#0a0a0a]" />
                   </button>
                 </div>
               </div>
               <div v-if="runMode === 'task' && selectedExpert" class="group/agent relative ml-auto">
                 <button
                   type="button"
-                  class="inline-flex h-8 min-w-28 items-center justify-between gap-2 px-2 text-xs font-medium text-violet-700"
+                  class="inline-flex h-8 min-w-28 items-center justify-between gap-2 px-2 text-xs font-medium"
+                  :style="{ color: (selectedExpert?.accent || '#0a0a0a') }"
                   :aria-label="`选择${agentSelectLabel}`"
                   @click.stop="agentMenuOpen = !agentMenuOpen; modeMenuOpen = false"
                 >
@@ -1887,7 +1846,7 @@ onBeforeUnmount(() => {
                     :class="agent.value.startsWith('soon') ? 'cursor-not-allowed text-zinc-300' : 'text-zinc-700 hover:bg-zinc-50'"
                     @click.stop="selectAgent(agent.value)"
                   >
-                    <Sparkles class="h-4 w-4 shrink-0 text-violet-500" />
+                    <Sparkles class="h-4 w-4 shrink-0 text-zinc-400" />
                     <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ agent.label }}</span>
                     <CheckCircle2 v-if="selectedAgent === agent.value" class="h-4 w-4 shrink-0 text-blue-600" />
                   </button>
@@ -1895,109 +1854,113 @@ onBeforeUnmount(() => {
               </div>
             </div>
 
-            <div v-if="runMode === 'schedule'" class="schedule-panel mt-3">
-              <span class="schedule-title">周期</span>
-              <select :value="scheduleCycle" class="schedule-field schedule-field-main" aria-label="选择定时周期" @change="updateScheduleCycle(($event.target as HTMLSelectElement).value as ScheduleCycle)">
-                <option v-for="cycle in scheduleCycles" :key="cycle.value" :value="cycle.value">{{ cycle.label }}</option>
-              </select>
-              <template v-if="scheduleCycle === 'once'">
-                <input v-model="scheduleDate" type="date" class="schedule-field schedule-field-main" aria-label="选择执行日期" />
-                <input v-model="scheduleTime" type="time" class="schedule-field schedule-field-main" aria-label="输入执行时间" />
-              </template>
-              <template v-else-if="scheduleCycle === 'weekly'">
-                <select v-model="scheduleWeekday" class="schedule-field schedule-field-main" aria-label="选择星期">
-                  <option v-for="day in weekdayOptions" :key="day" :value="day">{{ day }}</option>
-                </select>
-                <input v-model="scheduleTime" type="time" class="schedule-field schedule-field-main" aria-label="输入执行时间" />
-              </template>
-              <template v-else-if="scheduleCycle === 'monthly'">
-                <select v-model="scheduleMonthDay" class="schedule-field schedule-field-main" aria-label="选择日期">
-                  <option v-for="day in monthDayOptions" :key="day" :value="day">{{ day }}</option>
-                </select>
-                <input v-model="scheduleTime" type="time" class="schedule-field schedule-field-main" aria-label="输入执行时间" />
-              </template>
-              <template v-else-if="scheduleCycle === 'cron'">
-                <input v-model="scheduleCron" class="schedule-field schedule-field-cron font-mono" placeholder="0 9 * * *" aria-label="输入 Cron 表达式" />
-              </template>
-              <template v-else>
-                <span class="schedule-field schedule-field-main schedule-field-muted">{{ scheduleCycle === 'daily' ? '每天' : '周一至周五' }}</span>
-                <input v-model="scheduleTime" type="time" class="schedule-field schedule-field-main" aria-label="输入执行时间" />
-              </template>
-            </div>
-
           </div>
 
           <Transition name="recommend">
-            <div v-if="showRecommendations && runMode !== 'schedule'" data-testid="home-case-section" class="mt-5 w-full">
-              <div v-if="runMode === 'task' && !selectedExpert" class="mx-auto grid w-full max-w-[800px] gap-3 md:grid-cols-3">
-                <button
-                  v-for="expert in featuredExpertAgents"
-                  :key="expert.value"
-                  type="button"
-                  class="group min-h-[246px] rounded-[20px] border border-[#f2f2f2] bg-white p-5 text-center transition hover:border-violet-100 hover:shadow-[0_14px_32px_rgba(15,23,42,0.08)]"
-                  @click="selectAgent(expert.value)"
-                >
-                  <div class="relative mx-auto grid h-[110px] w-[110px] place-items-center rounded-full bg-white">
-                    <img
-                      v-if="expert.avatarUrl"
-                      :src="expert.avatarUrl"
-                      :alt="`${expert.label}头像`"
-                      class="h-[110px] w-[110px] rounded-full object-cover ring-1 ring-violet-100"
-                    />
-                    <div v-else class="grid h-[86px] w-[86px] place-items-center rounded-full bg-gradient-to-br text-2xl font-semibold text-white shadow-inner" :class="expert.accent">
-                      {{ expert.label.slice(0, 1) }}
+            <div v-if="showRecommendations" data-testid="home-case-section" class="mt-5 w-full">
+              <div v-if="runMode === 'task' && !selectedExpert" class="mx-auto w-full max-w-[920px]">
+                <div class="grid grid-cols-3 gap-3">
+                  <button
+                    v-for="expert in pagedExperts"
+                    :key="expert.value"
+                    type="button"
+                    class="group flex min-h-[96px] items-center overflow-hidden rounded-2xl p-4 text-left text-white transition hover:opacity-90" :style="{ backgroundColor: expert.accent }"
+                    @click="selectAgent(expert.value)"
+                  >
+                    <div class="flex w-full items-center gap-3">
+                      <div class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/20 text-xl">{{ expert.emoji }}</div>
+                      <div class="min-w-0">
+                        <div class="truncate font-semibold text-sm text-zinc-950">{{ expert.label }}</div>
+                        <div class="truncate text-[11px] text-zinc-400">{{ expert.role }}</div>
+                        <div class="mt-1 line-clamp-2 text-xs leading-5 text-zinc-500">{{ expert.desc }}</div>
+                      </div>
                     </div>
-                    <span class="absolute bottom-4 right-0 rotate-[-10deg] rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-[11px] font-semibold text-orange-600 shadow-sm">{{ expert.role.slice(0, 6) }}</span>
-                  </div>
-                  <div class="mt-4 text-base font-semibold text-zinc-950">{{ expert.label }}</div>
-                  <p class="mx-auto mt-3 line-clamp-2 max-w-44 text-xs leading-5 text-zinc-400">{{ expert.desc }}</p>
-                </button>
+                  </button>
+                </div>
+                <div v-if="expertTotalPages > 1" class="mt-4 flex items-center justify-center gap-2 text-sm">
+                  <button
+                    type="button"
+                    class="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 text-zinc-500 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40"
+                    :disabled="expertPage === 1"
+                    @click="expertPage = Math.max(1, expertPage - 1)"
+                  >‹</button>
+                  <button
+                    v-for="p in expertTotalPages"
+                    :key="p"
+                    type="button"
+                    class="h-8 min-w-8 rounded-full border px-2 transition"
+                    :class="p === expertPage ? 'border-[#0a0a0a] bg-[#0a0a0a] font-medium text-white' : 'border-zinc-200 text-zinc-500 hover:bg-zinc-100'"
+                    @click="expertPage = p"
+                  >{{ p }}</button>
+                  <button
+                    type="button"
+                    class="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 text-zinc-500 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-40"
+                    :disabled="expertPage === expertTotalPages"
+                    @click="expertPage = Math.min(expertTotalPages, expertPage + 1)"
+                  >›</button>
+                </div>
               </div>
 
-              <div v-else-if="runMode === 'task' && selectedExpert" class="mx-auto max-w-[620px]">
-                  <div class="flex flex-wrap justify-center gap-2">
-                  <button
-                    v-for="(item, index) in visibleCases"
-                    :key="item.title"
-                    type="button"
-                    class="max-w-[min(520px,100%)] rounded-xl bg-zinc-100 px-4 py-2.5 text-left text-sm leading-5 text-zinc-800 transition hover:bg-violet-50 hover:text-violet-700"
-                    :class="[
-                      index % 5 === 0 ? 'w-[256px]' : '',
-                      index % 5 === 1 ? 'w-[172px]' : '',
-                      index % 5 === 2 ? 'w-[340px]' : '',
-                      index % 5 === 3 ? 'w-[186px]' : '',
-                      index % 5 === 4 ? 'w-[396px]' : '',
-                    ]"
-                    @click="fillPrompt(item, runMode); showRecommendations = true"
-                  >
-                    <span class="block truncate">{{ item.bubble ?? item.title }}</span>
-                  </button>
+              <div v-else-if="runMode === 'task' && selectedExpert" class="mx-auto w-full max-w-[920px]">
+                <button type="button" class="mb-3 inline-flex items-center gap-1 text-sm text-zinc-500 transition hover:text-zinc-900" @click="clearSelectedExpert">
+                  <span class="text-base leading-none">‹</span> 返回专家列表
+                </button>
+                <div class="mb-4 flex items-center gap-3 rounded-2xl border border-zinc-200 bg-white p-4">
+                  <div class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-xl text-white" :style="{ backgroundColor: selectedExpert.accent }">{{ selectedExpert.emoji }}</div>
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="text-base font-semibold text-zinc-950">{{ selectedExpert.label }}</span>
+                      <span class="rounded-full border border-zinc-200 px-2 py-px text-[11px] text-zinc-500">{{ selectedExpert.role }}</span>
+                    </div>
+                    <p class="mt-0.5 truncate text-xs text-zinc-400">{{ selectedExpert.desc }}</p>
                   </div>
+                </div>
+                <div class="mx-auto max-w-[620px]">
+                  <div class="flex flex-wrap justify-center gap-2">
+                    <button
+                      v-for="(item, index) in visibleCases"
+                      :key="item.title"
+                      type="button"
+                      class="max-w-[min(520px,100%)] rounded-full bg-zinc-100 px-4 py-2.5 text-left text-sm leading-5 text-zinc-800 transition hover:bg-[#f2f3f5]"
+                      :class="[
+                        index % 5 === 0 ? 'w-[256px]' : '',
+                        index % 5 === 1 ? 'w-[172px]' : '',
+                        index % 5 === 2 ? 'w-[340px]' : '',
+                        index % 5 === 3 ? 'w-[186px]' : '',
+                        index % 5 === 4 ? 'w-[396px]' : '',
+                      ]"
+                      @click="fillPrompt(item, runMode); showRecommendations = true"
+                    >
+                      <span class="block truncate">{{ item.bubble ?? item.title }}</span>
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div
                 v-else
-                class="grid gap-3"
-                :class="runMode === 'quick' ? 'mx-auto w-full max-w-[800px] md:grid-cols-3' : 'md:grid-cols-2 xl:grid-cols-3'"
+                class="mx-auto w-full max-w-[920px]"
               >
-                <button
-                  v-for="(item, index) in visibleCases"
-                  :key="item.title"
-                  class="group border bg-white text-left transition"
-                  :class="runMode === 'quick' ? 'min-h-[76px] rounded-[20px] border-[#f2f2f2] p-4 hover:border-blue-100 hover:shadow-[0_10px_26px_rgba(15,23,42,0.06)]' : 'min-h-32 rounded-2xl border-zinc-200 p-4 hover:border-blue-200 hover:bg-blue-50/30'"
-                  @click="fillPrompt(item, runMode); showRecommendations = true"
-                >
-                  <div class="flex h-full gap-3">
-                    <div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl" :class="index % 3 === 0 ? 'bg-violet-50 text-violet-600' : index % 3 === 1 ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'">
-                      <component :is="'icon' in item ? item.icon : LayoutGrid" class="h-5 w-5" />
+                <div class="grid grid-cols-3 gap-3">
+                  <button
+                    v-for="(item, i) in quickInstructionCases"
+                    :key="item.title"
+                    type="button"
+                    class="group flex min-h-[96px] items-center rounded-2xl border border-zinc-200 bg-white p-4 text-left transition hover:border-zinc-300 hover:bg-zinc-50"
+                    @click="fillPrompt(item, runMode); showRecommendations = true"
+                  >
+                    <div class="flex w-full items-center gap-3">
+                      <div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl" :class="i % 3 === 0 ? 'bg-[#ff5530]/10 text-[#ff5530]' : i % 3 === 1 ? 'bg-[#ea5ec1]/10 text-[#ea5ec1]' : 'bg-[#1456f0]/10 text-[#1456f0]'">
+                        <component :is="'icon' in item ? item.icon : FileText" class="h-5 w-5" />
+                      </div>
+                      <div class="min-w-0">
+                        <div class="truncate font-semibold text-sm text-zinc-950">{{ item.title }}</div>
+                        <div class="mt-1 line-clamp-2 text-xs leading-5 text-zinc-500">{{ item.desc }}</div>
+                        <div v-if="item.kb" class="mt-1 text-[11px] text-blue-500">引用 {{ item.kb }}</div>
+                      </div>
                     </div>
-                    <div class="min-w-0">
-                      <div class="truncate font-semibold text-zinc-950" :class="runMode === 'quick' ? 'text-sm' : 'text-base'">{{ item.title }}</div>
-                      <div class="line-clamp-2 text-zinc-500" :class="runMode === 'quick' ? 'mt-1 text-xs leading-5' : 'mt-2 text-sm leading-6'">{{ item.desc }}</div>
-                      <div v-if="runMode !== 'quick'" class="mt-3 text-xs text-blue-500">引用 {{ item.kb }}</div>
-                    </div>
-                  </div>
-                </button>
+                  </button>
+                </div>
               </div>
             </div>
           </Transition>
@@ -2030,7 +1993,6 @@ onBeforeUnmount(() => {
                   { key: 'all', label: '全部' },
                   { key: 'task', label: '专家模式' },
                   { key: 'quick', label: '日常办公' },
-                  { key: 'schedule', label: '定时任务' },
                 ]"
                 :key="option.key"
                 type="button"
@@ -2295,10 +2257,10 @@ onBeforeUnmount(() => {
                 </button>
               </div>
             <div class="flex items-end gap-2">
-              <div v-if="runMode === 'task' && selectedExpert" class="mb-1 inline-flex max-w-[160px] shrink-0 items-center gap-1.5 rounded-xl bg-violet-50 px-2.5 py-1.5 text-xs font-medium text-violet-700">
+              <div v-if="runMode === 'task' && selectedExpert" class="mb-1 inline-flex max-w-[160px] shrink-0 items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-medium" :style="{ borderColor: (selectedExpert.accent || '#0a0a0a') + '40', backgroundColor: (selectedExpert.accent || '#0a0a0a') + '12', color: selectedExpert.accent || '#0a0a0a' }">
                 <Sparkles class="h-3.5 w-3.5 shrink-0" />
                 <span class="truncate">{{ selectedExpert.label }}</span>
-                <button type="button" class="rounded p-0.5 hover:bg-violet-100" aria-label="移除已选专家" @click="clearSelectedExpert">
+                <button type="button" class="rounded p-0.5 hover:bg-black/5" aria-label="移除已选专家" @click="clearSelectedExpert">
                   <X class="h-3 w-3" />
                 </button>
               </div>
@@ -2324,7 +2286,7 @@ onBeforeUnmount(() => {
               </button>
             </div>
               <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-zinc-100 px-1 pt-3">
-                <div v-if="runMode !== 'schedule'" class="relative">
+                <div class="relative">
                   <button
                     class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
                     aria-label="添加附件"
@@ -2359,7 +2321,7 @@ onBeforeUnmount(() => {
                   >
                     <Zap v-if="runMode === 'quick'" class="h-3.5 w-3.5" />
                     <Bot v-else-if="runMode === 'task'" class="h-3.5 w-3.5" />
-                    <CalendarDays v-else class="h-3.5 w-3.5" />
+                    <Bot v-else class="h-3.5 w-3.5" />
                     {{ modeLabel }}
                     <ChevronDown class="h-3.5 w-3.5" />
                   </button>
@@ -2370,30 +2332,23 @@ onBeforeUnmount(() => {
                         <span class="block text-sm font-medium text-zinc-900">日常办公</span>
                         <span class="block text-xs leading-5 text-zinc-400">适合日常轻度办公任务</span>
                       </span>
-                      <CheckCircle2 v-if="runMode === 'quick'" class="mt-0.5 h-4 w-4 text-blue-600" />
+                      <CheckCircle2 v-if="runMode === 'quick'" class="mt-0.5 h-4 w-4 text-[#0a0a0a]" />
                     </button>
                     <button type="button" data-testid="mode-option-task" class="flex w-full items-start gap-2 rounded-xl px-3 py-2.5 text-left hover:bg-zinc-50" @click.stop="selectMode('task')">
-                      <Bot class="mt-0.5 h-4 w-4 text-violet-600" />
+                      <Bot class="mt-0.5 h-4 w-4 text-[#0a0a0a]" />
                       <span class="min-w-0 flex-1">
                         <span class="block text-sm font-medium text-zinc-900">专家模式</span>
                         <span class="block text-xs leading-5 text-zinc-400">处理复杂的专项类任务</span>
                       </span>
-                      <CheckCircle2 v-if="runMode === 'task'" class="mt-0.5 h-4 w-4 text-blue-600" />
-                    </button>
-                    <button type="button" data-testid="mode-option-schedule" class="flex w-full items-start gap-2 rounded-xl px-3 py-2.5 text-left hover:bg-zinc-50" @click.stop="selectMode('schedule')">
-                      <CalendarDays class="mt-0.5 h-4 w-4 text-blue-600" />
-                      <span class="min-w-0 flex-1">
-                        <span class="block text-sm font-medium text-zinc-900">定时任务</span>
-                        <span class="block text-xs leading-5 text-zinc-400">设置周期性自动化任务</span>
-                      </span>
-                      <CheckCircle2 v-if="runMode === 'schedule'" class="mt-0.5 h-4 w-4 text-blue-600" />
+                      <CheckCircle2 v-if="runMode === 'task'" class="mt-0.5 h-4 w-4 text-[#0a0a0a]" />
                     </button>
                   </div>
                 </div>
                 <div v-if="runMode === 'task' && selectedExpert" class="relative ml-auto">
                   <button
                     type="button"
-                    class="inline-flex h-8 min-w-28 items-center justify-between gap-2 px-2 text-xs font-medium text-violet-700"
+                    class="inline-flex h-8 min-w-28 items-center justify-between gap-2 px-2 text-xs font-medium"
+                    :style="{ color: (selectedExpert?.accent || '#0a0a0a') }"
                     :aria-label="`选择${agentSelectLabel}`"
                     @click.stop="agentMenuOpen = !agentMenuOpen; modeMenuOpen = false"
                   >
@@ -2410,7 +2365,7 @@ onBeforeUnmount(() => {
                       :class="agent.value.startsWith('soon') ? 'cursor-not-allowed text-zinc-300' : 'text-zinc-700 hover:bg-zinc-50'"
                       @click.stop="selectAgent(agent.value)"
                     >
-                      <Sparkles class="h-4 w-4 shrink-0 text-violet-500" />
+                      <Sparkles class="h-4 w-4 shrink-0 text-zinc-400" />
                       <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ agent.label }}</span>
                       <CheckCircle2 v-if="selectedAgent === agent.value" class="h-4 w-4 shrink-0 text-blue-600" />
                     </button>
@@ -2420,40 +2375,6 @@ onBeforeUnmount(() => {
                   <span class="h-3.5 w-3.5 rounded-full bg-white" />
                 </span>
               </div>
-             <div v-if="runMode === 'schedule'" class="schedule-panel mt-3">
-                <div class="schedule-layer schedule-layer-top">
-                  <span class="schedule-title">周期</span>
-                  <select :value="scheduleCycle" class="schedule-field schedule-field-main" aria-label="选择定时周期" @change="updateScheduleCycle(($event.target as HTMLSelectElement).value as ScheduleCycle)">
-                    <option v-for="cycle in scheduleCycles" :key="cycle.value" :value="cycle.value">{{ cycle.label }}</option>
-                  </select>
-                </div>
-                <div class="schedule-layer schedule-layer-bottom">
-                  <template v-if="scheduleCycle === 'once'">
-                    <input v-model="scheduleDate" type="date" class="schedule-field schedule-field-main" aria-label="选择执行日期" />
-                    <input v-model="scheduleTime" type="time" class="schedule-field schedule-field-main" aria-label="输入执行时间" />
-                  </template>
-                  <template v-else-if="scheduleCycle === 'weekly'">
-                    <select v-model="scheduleWeekday" class="schedule-field schedule-field-main" aria-label="选择星期">
-                      <option v-for="day in weekdayOptions" :key="day" :value="day">{{ day }}</option>
-                    </select>
-                    <input v-model="scheduleTime" type="time" class="schedule-field schedule-field-main" aria-label="输入执行时间" />
-                  </template>
-                  <template v-else-if="scheduleCycle === 'monthly'">
-                    <select v-model="scheduleMonthDay" class="schedule-field schedule-field-main" aria-label="选择日期">
-                      <option v-for="day in monthDayOptions" :key="day" :value="day">{{ day }}</option>
-                    </select>
-                    <input v-model="scheduleTime" type="time" class="schedule-field schedule-field-main" aria-label="输入执行时间" />
-                  </template>
-                  <template v-else-if="scheduleCycle === 'cron'">
-                    <input v-model="scheduleCron" class="schedule-field schedule-field-cron font-mono" placeholder="0 9 * * *" aria-label="输入 Cron 表达式" />
-                  </template>
-                  <template v-else>
-                    <span class="schedule-field schedule-field-main schedule-field-muted">{{ scheduleCycle === 'daily' ? '每天' : '周一至周五' }}</span>
-                    <input v-model="scheduleTime" type="time" class="schedule-field schedule-field-main" aria-label="输入执行时间" />
-                  </template>
-                  <span class="schedule-summary">{{ scheduleCycle === 'cron' ? 'Cron 例：0 9 * * *' : scheduleSummary }}</span>
-                </div>
-             </div>
             </div>
           </div>
         </section>
@@ -2618,8 +2539,8 @@ onBeforeUnmount(() => {
             </div>
           </section>
 
-          <section v-if="hasGeneratedAssets" class="rounded-lg border border-transparent px-3 py-2.5 hover:border-violet-200 hover:bg-violet-50">
-            <div class="mb-3 flex items-center gap-2 text-sm font-semibold text-violet-800">
+          <section v-if="hasGeneratedAssets" class="rounded-lg border border-transparent px-3 py-2.5 hover:border-zinc-200 hover:bg-zinc-50">
+            <div class="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-800">
               <BarChart3 class="h-4 w-4" />
               图表工具
             </div>
@@ -2631,7 +2552,7 @@ onBeforeUnmount(() => {
               <div class="flex h-20 items-end gap-2">
                 <div class="w-1/3 rounded-t-md bg-orange-300" style="height: 42%"></div>
                 <div class="w-1/3 rounded-t-md bg-blue-300" style="height: 72%"></div>
-                <div class="w-1/3 rounded-t-md bg-violet-300" style="height: 54%"></div>
+                <div class="w-1/3 rounded-t-md bg-zinc-300" style="height: 54%"></div>
               </div>
               <div class="mt-2 grid grid-cols-3 text-center text-[10px] text-zinc-400">
                 <span>保守</span><span>均衡</span><span>品质</span>
@@ -2918,146 +2839,6 @@ onBeforeUnmount(() => {
 .composer-shell:hover::before,
 .composer-shell:focus-within::before {
   opacity: 0.24;
-}
-
-.schedule-panel {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  border-radius: 16px;
-  background: #f7f7f8;
-  padding: 8px 10px;
-}
-
-.schedule-layer {
-  display: contents;
-}
-
-.schedule-title {
-  color: #52525b;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.schedule-field {
-  height: 32px;
-  min-width: 0;
-  border-radius: 10px;
-  border: 1px solid transparent;
-  background: #fff;
-  padding: 0 10px;
-  color: #27272a;
-  font-size: 0.8125rem;
-  line-height: 32px;
-  outline: none;
-}
-
-.schedule-field:focus {
-  border-color: #bfdbfe;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.08);
-}
-
-.schedule-field-main {
-  width: 148px;
-}
-
-.schedule-field-cron {
-  width: min(260px, 100%);
-}
-
-.schedule-field-muted {
-  display: inline-flex;
-  align-items: center;
-  color: #71717a;
-}
-
-.schedule-summary {
-  color: #a1a1aa;
-  font-size: 0.75rem;
-  white-space: nowrap;
-}
-
-.schedule-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: #f4f4f5;
-  border-radius: 12px;
-  padding: 8px 12px;
-}
-
-.schedule-bar-label {
-  color: #71717a;
-  font-size: 0.8rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.schedule-bar-select {
-  height: 32px;
-  border-radius: 8px;
-  border: none;
-  background: #fff;
-  padding: 0 10px;
-  color: #27272a;
-  font-size: 0.8rem;
-  outline: none;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
-  cursor: pointer;
-  min-width: 0;
-}
-
-.schedule-bar-input {
-  height: 32px;
-  width: auto;
-  min-width: 0;
-  border-radius: 8px;
-  border: none;
-  background: #fff;
-  padding: 0 10px;
-  color: #27272a;
-  font-size: 0.8rem;
-  outline: none;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
-}
-
-.schedule-bar-cron {
-  flex: 1 1 auto;
-  font-family: ui-monospace, monospace;
-  max-width: 200px;
-}
-
-.schedule-bar-muted {
-  display: inline-flex;
-  align-items: center;
-  height: 32px;
-  border-radius: 8px;
-  background: #fff;
-  padding: 0 10px;
-  color: #71717a;
-  font-size: 0.8rem;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
-}
-
-.schedule-bar-summary {
-  flex: 0 0 auto;
-  color: #a1a1aa;
-  font-size: 0.75rem;
-  margin-left: auto;
-  white-space: nowrap;
-}
-
-@media (max-width: 640px) {
-  .schedule-bar {
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  .schedule-bar-summary {
-    margin-left: 0;
-    order: 10;
-  }
 }
 
 @keyframes process-flow {

@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-vue-next'
 import { useAppStore } from '@/stores/app'
+import { mockUser as defaultUser } from '@/mock/user'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import {
   DropdownMenu,
@@ -41,6 +42,7 @@ const profileFileInput = ref<HTMLInputElement | null>(null)
 const navItems = [
   { label: '知识中心', to: '/knowledge' },
   { label: '工作台', to: '/portals' },
+  { label: 'AI 治理', to: '/admin/governance' },
 ]
 
 const mobileNavItems = [
@@ -139,6 +141,22 @@ function saveProfile() {
       </nav>
 
       <div class="ml-auto flex shrink-0 items-center gap-2">
+        <!-- Coins -->
+        <div class="group relative">
+          <button
+            type="button"
+            class="flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
+            aria-label="我的金币"
+          >
+            <span class="h-3.5 w-3.5 rounded-full bg-amber-400 text-[9px] leading-3.5 text-white">¥</span>
+            776
+          </button>
+          <div class="pointer-events-none absolute right-0 top-11 z-50 hidden w-60 rounded-xl border border-zinc-200 bg-white p-3 text-left shadow-xl group-hover:block">
+            <div class="text-xs font-semibold text-zinc-900">金币使用说明</div>
+            <p class="mt-1 text-[11px] leading-5 text-zinc-500">金币用于抵扣 AI 对话、知识库检索与方案生成的算力消耗。当前余额 776，可在「设置 - 账户」中充值或查看明细。</p>
+          </div>
+        </div>
+
         <DropdownMenu>
           <DropdownMenuTrigger as-child>
             <button data-testid="header-user-anchor" class="touch-target flex items-center gap-2 rounded-full py-1 pl-2 pr-2 transition hover:bg-zinc-100">
@@ -176,7 +194,22 @@ function saveProfile() {
                 <span>切换账号</span>
                 <ChevronRight class="ml-auto h-4 w-4" />
               </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent class="w-44">
+              <DropdownMenuSubContent class="w-52 p-1">
+                <DropdownMenuItem @select="store.login(defaultUser)" class="cursor-pointer">
+                  <span class="flex h-6 w-6 items-center justify-center rounded-full bg-[#1456f0] text-[10px] text-white mr-2">张</span>
+                  <div class="min-w-0 flex-1">
+                    <div class="text-sm font-medium">张三</div>
+                    <div class="text-xs text-zinc-400">系统管理员</div>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem @select="store.login({ ...defaultUser, id: 'user-lisi', displayName: '李四', role: 'user' as const, department: '品牌营销部' })" class="cursor-pointer">
+                  <span class="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-200 text-[10px] text-zinc-600 mr-2">李</span>
+                  <div class="min-w-0 flex-1">
+                    <div class="text-sm font-medium">李四</div>
+                    <div class="text-xs text-zinc-400">普通员工</div>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem @select="router.push({ name: 'login' })">
                   <Plus class="mr-2 h-4 w-4" /> 添加账号
                 </DropdownMenuItem>
