@@ -15,7 +15,7 @@ const chat = useChatController()
 const quickCards = [
   { icon: '📋', title: '案知识库', desc: '检索、识别、译评、产品资料', fill: '帮我查知识库里的相关规定' },
   { icon: '📄', title: '营销分析报告', desc: '相对材料提炼成结构化内容', fill: '帮我生成一份营销分析报告' },
-  { icon: '✅', title: '定日程', desc: '安排各项工作日行程', fill: '帮我设置一个每日定时任务' },
+  { icon: '✅', title: '建待办', desc: '安排各项工作日程', fill: '帮我创建一个项目跟进待办' },
 ]
 
 // 规格书模块2.2：点击快捷卡片 → 自动填充到输入框并聚焦（不自动发送）

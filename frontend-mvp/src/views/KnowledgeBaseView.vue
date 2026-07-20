@@ -23,6 +23,7 @@ import { useKnowledgeBase } from '@/composables/useKnowledgeBase'
 import type { TreeNode, DocItem } from '@/types/knowledge'
 
 const kb = useKnowledgeBase()
+const figmaAssetBase = `${import.meta.env.BASE_URL}assets/figma`
 const searchOpen = ref(false)
 const kbRowMenuId = ref('')
 const fileRowMenuId = ref('')
@@ -63,7 +64,7 @@ function getIconColor(f: string) {
 </script>
 
 <template>
-  <div class="flex h-[calc(100vh-4rem)] bg-zinc-50 text-zinc-950">
+  <div class="flex h-[calc(100vh-3.5rem)] bg-white text-zinc-950">
     <!-- 侧栏折叠时的展开按钮 -->
     <div v-if="!kb.sidebarVisible.value" class="fixed left-3 top-[4.75rem] z-40 flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white/95 p-1 shadow-sm backdrop-blur">
       <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-xl text-zinc-600 transition hover:bg-zinc-100" aria-label="展开侧边栏" @click="kb.sidebarVisible.value = true">
@@ -73,18 +74,20 @@ function getIconColor(f: string) {
 
     <!-- 左侧边栏 -->
     <aside
-      class="fixed inset-y-0 left-0 z-50 flex w-[clamp(286px,21vw,400px)] flex-col overflow-hidden border-r border-zinc-200 bg-white transition-transform duration-300 lg:top-16 lg:h-[calc(100vh-4rem)]"
+      class="fixed inset-y-0 left-0 z-50 flex w-[270px] flex-col overflow-hidden border-r border-[#eaeaea] bg-white transition-transform duration-300 lg:top-14 lg:h-[calc(100vh-3.5rem)]"
       :class="kb.sidebarVisible.value ? 'translate-x-0' : '-translate-x-full'"
     >
-      <div data-testid="knowledge-sidebar-subheader" class="border-b border-zinc-100 px-3 py-3">
+      <div data-testid="knowledge-sidebar-subheader" class="px-3 pt-4">
         <div class="flex items-center justify-between">
-          <div class="text-sm font-semibold text-zinc-900">知识中心</div>
-          <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-500 shadow-sm hover:bg-zinc-50" aria-label="折叠侧边栏" @click="kb.sidebarVisible.value = false">
+          <button type="button" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#111] hover:bg-[#f7f7f9]" aria-label="搜索知识库" @click="searchOpen = true">
+            <Search class="h-4 w-4" />
+          </button>
+          <button type="button" class="mr-auto inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#111] hover:bg-[#f7f7f9]" aria-label="折叠侧边栏" @click="kb.sidebarVisible.value = false">
             <ChevronLeft class="h-4 w-4" />
           </button>
         </div>
         <!-- 搜索框 -->
-        <div class="relative mt-2">
+        <div class="relative mt-2 hidden">
           <Search class="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-300" />
           <input
             type="text"
@@ -94,25 +97,29 @@ function getIconColor(f: string) {
             @click="searchOpen = true"
           />
         </div>
+        <button type="button" class="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-[#111] text-sm font-medium text-white hover:bg-[#333]" aria-label="新建知识库" @click="kb.createMode.value = true; kb.createKbName.value = ''">
+          <Plus class="h-4 w-4" />
+          <span>新建知识库</span>
+        </button>
         <!-- 空间切换：横向 pill -->
-        <div class="mt-2 flex gap-1 rounded-lg bg-[#f7f8fa] p-0.5">
+        <div class="mt-4 flex h-9 gap-1 rounded-lg bg-[#f7f7f9] p-[3px]">
           <button
             type="button"
-            class="flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition"
-            :class="kb.activeSpace.value === 'public' ? 'bg-white text-[#1456f0] shadow-sm' : 'text-zinc-500 hover:text-zinc-700'"
+            class="flex-1 rounded-md px-3 text-sm font-medium transition"
+            :class="kb.activeSpace.value === 'public' ? 'bg-white text-[#111] shadow-[0_4px_24px_rgba(0,0,0,0.08)]' : 'text-[#777] hover:text-[#111]'"
             @click="kb.switchSpace('public')"
           >公共空间</button>
           <button
             type="button"
-            class="flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition"
-            :class="kb.activeSpace.value === 'personal' ? 'bg-white text-[#1456f0] shadow-sm' : 'text-zinc-500 hover:text-zinc-700'"
+            class="flex-1 rounded-md px-3 text-sm font-medium transition"
+            :class="kb.activeSpace.value === 'personal' ? 'bg-white text-[#111] shadow-[0_4px_24px_rgba(0,0,0,0.08)]' : 'text-[#777] hover:text-[#111]'"
             @click="kb.switchSpace('personal')"
           >个人空间</button>
         </div>
       </div>
 
       <!-- 操作按钮 -->
-      <div class="border-b border-zinc-100 px-2 py-2">
+      <div class="hidden border-b border-zinc-100 px-2 py-2">
         <Button v-if="kb.isAdmin.value || kb.activeSpace.value === 'personal'" variant="ghost" size="sm" class="w-full justify-start gap-2 text-sm font-medium" aria-label="新建知识库" @click="kb.createMode.value = true; kb.createKbName.value = ''">
           <BookOpen class="h-4 w-4 text-[#ff5530]" />
           <span>新建知识库</span>
@@ -147,40 +154,42 @@ function getIconColor(f: string) {
     <main
       data-testid="knowledge-main-pane"
       class="flex min-w-0 flex-1 flex-col overflow-hidden transition-[margin] duration-300"
-      :style="{ marginLeft: kb.sidebarVisible.value ? 'clamp(286px,21vw,400px)' : '0px' }"
+      :style="{ marginLeft: kb.sidebarVisible.value ? '270px' : '0px' }"
     >
       <!-- 头部 -->
-      <div data-testid="knowledge-main-header" class="flex min-h-14 items-center border-b border-zinc-200 bg-white px-4">
+      <div data-testid="knowledge-main-header" class="flex min-h-[102px] items-start border-b border-[#eaeaea] bg-white px-8 pt-5">
         <div class="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
           <button v-if="!kb.sidebarVisible.value" type="button" class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600" aria-label="展开侧边栏" @click="kb.sidebarVisible.value = true">
             <ChevronsRight class="h-4 w-4" />
           </button>
           <template v-for="(crumb, idx) in breadcrumbTrail" :key="idx">
-            <button v-if="crumb.onClick" type="button" class="rounded-md px-1.5 py-0.5 text-xs font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800" @click="crumb.onClick">{{ crumb.label }}</button>
+            <button v-if="crumb.onClick" type="button" class="px-0 text-base font-medium leading-6 text-[#111]" @click="crumb.onClick">{{ kb.selectedKb.value ? crumb.label : '全部知识库' }}</button>
             <span v-else class="truncate font-semibold text-zinc-950">{{ crumb.label }}</span>
             <span v-if="idx < breadcrumbTrail.length - 1" class="text-zinc-300">/</span>
           </template>
         </div>
-        <div class="ml-auto flex items-center gap-2">
+        <div class="ml-auto flex items-center gap-3">
           <!-- 视图切换（仅文件视图） -->
           <div v-if="kb.selectedKb.value" class="inline-flex h-9 overflow-hidden rounded-lg border border-zinc-200 bg-white">
             <button class="px-2.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600" :class="{ 'bg-zinc-100 text-zinc-600': kb.fileView.value === 'list' }" aria-label="列表视图" @click="kb.fileView.value = 'list'"><List class="h-4 w-4" /></button>
             <button class="px-2.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600" :class="{ 'bg-zinc-100 text-zinc-600': kb.fileView.value === 'grid' }" aria-label="宫格视图" @click="kb.fileView.value = 'grid'"><LayoutGrid class="h-4 w-4" /></button>
           </div>
-          <Button v-if="!kb.selectedKb.value" size="sm" aria-label="新建知识库" @click="kb.createMode.value = true; kb.createKbName.value = ''">
-            <Plus class="h-4 w-4" />新建知识库
-          </Button>
+          <template v-if="!kb.selectedKb.value">
+            <button type="button" class="inline-flex h-8 items-center gap-2 rounded-lg bg-[#111] px-4 text-sm text-white hover:bg-[#333]" @click="kb.openUploadModal()"><Upload class="h-4 w-4" />上传文件</button>
+            <button type="button" class="inline-flex h-8 items-center gap-2 rounded-lg border border-[#d3d3d3] bg-white px-4 text-sm text-[#111] hover:bg-[#f7f7f9]" @click="kb.openCreateFolderModal()"><Folder class="h-4 w-4" />新建文件夹</button>
+            <button type="button" class="inline-flex h-8 items-center gap-2 rounded-lg border border-[#d3d3d3] bg-white px-4 text-sm text-[#111] hover:bg-[#f7f7f9]" @click="kb.openQaPanel()"><MessageSquareText class="h-4 w-4" />小智问答</button>
+          </template>
         </div>
       </div>
 
       <!-- 主内容 -->
-      <div class="flex-1 overflow-y-auto p-4 md:p-6">
+      <div class="flex-1 overflow-y-auto bg-white px-8 py-0">
         <!-- === 视图：知识库列表（纯表格） === -->
         <template v-if="!kb.selectedKb.value">
           <div class="space-y-4">
-            <div class="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+            <div class="overflow-hidden bg-white">
               <!-- Table header -->
-              <div class="grid grid-cols-[minmax(240px,1fr)_100px_140px_140px_80px] border-b border-zinc-100 bg-[#f7f8fa] px-4 py-3 text-xs font-medium text-zinc-500">
+              <div class="grid h-[54px] grid-cols-[minmax(240px,1fr)_100px_140px_140px_80px] items-center border-b border-[#eaeaea] bg-white px-1 text-sm font-medium text-[#666]">
                 <span>名称</span><span>所有者</span><span>创建时间</span><span>最近访问</span><span class="text-right">操作</span>
               </div>
               <!-- Table rows -->
@@ -188,7 +197,7 @@ function getIconColor(f: string) {
                 v-for="k in kb.displayedKnowledgeBases.value"
                 :key="k.id"
                 data-testid="knowledge-kb-card"
-                class="grid grid-cols-[minmax(240px,1fr)_100px_140px_140px_80px] items-center border-b border-zinc-100 px-4 py-3.5 last:border-0 hover:bg-[#f7f8fa] cursor-pointer transition"
+                class="grid grid-cols-[minmax(240px,1fr)_100px_140px_140px_80px] items-center border-b border-[#f2f2f2] px-1 py-3.5 hover:bg-[#fafafa] cursor-pointer transition"
                 @click="kb.selectKb(k.id)"
               >
                 <div class="flex min-w-0 items-center gap-3">
@@ -223,6 +232,12 @@ function getIconColor(f: string) {
                     </div>
                   </div>
                 </div>
+              </div>
+              <div v-if="!kb.displayedKnowledgeBases.value.length" class="flex h-[470px] flex-col items-center justify-center text-center">
+                <img :src="`${figmaAssetBase}/knowledge-empty.png`" alt="" class="h-20 w-20 object-contain" />
+                <p class="mt-1 text-sm font-medium leading-[22px] text-[#111]">暂无知识库</p>
+                <p class="text-xs leading-5 text-[#999]">请点击新建知识库开始使用吧～</p>
+                <button type="button" class="mt-3 inline-flex h-9 items-center gap-2 rounded-lg bg-[#111] px-5 text-sm font-medium text-white hover:bg-[#333]" @click="kb.createMode.value = true; kb.createKbName.value = ''"><Plus class="h-4 w-4" />新建知识库</button>
               </div>
             </div>
             <!-- Footer count -->

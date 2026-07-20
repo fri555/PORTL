@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useAIChat, type Conversation } from '@/composables/useAIChat'
 import { useChatController } from '@/composables/useWorkspaceChat'
 import {
-  Clock, Database, FileText, MessageSquareText, Plug2, Plus,
+  Database, FileText, MessageSquareText, Plug2, Plus,
   Search, User, X, Zap,
 } from 'lucide-vue-next'
 
@@ -61,7 +61,6 @@ const previewMessages = computed(() => {
 const quickActions = [
   { id: 'new', label: '新对话', desc: '开始一轮新会话', icon: Plus, run: () => { chat.handleNewConversation(); chat.closeSearchDialog() } },
   { id: 'expert', label: '专家模式', desc: '切换到专家模式', icon: User, run: () => { chat.runMode.value = 'task'; chat.closeSearchDialog() } },
-  { id: 'schedule', label: '定时任务', desc: '切换到定时任务', icon: Clock, run: () => { chat.runMode.value = 'schedule'; chat.closeSearchDialog() } },
   { id: 'quick', label: '日常办公', desc: '切换到日常办公', icon: Zap, run: () => { chat.runMode.value = 'quick'; chat.closeSearchDialog() } },
   { id: 'kb', label: '知识库', desc: '查看已接入知识库', icon: Database, run: () => { chat.openSubPanel('knowledge'); chat.closeSearchDialog() } },
   { id: 'mcp', label: 'MCP 连接器', desc: '查看已连接连接器', icon: Plug2, run: () => { chat.openSubPanel('mcp'); chat.closeSearchDialog() } },

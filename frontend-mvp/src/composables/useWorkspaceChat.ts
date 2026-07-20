@@ -4,16 +4,8 @@ import { stripModePrefix, summarizeConversationTitle, useAIChat, type ChatMessag
 import { experts as mockExperts, type Expert } from '@/mock/experts'
 
 // ---- types ----
-export type RunMode = 'quick' | 'task' | 'schedule'
-export type SubPanel = 'knowledge' | 'automation' | 'expert' | 'mcp' | 'skills' | 'more' | null
-
-export interface ScheduleConfig {
-  enabled: boolean
-  frequency: 'once' | 'daily' | 'workday' | 'weekly' | 'monthly' | 'cron'
-  date: string
-  time: string
-  cron: string
-}
+export type RunMode = 'quick' | 'task'
+export type SubPanel = 'knowledge' | 'expert' | 'mcp' | 'skills' | 'more' | null
 
 export interface KbFile {
   id: string
@@ -70,7 +62,6 @@ export interface ChatController {
   attachedFiles: Ref<ChatAttachment[]>
   maxChars: number
   warnAt: number
-  schedule: Ref<ScheduleConfig>
   selectedExperts: Ref<Expert[]>
   showUploadModal: Ref<boolean>
   uploadTab: Ref<'local' | 'kb'>
@@ -94,7 +85,6 @@ export interface ChatController {
   mcpConnections: { name: string; type: string; desc: string; status: string }[]
   skillsList: { name: string; desc: string; from: string }[]
   moreMenuItems: { id: string; label: string; desc: string; icon: string }[]
-  automations: Ref<{ name: string; trigger: string; agent: string; status: string }[]>
   modeMeta: Record<RunMode, { label: string; desc: string; tone: string }>
   agentOptions: Ref<string[]>
   agentSelectLabel: ComputedRef<string>
@@ -146,8 +136,6 @@ export interface ChatController {
   elide: (text: string, max: number) => string
   openSubPanel: (panel: string) => void
   closeSubPanel: () => void
-  toggleAutomation: (name: string) => void
-  runAutomationNow: (name: string) => void
   // new methods
   openUploadModal: () => void
   closeUploadModal: () => void
@@ -162,7 +150,6 @@ export interface ChatController {
   confirmKbUpload: () => void
   selectKbFolder: (id: string) => void
   changeKbPage: (delta: number) => void
-  setScheduleFrequency: (f: ScheduleConfig['frequency']) => void
 }
 
 export const CHAT_KEY: InjectionKey<ChatController> = Symbol('chat-controller')
@@ -218,7 +205,6 @@ export function createChatController() {
   const attachedFiles = ref<ChatAttachment[]>([])
   const maxChars = 10000
   const warnAt = 9000
-  const schedule = ref<ScheduleConfig>({ enabled: false, frequency: 'once', date: '', time: '09:00', cron: '0 9 * * *' })
   const selectedExperts = ref<Expert[]>([])
   const showUploadModal = ref(false)
   const uploadTab = ref<'local' | 'kb'>('local')
@@ -318,7 +304,6 @@ export function createChatController() {
   const modeMeta: Record<RunMode, { label: string; desc: string; tone: string }> = {
     quick: { label: '日常办公', desc: 'RAG架构，适合问答、检索和轻量办公', tone: 'bg-zinc-100 text-zinc-700 border-zinc-200' },
     task: { label: '专家模式', desc: 'P&E架构，可调用工具和MCP完成复杂任务', tone: 'bg-zinc-100 text-zinc-700 border-zinc-200' },
-    schedule: { label: '定时任务', desc: '按频率与时间自动执行任务', tone: 'bg-zinc-100 text-zinc-700 border-zinc-200' },
   }
 
   const agentOptions = computed(() => runMode.value === 'task'
@@ -346,7 +331,6 @@ export function createChatController() {
     { id: 'expert', label: '专家智能体', desc: '主管智能体与子智能体', icon: 'users' },
     { id: 'mcp', label: 'MCP 连接器', desc: '知识库、钉钉文档、AI表格等', icon: 'plug' },
     { id: 'skills', label: '技能 Skill', desc: '字段校验、预算分档、文案生成', icon: 'wrench' },
-    { id: 'automation', label: '触发器', desc: '定时任务与事件触发', icon: 'timer' },
   ]
 
   const sortedConversations = computed(() =>
@@ -403,7 +387,7 @@ export function createChatController() {
     const key = activeSubPanel.value
     if (!key) return ''
     const map: Record<string, string> = {
-      knowledge: '知识库', automation: '自动化', expert: '专家',
+      knowledge: '知识库', expert: '专家',
       mcp: 'MCP 连接器', skills: '技能 Skill',
     }
     return map[key] ?? ''
@@ -657,18 +641,6 @@ export function createChatController() {
     showMoreMenu.value = false
   }
   function closeSubPanel() { activeSubPanel.value = null }
-  function toggleAutomation(name: string) {
-    automations.value = automations.value.map((item) => item.name === name ? { ...item, status: item.status === 'active' ? 'paused' : 'active' } : item)
-  }
-  function runAutomationNow(name: string) {
-    automations.value = automations.value.map((item) => item.name === name ? { ...item, status: 'active' } : item)
-  }
-
-  const automations = ref([
-    { name: '周一竞品动态汇总', trigger: '每周一 09:00', agent: '竞品分析助手', status: 'active' },
-    { name: '知识缺口周报', trigger: '每周五 17:00', agent: '知识库管理员', status: 'active' },
-    { name: '方案模板更新检查', trigger: '每天 08:00', agent: '方案中心主管', status: 'paused' },
-  ])
 
   // ---- upload modal ----
   function openUploadModal() { showUploadModal.value = true; localFiles.value = [] }
@@ -710,10 +682,6 @@ export function createChatController() {
       if (el) (el as HTMLTextAreaElement).dispatchEvent(new Event('input'))
     })
   }
-  function setScheduleFrequency(f: ScheduleConfig['frequency']) {
-    schedule.value.frequency = f
-  }
-
   // ---- helpers ----
   function elide(text: string, max: number) { return text.length > max ? text.slice(0, max) + '...' : text }
   function formatConversationTitle(title: string) { return title === '新会话' ? title : summarizeConversationTitle(title) }
@@ -774,8 +742,8 @@ export function createChatController() {
     renamingConversationId, renameDraft, showDislikeModal, dislikeMsgId, dislikeReasons, dislikeComment,
     messageFeedback, uploadedFiles, selectedAgent, selectedKnowledgeRefs, referenceFiles, outputArtifacts,
     knowledgeGaps, activeSubPanel, showMoreMenu, showSearchDialog, searchDialogMode, textPreview,
-    attachedFiles, maxChars, warnAt, schedule, selectedExperts, showUploadModal, uploadTab,
-    localFiles, kbFiles, kbSearch, kbTypeFilter, kbFolders, kbCurrentFolder, kbPage, kbBreadcrumb, kbPageTotal, kbPageFiles, kbFilteredAll, kbSelectedCount, networkOn, experts, knowledgeBases, mcpConnections, skillsList, moreMenuItems, automations, modeMeta,
+    attachedFiles, maxChars, warnAt, selectedExperts, showUploadModal, uploadTab,
+    localFiles, kbFiles, kbSearch, kbTypeFilter, kbFolders, kbCurrentFolder, kbPage, kbBreadcrumb, kbPageTotal, kbPageFiles, kbFilteredAll, kbSelectedCount, networkOn, experts, knowledgeBases, mcpConnections, skillsList, moreMenuItems, modeMeta,
     agentOptions, agentSelectLabel,
     sortedConversations, filteredSidebarConversations, displayConversationTitle, gridTemplate,
     sidebarGroups, charCount, isNearLimit, isOverLimit, subPanelTitle,
@@ -785,9 +753,9 @@ export function createChatController() {
     triggerChatUpload, handleChatUpload, isSupportedUpload, addAttachedFile, removeAttachedFile, handlePaste,
     onKeydown, handleInput, scrollToBottom, handleMessagesScroll, markUserScrollIntent, handleSelectionChange,
     formatConversationTitle, formatTime, getLastThinking, renderMarkdown, elide,
-    openSubPanel, closeSubPanel, toggleAutomation, runAutomationNow,
+    openSubPanel, closeSubPanel,
     openUploadModal, closeUploadModal, toggleExpert, removeExpert, applyExpertPrompt, openTextPreview, closeTextPreview,
-    confirmLocalUpload, toggleKbFile, isKbSelected, confirmKbUpload, selectKbFolder, changeKbPage, setScheduleFrequency,
+    confirmLocalUpload, toggleKbFile, isKbSelected, confirmKbUpload, selectKbFolder, changeKbPage,
   }
 
   provide(CHAT_KEY, controller)
