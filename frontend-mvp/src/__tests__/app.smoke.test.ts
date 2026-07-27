@@ -26,7 +26,7 @@ function makeRouter() {
       { path: '/auth/login', name: 'login', component: LoginView },
       { path: '/', name: 'home', component: () => import('@/views/HomeView.vue') },
       { path: '/portals', name: 'workspace', component: { template: '<div>工作台</div>' } },
-      { path: '/dashboards', redirect: '/knowledge' },
+      { path: '/dashboards', name: 'dashboards', component: { template: '<div>仪表盘</div>' } },
       { path: '/workspace/chat', name: 'workspace-chat', component: () => import('@/views/WorkspaceChatView.vue') },
       { path: '/knowledge', name: 'knowledge', component: () => import('@/views/KnowledgeBaseView.vue') },
       { path: '/:pathMatch(.*)*', redirect: '/' },
@@ -64,13 +64,27 @@ describe('MVP prototype flows', () => {
     document.body.innerHTML = ''
   })
 
+  it('restores the dashboard tab in the global header', async () => {
+    const { router } = await mountAuthedApp('/')
+    const html = document.body.innerHTML
+
+    expect(html).toContain('工作台')
+    expect(html).toContain('仪表盘')
+    expect(html).toContain('知识中心')
+    expect(html.indexOf('工作台')).toBeLessThan(html.indexOf('仪表盘'))
+    expect(html.indexOf('仪表盘')).toBeLessThan(html.indexOf('知识中心'))
+    expect(router.resolve('/dashboards').name).toBe('dashboards')
+  })
+
   it('uses the new global shell order and keeps login full-screen after logout', async () => {
     const { wrapper, router } = await mountAuthedApp('/')
     const html = document.body.innerHTML
     expect(html).toContain('知识中心')
     expect(html).toContain('工作台')
-    expect(html).not.toContain('仪表盘')
-    expect(html.indexOf('知识中心')).toBeLessThan(html.indexOf('工作台'))
+    expect(html).toContain('仪表盘')
+    expect(router.resolve('/dashboards').name).toBe('dashboards')
+    expect(html.indexOf('工作台')).toBeLessThan(html.indexOf('仪表盘'))
+    expect(html.indexOf('仪表盘')).toBeLessThan(html.indexOf('知识中心'))
     expect(html).not.toContain('app-header-left-control')
     expect(html).not.toContain('app-header-right-control')
 

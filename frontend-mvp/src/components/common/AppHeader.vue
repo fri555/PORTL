@@ -45,12 +45,14 @@ const profileFileInput = ref<HTMLInputElement | null>(null)
 const navItems = [
   { label: '天马智擎', to: '/' },
   { label: '工作台', to: '/portals' },
+  { label: '仪表盘', to: '/dashboards' },
   { label: '知识中心', to: '/knowledge' },
   { label: '设置', to: '/settings' },
 ]
 
 const mobileNavItems = [
   { label: '工作区', to: '/', icon: MessageSquareText },
+  { label: '仪表盘', to: '/dashboards', icon: BriefcaseBusiness },
   { label: '知识中心', to: '/knowledge', icon: BookOpen },
   { label: '设置', to: '/settings', icon: Settings },
 ]

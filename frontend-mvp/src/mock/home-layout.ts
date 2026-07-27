@@ -16,7 +16,7 @@ const executiveLayout: HomeComponent[] = [
   { id: generateId(), type: 'dept_value_ranking', size: '2x2', order: 4, config: {} },
   { id: generateId(), type: 'model_usage', size: '2x2', order: 5, config: {} },
   { id: generateId(), type: 'digital_human', size: '2x2', order: 6, config: {} },
-  { id: generateId(), type: 'tool_shortcuts', size: '1x1', order: 7, config: { title: 'ChatBI', color: '#2563eb', url: '/dashboards/chat-bi' } },
+  { id: generateId(), type: 'tool_shortcuts', size: '1x1', order: 7, config: { title: 'ChatBI', color: '#2563eb', url: '/workspace/chat?source=ChatBI' } },
   { id: generateId(), type: 'system_shortcuts', size: '1x1', order: 8, config: { title: '经营看板', color: '#16a34a', url: '/dashboards' } },
 ]
 
