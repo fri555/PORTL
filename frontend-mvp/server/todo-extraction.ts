@@ -45,7 +45,7 @@ export const TODO_EXTRACTION_SYSTEM_PROMPT = `# Role: 钉钉待办智能提取�
 - 同一交付目标的连续步骤不机械拆分；只有可以独立执行、验收或分配时才拆分。
 
 ### 字段抽取
-- title：25个汉字以内，以动词开头或清晰表达行动结果；背景和细节放入 description。
+- title：10个汉字以内，以动词开头或清晰表达行动结果；背景和细节放入 description。
 - description：不能为空；忠实概括任务背景、执行要求、交付物和验收口径。原文信息有限时，至少保留对应行动原意，不添加新要求。
 - executor：只填写原文明示的直接负责人姓名或花名。未明确、存在同音/简称/指代歧义时填写 ["需人工确认人员"]。
 - participant：只填写原文明示的协作、评审或参与人员；不得把会议参会人、发言人或被提及人员自动视为参与人。缺失时填写 []。
@@ -82,7 +82,7 @@ export const TODO_EXTRACTION_SYSTEM_PROMPT = `# Role: 钉钉待办智能提取�
 - 是否每条结果都是尚待执行的具体行动？
 - 是否正确拆分了不同负责人、交付物或截止时间的任务？
 - 是否完成语义去重且没有误合并独立任务？
-- title 是否不超过25个汉字，description 是否非空且忠于原文？
+- title 是否不超过10个汉字，description 是否非空且忠于原文？
 - 人员是否均来自原文，歧义人员是否标记为“需人工确认人员”？
 - 缺失 deadline 是否为 ""，priority 是否仅为“高、普通、低”？
 - 最终内容是否为可直接解析的合法 JSON 数组？`
@@ -141,7 +141,7 @@ export function normalizeTodoExtraction(value: unknown, now = new Date()): Extra
   if (!Array.isArray(value)) return []
   return value.slice(0, 20).flatMap((entry) => {
     const item = record(entry)
-    const title = clean(item.title, 25)
+    const title = clean(item.title, 10)
     if (!title) return []
     const rawPriority = clean(item.priority, 10)
     const priority: TodoPriority = rawPriority === '高' || rawPriority === 'high'

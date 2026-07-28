@@ -495,19 +495,26 @@ describe('SystemPortalsView', () => {
     expect(wrapper.find('[data-testid="schedule-ai-detail-schedule-5"]').exists()).toBe(false)
   })
 
-  it('opens meeting notes from a schedule row and restores the manually entered draft', async () => {
+  it('opens the focused AI todo generator and restores the manually entered draft', async () => {
     const wrapper = mountWorkbench()
 
     await wrapper.get('[data-testid="schedule-note-schedule-1"]').trigger('click')
     const dialog = wrapper.get('[data-testid="meeting-notes-dialog"]')
-    expect(dialog.text()).toContain('产品需求评审会')
-    expect(dialog.text()).toContain('粘贴会议纪要，也可以直接记录')
+    expect(dialog.text()).toContain('AI生成待办')
+    expect(dialog.text()).not.toContain('产品需求评审会')
+    expect(dialog.text()).not.toContain('粘贴会议纪要，也可以直接记录')
+    expect(dialog.text()).not.toContain('一行一条，点击事项展开修改')
+    expect(dialog.get('[data-testid="meeting-note-editor"]').attributes('placeholder')).toBe('输入文本，从文本中提取待办事项')
+    expect(dialog.get('[data-testid="extract-meeting-todos"]').attributes('disabled')).toBeDefined()
 
     const editor = dialog.get('[data-testid="meeting-note-editor"]')
+    await editor.setValue('   ')
+    expect(dialog.get('[data-testid="extract-meeting-todos"]').attributes('disabled')).toBeDefined()
     await editor.setValue('张明负责周三前更新需求基线。')
-    expect(dialog.get('[data-testid="meeting-note-save-state"]').text()).toContain('已保存')
+    expect(dialog.get('[data-testid="extract-meeting-todos"]').attributes('disabled')).toBeUndefined()
+    expect(dialog.find('[data-testid="meeting-note-save-state"]').exists()).toBe(false)
 
-    await dialog.get('[aria-label="关闭会议笔记"]').trigger('click')
+    await dialog.get('[aria-label="关闭AI生成待办"]').trigger('click')
     await wrapper.get('[data-testid="schedule-note-schedule-1"]').trigger('click')
     expect(wrapper.get('[data-testid="meeting-note-editor"]').element).toHaveProperty('value', '张明负责周三前更新需求基线。')
   })
@@ -546,6 +553,7 @@ describe('SystemPortalsView', () => {
     expect(dialog.findAll('[data-testid^="meeting-todo-candidate-"]')).toHaveLength(3)
     expect(dialog.get('[data-testid="meeting-todo-candidate-0"]').text()).toContain('DDL：')
     expect(dialog.get('[data-testid="meeting-todo-candidate-0"]').text()).toContain('负责人：产品部')
+    expect(dialog.get('[data-testid="meeting-todo-candidate-0"]').text()).toContain('：产品部负责今天更新需求基线')
     expect(dialog.get('[data-testid="meeting-todo-candidate-0"]').text()).not.toContain('提醒')
     expect(dialog.get('[data-testid="confirm-meeting-todos"]').text()).toContain('创建 3 条待办')
     await dialog.get('[data-testid="meeting-todo-selected-0"]').setValue(false)
@@ -559,50 +567,26 @@ describe('SystemPortalsView', () => {
     expect(dialog.find('[data-testid="meeting-todo-priority-1"]').exists()).toBe(true)
     expect(dialog.find('[data-testid="meeting-todo-tags-1"]').exists()).toBe(true)
     const title = dialog.get('[data-testid="meeting-todo-title-1"]')
-    await title.setValue('周三前完成接口联调与回归验证')
-    expect(title.element).toHaveProperty('value', '周三前完成接口联调与回归验证')
+    expect(title.attributes('maxlength')).toBe('10')
+    await title.setValue('完成接口联调')
+    expect(title.element).toHaveProperty('value', '完成接口联调')
 
     await dialog.get('[data-testid="confirm-meeting-todos"]').trigger('click')
     expect(dialog.get('[data-testid="meeting-todo-feedback"]').text()).toContain('已确认 2 条待办')
     expect(dialog.get('[data-testid="meeting-todo-feedback"]').text()).toContain('未写入钉钉')
   })
 
-  it('syncs a user-selected OneNote page into the meeting note editor', async () => {
+  it('removes the OneNote, clipboard, and explicit save controls', async () => {
     const wrapper = mountWorkbench()
 
     await wrapper.get('[data-testid="schedule-note-schedule-1"]').trigger('click')
     const dialog = wrapper.get('[data-testid="meeting-notes-dialog"]')
-    await dialog.get('[data-testid="sync-onenote-note"]').trigger('click')
-    const syncPanel = dialog.get('[data-testid="onenote-sync-panel"]')
-    expect(syncPanel.text()).toContain('连接 Microsoft 账号')
-
-    await syncPanel.get('[data-testid="connect-onenote"]').trigger('click')
-    expect(syncPanel.text()).toContain('产品需求评审会纪要')
-    await syncPanel.get('[data-testid="onenote-page-0"]').trigger('click')
-    await syncPanel.get('[data-testid="confirm-onenote-sync"]').trigger('click')
-
-    expect(dialog.get('[data-testid="meeting-note-editor"]').element).toHaveProperty('value', expect.stringContaining('需求基线'))
-    expect(dialog.get('[data-testid="meeting-note-action-feedback"]').text()).toContain('已从 OneNote 同步')
+    expect(dialog.find('[data-testid="sync-onenote-note"]').exists()).toBe(false)
+    expect(dialog.find('[data-testid="paste-meeting-note"]').exists()).toBe(false)
+    expect(dialog.find('[data-testid="copy-meeting-note"]').exists()).toBe(false)
+    expect(dialog.find('[data-testid="save-meeting-note"]').exists()).toBe(false)
     expect(dialog.find('[data-testid="onenote-sync-panel"]').exists()).toBe(false)
-  })
-
-  it('pastes and copies meeting notes with visible clipboard feedback', async () => {
-    const readText = vi.fn().mockResolvedValue('从 OneNote 复制的会议纪要')
-    const writeText = vi.fn().mockResolvedValue(undefined)
-    vi.stubGlobal('navigator', { ...window.navigator, clipboard: { readText, writeText } })
-    const wrapper = mountWorkbench()
-
-    await wrapper.get('[data-testid="schedule-note-schedule-1"]').trigger('click')
-    const dialog = wrapper.get('[data-testid="meeting-notes-dialog"]')
-    await dialog.get('[data-testid="paste-meeting-note"]').trigger('click')
-    await flushPromises()
-    expect(dialog.get('[data-testid="meeting-note-editor"]').element).toHaveProperty('value', '从 OneNote 复制的会议纪要')
-    await dialog.get('[data-testid="save-meeting-note"]').trigger('click')
-    expect(dialog.get('[data-testid="meeting-note-save-state"]').text()).toContain('已保存')
-
-    await dialog.get('[data-testid="copy-meeting-note"]').trigger('click')
-    await flushPromises()
-    expect(dialog.get('[data-testid="meeting-note-action-feedback"]').text()).toContain('已复制全部笔记')
+    expect(dialog.find('[data-testid="extract-meeting-todos"]').exists()).toBe(true)
   })
 
   it('lets the user add and remove todo candidates before confirmation', async () => {
