@@ -125,6 +125,13 @@ export async function searchDwsContacts(query: string): Promise<DwsContact[]> {
   return payload.contacts ?? []
 }
 
+export async function suggestDwsContacts(): Promise<DwsContact[]> {
+  const response = await fetch('/api/dws/contacts?suggest=1')
+  const payload = await response.json().catch(() => ({})) as { contacts?: DwsContact[]; message?: string }
+  if (!response.ok) throw new Error(payload.message || '通讯录建议暂时不可用')
+  return payload.contacts ?? []
+}
+
 export async function executeDwsAction(request: DwsActionRequest): Promise<DwsActionResult> {
   const response = await fetch('/api/dws/actions', {
     method: 'POST',

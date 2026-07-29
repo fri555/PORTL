@@ -12,6 +12,7 @@ const execFileAsync = promisify(execFile)
 const DWS_BINARY = process.env.DWS_BIN || (existsSync('/opt/homebrew/bin/dws') ? '/opt/homebrew/bin/dws' : 'dws')
 const SNAPSHOT_PATH = path.resolve(process.cwd(), '.local/dws/chao-mu.json')
 const messageTargets = new Map<string, { group?: string; user?: string }>()
+const contactSuggestions = new Map<string, { name: string; department: string; avatar?: string }>()
 let currentIdentityUserId = ''
 let currentIdentityName = ''
 
@@ -300,6 +301,23 @@ export function sanitizeSnapshot(
     content: messageText(message.content ?? message.message ?? message.text),
     openMessageId: text(message.openMsgId ?? message.msgId ?? message.messageId),
   }))
+  if (source === 'live') {
+    contactSuggestions.clear()
+    if (identityId && identityName) {
+      contactSuggestions.set(identityId, {
+        name: identityName,
+        department: text(identitySource.department ?? identitySource.dept ?? identitySource.deptName, '当前账号'),
+        avatar: text(identitySource.avatar ?? identitySource.avatarUrl) || undefined,
+      })
+    }
+    rawDigestMessages.forEach((message) => {
+      if (!message.senderId || !message.senderName || message.senderId === identityId || message.senderName === '钉钉用户') return
+      contactSuggestions.set(message.senderId, {
+        name: message.senderName,
+        department: message.singleChat ? '最近联系人' : message.conversationName,
+      })
+    })
+  }
   const messages = buildDigestItems({
     currentUser: { id: identityId, name: identityName },
     messages: rawDigestMessages,
@@ -676,6 +694,14 @@ async function searchContacts(query: string) {
   })
 }
 
+export function suggestedContacts() {
+  return [...contactSuggestions.entries()].slice(0, 12).map(([userId, item]) => {
+    const ref = randomUUID()
+    messageTargets.set(ref, { user: userId })
+    return { ref, ...item }
+  })
+}
+
 async function executeAction(body: JsonRecord) {
   const action = text(body.action)
   if (action === 'message') {
@@ -763,7 +789,14 @@ function handler(): Connect.NextHandleFunction {
         return
       }
       try {
-        const query = new URL(request.url ?? '', 'http://localhost').searchParams.get('query')?.trim() ?? ''
+        const searchParams = new URL(request.url ?? '', 'http://localhost').searchParams
+        const query = searchParams.get('query')?.trim() ?? ''
+        const suggestions = searchParams.get('suggest') === '1'
+        if (suggestions) {
+          response.statusCode = 200
+          response.end(JSON.stringify({ contacts: suggestedContacts() }))
+          return
+        }
         if (!query) throw new Error('请输入姓名或部门')
         response.statusCode = 200
         response.end(JSON.stringify({ contacts: await searchContacts(query) }))

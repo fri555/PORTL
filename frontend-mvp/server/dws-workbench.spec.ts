@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { contactSearchCandidates, executeTodoCommentRequest, loadAllChatMessages, sanitizeSnapshot, selectUniqueContact } from './dws-workbench'
+import { contactSearchCandidates, executeTodoCommentRequest, loadAllChatMessages, sanitizeSnapshot, selectUniqueContact, suggestedContacts } from './dws-workbench'
 
 describe('DWS workbench snapshot mapping', () => {
   it('reads the real DWS top-level contact search result and resolves an exact nickname', () => {
@@ -21,6 +21,26 @@ describe('DWS workbench snapshot mapping', () => {
     })
 
     expect(() => selectUniqueContact(candidates, '清晖')).toThrow('找到多位同名人员')
+  })
+
+  it('uses real live identity and recent DingTalk senders as contact suggestions', () => {
+    sanitizeSnapshot({
+      identity: { result: { userId: 'user-chao-mu', name: '朝暮', department: 'AI项目组' } },
+      calendar: { result: { events: [] } },
+      todos: {},
+      approvals: {},
+      minutes: {},
+      messages: {
+        result: {
+          messages: [{ senderUserId: 'user-qing-hui', senderName: '清晖', conversationName: '产品协作群', content: '请确认原型' }],
+        },
+      },
+    }, 'live')
+
+    expect(suggestedContacts()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: '朝暮', department: 'AI项目组' }),
+      expect.objectContaining({ name: '清晖', department: '产品协作群' }),
+    ]))
   })
 
   it('keeps pending and completed todo cards with their role scopes', () => {

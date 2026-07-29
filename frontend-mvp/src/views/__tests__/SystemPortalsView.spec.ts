@@ -276,7 +276,9 @@ describe('SystemPortalsView', () => {
       priority: 'high',
       tags: ['产品'],
     })
-    expect(dialog.get('[data-testid="meeting-todo-feedback"]').text()).toContain('已创建 1 条钉钉待办')
+    expect(dialog.get('[data-testid="meeting-todo-status-0"]').text()).toContain('成功')
+    expect(dialog.get('[data-testid="meeting-todo-candidate-0"]').text()).toContain('已创建到钉钉')
+    expect(dialog.find('[data-testid="meeting-todo-feedback"]').exists()).toBe(false)
   })
 
   it('renders the 50:50 information workbench without global search or create controls', () => {
@@ -498,6 +500,8 @@ describe('SystemPortalsView', () => {
 
   it('opens the focused AI todo generator and restores the manually entered draft', async () => {
     const wrapper = mountWorkbench()
+    document.body.style.overflow = ''
+    document.documentElement.style.overflow = ''
 
     await wrapper.get('[data-testid="schedule-note-schedule-1"]').trigger('click')
     const dialog = wrapper.get('[data-testid="meeting-notes-dialog"]')
@@ -514,6 +518,7 @@ describe('SystemPortalsView', () => {
     await editor.setValue('张明负责周三前更新需求基线。')
     expect(dialog.get('[data-testid="extract-meeting-todos"]').attributes('disabled')).toBeUndefined()
     expect(dialog.find('[data-testid="meeting-note-save-state"]').exists()).toBe(false)
+    expect(document.body.style.overflow).toBe('hidden')
 
     await dialog.get('[aria-label="关闭AI生成待办"]').trigger('click')
     const closeConfirm = dialog.get('[data-testid="ai-todo-close-confirm"]')
@@ -527,6 +532,7 @@ describe('SystemPortalsView', () => {
     await dialog.get('[aria-label="关闭AI生成待办"]').trigger('click')
     await dialog.get('[data-testid="confirm-ai-todo-close"]').trigger('click')
     expect(wrapper.find('[data-testid="meeting-notes-dialog"]').exists()).toBe(false)
+    expect(document.body.style.overflow).toBe('')
     await wrapper.get('[data-testid="schedule-note-schedule-1"]').trigger('click')
     expect(wrapper.get('[data-testid="meeting-note-editor"]').element).toHaveProperty('value', '张明负责周三前更新需求基线。')
   })
@@ -589,14 +595,24 @@ describe('SystemPortalsView', () => {
     expect(dialog.find('[data-testid="meeting-todo-participants-1"]').exists()).toBe(true)
     expect(dialog.find('[data-testid="meeting-todo-priority-1"]').exists()).toBe(true)
     expect(dialog.find('[data-testid="meeting-todo-tags-1"]').exists()).toBe(true)
+    await dialog.get('[data-testid="meeting-todo-executors-1-input"]').trigger('focus')
+    const suggestions = dialog.get('[data-testid="meeting-todo-executors-1-suggestions"]')
+    expect(suggestions.text()).toContain('张明')
+    expect(suggestions.text()).toContain('清晖')
     const title = dialog.get('[data-testid="meeting-todo-title-1"]')
     expect(title.attributes('maxlength')).toBe('10')
     await title.setValue('完成接口联调')
     expect(title.element).toHaveProperty('value', '完成接口联调')
 
     await dialog.get('[data-testid="confirm-meeting-todos"]').trigger('click')
-    expect(dialog.get('[data-testid="meeting-todo-feedback"]').text()).toContain('已确认 2 条待办')
-    expect(dialog.get('[data-testid="meeting-todo-feedback"]').text()).toContain('未写入钉钉')
+    expect(dialog.get('[data-testid="meeting-todo-status-1"]').text()).toContain('创建中')
+    expect(dialog.get('[data-testid="meeting-todo-status-2"]').text()).toContain('创建中')
+    await vi.waitFor(() => expect(dialog.get('[data-testid="meeting-todo-status-1"]').text()).toContain('成功'))
+    expect(dialog.get('[data-testid="meeting-todo-candidate-1"]').text()).toContain('原型创建成功')
+    expect(dialog.get('[data-testid="meeting-todo-status-2"]').text()).toContain('演示网络波动')
+    expect(dialog.find('[data-testid="meeting-todo-feedback"]').exists()).toBe(false)
+    await dialog.get('[data-testid="retry-meeting-todo-2"]').trigger('click')
+    await vi.waitFor(() => expect(dialog.get('[data-testid="meeting-todo-status-2"]').text()).toContain('成功'))
   })
 
   it('removes the OneNote, clipboard, and explicit save controls', async () => {

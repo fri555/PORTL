@@ -4,6 +4,7 @@ import {
   fetchDwsWorkbench,
   getCachedDwsWorkbench,
   searchDwsContacts,
+  suggestDwsContacts,
 } from './dws-workbench'
 
 const payload = {
@@ -93,5 +94,16 @@ describe('DWS workbench session cache', () => {
 
     await expect(searchDwsContacts('李娜')).resolves.toEqual([{ ref: 'opaque-contact-ref', name: '李娜', department: '财务部' }])
     expect(fetchMock).toHaveBeenCalledWith('/api/dws/contacts?query=%E6%9D%8E%E5%A8%9C')
+  })
+
+  it('loads real contact suggestions for the live workspace', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ contacts: [{ ref: 'opaque-recent-ref', name: '清晖', department: '最近联系人' }] }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(suggestDwsContacts()).resolves.toEqual([{ ref: 'opaque-recent-ref', name: '清晖', department: '最近联系人' }])
+    expect(fetchMock).toHaveBeenCalledWith('/api/dws/contacts?suggest=1')
   })
 })

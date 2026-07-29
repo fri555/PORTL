@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { ChevronDown, ChevronRight, Plus, Sparkles, Trash2, TriangleAlert, X } from 'lucide-vue-next'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { CheckCircle2, ChevronDown, ChevronRight, LoaderCircle, Plus, RotateCcw, Sparkles, Trash2, TriangleAlert, X } from 'lucide-vue-next'
 import DwsContactPicker from './DwsContactPicker.vue'
 import { executeDwsAction, extractDwsTodos, type DwsContact, type ExtractedDwsTodo } from '@/services/dws-workbench'
 import type { ScheduleItem } from '@/types/workbench'
@@ -27,12 +27,31 @@ interface TodoCandidate {
   due: string
   priority: 'high' | 'normal' | 'low'
   tags: string
+  status: 'idle' | 'creating' | 'success' | 'failed'
+  statusMessage: string
 }
 
 const candidates = ref<TodoCandidate[]>([])
 const nextCandidateId = ref(0)
-const selectedCount = computed(() => candidates.value.filter((item) => item.selected).length)
-const allCandidatesSelected = computed(() => candidates.value.length > 0 && selectedCount.value === candidates.value.length)
+const selectableCandidates = computed(() => candidates.value.filter((item) => item.status !== 'success' && item.status !== 'creating'))
+const selectedCount = computed(() => selectableCandidates.value.filter((item) => item.selected).length)
+const allCandidatesSelected = computed(() => selectableCandidates.value.length > 0 && selectedCount.value === selectableCandidates.value.length)
+const anyCandidateCreating = computed(() => candidates.value.some((item) => item.status === 'creating'))
+
+let previousBodyOverflow = ''
+let previousRootOverflow = ''
+
+onMounted(() => {
+  previousBodyOverflow = document.body.style.overflow
+  previousRootOverflow = document.documentElement.style.overflow
+  document.body.style.overflow = 'hidden'
+  document.documentElement.style.overflow = 'hidden'
+})
+
+onBeforeUnmount(() => {
+  document.body.style.overflow = previousBodyOverflow
+  document.documentElement.style.overflow = previousRootOverflow
+})
 
 watch(note, (value) => {
   window.localStorage.setItem(storageKey, value)
@@ -96,6 +115,8 @@ function setCandidates(items: ExtractedDwsTodo[]) {
     due: item.due,
     priority: item.priority,
     tags: item.tags.join('，'),
+    status: 'idle',
+    statusMessage: '',
   }))
   expandedCandidateId.value = null
   if (!candidates.value.length) feedback.value = '请先输入文本'
@@ -140,6 +161,8 @@ function addCandidate() {
     due: defaultDue(''),
     priority: 'normal',
     tags: '',
+    status: 'idle',
+    statusMessage: '',
   })
   expandedCandidateId.value = id
 }
@@ -151,7 +174,7 @@ function removeCandidate(index: number) {
 
 function toggleAllCandidates() {
   const selected = !allCandidatesSelected.value
-  candidates.value.forEach((candidate) => {
+  selectableCandidates.value.forEach((candidate) => {
     candidate.selected = selected
   })
 }
@@ -164,23 +187,14 @@ function formatCandidateDue(value: string) {
   return value ? value.replace('T', ' ') : '待补充'
 }
 
-async function confirmTodos() {
-  const valid = candidates.value.filter((item) => item.selected && item.title.trim() && item.executors.length && item.due)
-  if (!valid.length) {
-    feedback.value = '请至少选择一条信息完整的待办'
-    return
-  }
-  if (!props.liveConnected) {
-    feedback.value = `已确认 ${valid.length} 条待办（原型预览，未写入钉钉）`
-    return
-  }
-
-  submitting.value = true
-  feedback.value = '正在创建钉钉待办…'
-  const succeeded = new Set<number>()
-  const failed: string[] = []
-  for (const item of valid) {
-    try {
+async function createCandidate(item: TodoCandidate, simulateFailure = false) {
+  item.status = 'creating'
+  item.statusMessage = '正在创建待办…'
+  try {
+    if (!props.liveConnected) {
+      await new Promise((resolve) => window.setTimeout(resolve, 260))
+      if (simulateFailure) throw new Error('演示网络波动，请重试')
+    } else {
       await executeDwsAction({
         action: 'todo',
         executors: item.executors.map((contact) => contact.ref),
@@ -191,21 +205,36 @@ async function confirmTodos() {
         priority: item.priority,
         tags: item.tags.split(/[，,]/).map((tag) => tag.trim()).filter(Boolean),
       })
-      succeeded.add(item.id)
-    } catch (error) {
-      failed.push(`${item.title}：${error instanceof Error ? error.message : '创建失败'}`)
     }
+    item.status = 'success'
+    item.statusMessage = props.liveConnected ? '已创建到钉钉' : '原型创建成功'
+    item.selected = false
+  } catch (error) {
+    item.status = 'failed'
+    item.statusMessage = error instanceof Error ? error.message : '创建失败，请重试'
+    item.selected = true
   }
-  candidates.value = candidates.value.filter((item) => !succeeded.has(item.id))
+}
+
+async function retryCandidate(item: TodoCandidate) {
+  await createCandidate(item)
+}
+
+async function confirmTodos() {
+  const valid = candidates.value.filter((item) => item.selected && item.status !== 'success' && item.title.trim() && item.executors.length && item.due)
+  if (!valid.length) {
+    feedback.value = '请至少选择一条信息完整的待办'
+    return
+  }
+  submitting.value = true
+  feedback.value = ''
+  await Promise.all(valid.map((item, index) => createCandidate(item, !props.liveConnected && valid.length > 1 && index === valid.length - 1)))
   submitting.value = false
-  if (!failed.length) feedback.value = `已创建 ${succeeded.size} 条钉钉待办`
-  else if (succeeded.size) feedback.value = `已创建 ${succeeded.size} 条，${failed.length} 条失败并已保留：${failed.join('；')}`
-  else feedback.value = `创建失败，候选项已保留：${failed.join('；')}`
 }
 </script>
 
 <template>
-  <div class="fixed inset-0 z-[200] grid place-items-center bg-[#111827]/35 px-4 backdrop-blur-[3px]" @click.self="requestClose">
+  <div class="fixed inset-0 z-[200] grid overscroll-none place-items-center bg-[#111827]/35 px-4 backdrop-blur-[3px]" @click.self="requestClose">
     <section data-testid="meeting-notes-dialog" role="dialog" aria-modal="true" aria-label="AI生成待办" class="relative max-h-[calc(100vh-32px)] w-[1040px] max-w-full overflow-hidden rounded-[24px] border border-white/90 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
       <header class="flex items-center justify-between gap-4 border-b border-[#eceff3] px-6 py-5">
         <div class="flex min-w-0 items-center gap-3">
@@ -218,7 +247,7 @@ async function confirmTodos() {
       <div data-testid="ai-todo-dialog-body" class="grid h-[500px] max-h-[calc(100vh-124px)] overflow-hidden lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
         <div class="flex min-h-0 flex-col border-b border-[#eceff3] px-6 py-5 lg:border-b-0 lg:border-r">
           <h4 class="shrink-0 text-[14px] font-semibold text-[#25282e]">输入文本</h4>
-          <textarea v-model="note" data-testid="meeting-note-editor" aria-label="待办提取文本" class="mt-4 min-h-0 w-full flex-1 resize-none rounded-[18px] border border-[#dfe4eb] bg-[#fbfcfd] px-4 py-3 text-[14px] leading-6 text-[#30343a] outline-none transition placeholder:text-[#b0b5bd] focus:border-[#9d85e6] focus:bg-white focus:ring-4 focus:ring-[#7652d6]/8" placeholder="输入文本，从文本中提取待办事项" />
+          <textarea v-model="note" data-testid="meeting-note-editor" aria-label="待办提取文本" class="mt-4 min-h-0 w-full flex-1 resize-none overscroll-contain rounded-[18px] border border-[#dfe4eb] bg-[#fbfcfd] px-4 py-3 text-[14px] leading-6 text-[#30343a] outline-none transition placeholder:text-[#b0b5bd] focus:border-[#9d85e6] focus:bg-white focus:ring-4 focus:ring-[#7652d6]/8" placeholder="输入文本，从文本中提取待办事项" />
           <div class="mt-3 flex shrink-0 justify-end">
             <button data-testid="extract-meeting-todos" type="button" :disabled="extracting || !note.trim()" class="inline-flex items-center gap-2 rounded-xl bg-[#7652d6] px-4 py-2.5 text-[12px] font-semibold text-white transition hover:bg-[#6844ca] disabled:cursor-not-allowed disabled:bg-[#d5cee9] disabled:text-white/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7652d6]" @click="extractTodos"><Sparkles class="h-3.5 w-3.5" />{{ extracting ? 'AI 提取中…' : 'AI 提取待办' }}</button>
           </div>
@@ -228,22 +257,27 @@ async function confirmTodos() {
         <div data-testid="todo-candidate-panel" class="flex min-h-0 flex-col bg-[#fafbfc] px-6 py-5">
           <div class="flex shrink-0 items-start justify-between gap-4"><h4 class="text-[14px] font-semibold text-[#25282e]">待办候选</h4><div class="flex items-center gap-2"><button data-testid="add-meeting-todo" type="button" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[10px] font-medium text-[#59616c] shadow-sm transition hover:text-[#7652d6]" @click="addCandidate"><Plus class="h-3 w-3" />新增</button><button data-testid="toggle-all-meeting-todos" type="button" :disabled="!candidates.length" class="rounded-full bg-white px-2.5 py-1 text-[10px] font-medium text-[#7652d6] shadow-sm transition hover:bg-[#f5f1ff] disabled:cursor-not-allowed disabled:text-[#b8bdc5]" @click="toggleAllCandidates">{{ allCandidatesSelected ? '清除' : '全选' }}</button></div></div>
           <div v-if="candidates.length" data-testid="todo-candidate-scroll" class="elegant-scrollbar mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-            <article v-for="(candidate, index) in candidates" :key="candidate.id" :data-testid="`meeting-todo-candidate-${index}`" class="overflow-hidden rounded-[16px] border bg-white transition" :class="expandedCandidateId === candidate.id ? 'border-[#c9bced] shadow-[0_8px_24px_rgba(90,67,160,0.08)]' : 'border-[#e1e5eb] hover:border-[#d2c9eb]'">
+            <article v-for="(candidate, index) in candidates" :key="candidate.id" :data-testid="`meeting-todo-candidate-${index}`" class="overflow-hidden rounded-[16px] border bg-white transition" :class="candidate.status === 'success' ? 'border-[#bfe5d2]' : candidate.status === 'failed' ? 'border-[#f1c5bd]' : expandedCandidateId === candidate.id ? 'border-[#c9bced] shadow-[0_8px_24px_rgba(90,67,160,0.08)]' : 'border-[#e1e5eb] hover:border-[#d2c9eb]'">
               <div class="flex min-h-[58px] items-center gap-3 px-3 py-2.5">
-                <input v-model="candidate.selected" :data-testid="`meeting-todo-selected-${index}`" type="checkbox" :aria-label="`选择候选 ${index + 1}`" class="h-4 w-4 shrink-0 rounded border-[#c6ccd4] accent-[#7652d6]" />
+                <input v-model="candidate.selected" :data-testid="`meeting-todo-selected-${index}`" type="checkbox" :aria-label="`选择候选 ${index + 1}`" :disabled="candidate.status === 'success' || candidate.status === 'creating'" class="h-4 w-4 shrink-0 rounded border-[#c6ccd4] accent-[#7652d6] disabled:opacity-40" />
                 <button :data-testid="`edit-meeting-todo-${index}`" type="button" class="min-w-0 flex-1 text-left focus-visible:outline-none" :aria-expanded="expandedCandidateId === candidate.id" @click="toggleCandidate(candidate)">
                   <span class="block truncate text-xs text-[#30343a]"><strong class="font-semibold">{{ candidate.title || '未命名待办' }}</strong><span class="text-[#69717c]">：{{ candidate.description || '待补充描述' }}</span></span>
                   <span class="mt-1 block truncate text-[10px] text-[#858c96]">DDL：{{ formatCandidateDue(candidate.due) }}，负责人：{{ candidate.executors.map((item) => item.name).join('、') || '待补充' }}，优先级：{{ candidate.priority === 'high' ? '高' : candidate.priority === 'low' ? '低' : '普通' }}</span>
                 </button>
+                <span v-if="candidate.status === 'creating'" :data-testid="`meeting-todo-status-${index}`" class="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#eef4ff] px-2 py-1 text-[10px] font-medium text-[#1769e0]"><LoaderCircle class="h-3 w-3 animate-spin" />创建中</span>
+                <span v-else-if="candidate.status === 'success'" :data-testid="`meeting-todo-status-${index}`" class="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#eaf8f1] px-2 py-1 text-[10px] font-medium text-[#087b4d]"><CheckCircle2 class="h-3 w-3" />成功</span>
+                <button v-else-if="candidate.status === 'failed'" :data-testid="`retry-meeting-todo-${index}`" type="button" class="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#fff0ed] px-2 py-1 text-[10px] font-medium text-[#c43825] transition hover:bg-[#ffe4de]" @click.stop="retryCandidate(candidate)"><RotateCcw class="h-3 w-3" />重试</button>
                 <button :data-testid="`edit-meeting-todo-icon-${index}`" type="button" :aria-label="`${expandedCandidateId === candidate.id ? '收起' : '编辑'}候选 ${index + 1}`" class="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[#8e83ad] transition hover:bg-[#f3efff]" @click="toggleCandidate(candidate)"><ChevronDown v-if="expandedCandidateId === candidate.id" class="h-3.5 w-3.5" /><ChevronRight v-else class="h-3.5 w-3.5" /></button>
-                <button :data-testid="`remove-meeting-todo-${index}`" type="button" :aria-label="`删除候选 ${index + 1}`" class="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[#a0a5ae] transition hover:bg-[#fff0ed] hover:text-[#d84321]" @click="removeCandidate(index)"><Trash2 class="h-3.5 w-3.5" /></button>
+                <button :data-testid="`remove-meeting-todo-${index}`" type="button" :aria-label="`删除候选 ${index + 1}`" :disabled="candidate.status === 'creating'" class="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[#a0a5ae] transition hover:bg-[#fff0ed] hover:text-[#d84321] disabled:opacity-35" @click="removeCandidate(index)"><Trash2 class="h-3.5 w-3.5" /></button>
               </div>
+              <div v-if="candidate.status === 'failed'" :data-testid="`meeting-todo-status-${index}`" class="flex items-center gap-1.5 border-t border-[#f7ddd8] bg-[#fff8f6] px-3 py-2 text-[10px] text-[#b83b28]"><TriangleAlert class="h-3 w-3 shrink-0" />创建失败：{{ candidate.statusMessage }}</div>
+              <div v-else-if="candidate.status === 'success'" class="border-t border-[#d9f0e4] bg-[#f5fbf8] px-3 py-2 text-[10px] text-[#087b4d]">{{ candidate.statusMessage }}</div>
               <div v-if="expandedCandidateId === candidate.id" :data-testid="`meeting-todo-editor-${index}`" class="border-t border-[#ece9f4] bg-[#fcfbff] px-4 pb-4 pt-3">
                 <label class="block text-[10px] font-medium text-[#68717d]">待办标题 <span class="text-[#d84321]">*</span><input v-model="candidate.title" :data-testid="`meeting-todo-title-${index}`" maxlength="10" class="mt-1 h-9 w-full rounded-xl border border-[#dfe4eb] bg-white px-3 text-xs outline-none focus:border-[#9d85e6]" /></label>
                 <label class="mt-2 block text-[10px] font-medium text-[#68717d]">详细描述<textarea v-model="candidate.description" :data-testid="`meeting-todo-description-${index}`" class="mt-1 min-h-[52px] w-full rounded-xl border border-[#dfe4eb] bg-white px-3 py-2 text-[12px] leading-5 outline-none focus:border-[#9d85e6]" /></label>
                 <div class="mt-2 grid gap-2 sm:grid-cols-2">
-                  <div><label class="block text-[10px] font-medium text-[#68717d]">执行人 <span class="text-[#d84321]">*</span></label><DwsContactPicker v-model="candidate.executors" :test-id="`meeting-todo-executors-${index}`" placeholder="从企业通讯录搜索执行人" class="mt-1" /></div>
-                  <div><label class="block text-[10px] font-medium text-[#68717d]">参与人</label><DwsContactPicker v-model="candidate.participants" :test-id="`meeting-todo-participants-${index}`" placeholder="添加参与人" class="mt-1" /></div>
+                  <div><label class="block text-[10px] font-medium text-[#68717d]">执行人 <span class="text-[#d84321]">*</span></label><DwsContactPicker v-model="candidate.executors" :live-connected="liveConnected" :test-id="`meeting-todo-executors-${index}`" placeholder="从企业通讯录搜索执行人" class="mt-1" /></div>
+                  <div><label class="block text-[10px] font-medium text-[#68717d]">参与人</label><DwsContactPicker v-model="candidate.participants" :live-connected="liveConnected" :test-id="`meeting-todo-participants-${index}`" placeholder="添加参与人" class="mt-1" /></div>
                 </div>
                 <div class="mt-2 grid grid-cols-2 gap-2">
                   <label class="block text-[10px] font-medium text-[#68717d]">截止时间 <span class="text-[#d84321]">*</span><input v-model="candidate.due" type="datetime-local" class="mt-1 h-9 w-full rounded-xl border border-[#dfe4eb] bg-white px-3 text-[12px] outline-none focus:border-[#9d85e6]" /></label>
@@ -255,7 +289,7 @@ async function confirmTodos() {
           </div>
           <div v-else class="mt-4 grid min-h-0 flex-1 place-items-center rounded-[18px] border border-dashed border-[#dfe3e9] bg-white/70 text-center"><div><Sparkles class="mx-auto h-5 w-5 text-[#a994e7]" /><p class="mt-2 text-xs font-medium text-[#666d78]">还没有待办候选</p><p class="mt-1 text-[10px] text-[#9aa0aa]">输入文本后点击“AI 提取待办”</p></div></div>
           <p v-if="feedback" data-testid="meeting-todo-feedback" class="mt-3 shrink-0 rounded-xl bg-[#eef8f3] px-3 py-2 text-xs font-medium text-[#087b4d]">{{ feedback }}</p>
-          <button v-if="candidates.length" data-testid="confirm-meeting-todos" type="button" :disabled="selectedCount === 0 || submitting" class="mt-4 w-full shrink-0 rounded-xl bg-[#1769e0] px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-[#0f5cc8] disabled:cursor-not-allowed disabled:opacity-45" @click="confirmTodos">{{ submitting ? '正在创建…' : `创建 ${selectedCount} 条待办` }}</button>
+          <button v-if="candidates.length" data-testid="confirm-meeting-todos" type="button" :disabled="selectedCount === 0 || submitting || anyCandidateCreating" class="mt-4 w-full shrink-0 rounded-xl bg-[#1769e0] px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-[#0f5cc8] disabled:cursor-not-allowed disabled:opacity-45" @click="confirmTodos">{{ submitting ? '正在创建…' : `创建 ${selectedCount} 条待办` }}</button>
         </div>
       </div>
 
