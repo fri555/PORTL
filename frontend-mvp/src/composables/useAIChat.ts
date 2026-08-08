@@ -16,7 +16,14 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
   timestamp: number
-  thinking?: ThinkingStep[]  // only on assistant messages
+  thinking?: ThinkingStep[] // only on assistant messages
+  attachments?: ChatAttachment[] // user-uploaded files rendered in the bubble
+}
+
+export interface ChatAttachment {
+  name: string
+  size?: number
+  ext: string // pdf | doc | docx | md | txt | xlsx | ...
 }
 
 export interface Conversation {
@@ -28,6 +35,7 @@ export interface Conversation {
   summary?: string
   isFavorite?: boolean
   isPinned?: boolean
+  mode?: 'quick' | 'task'
 }
 
 export type ModelProvider = 'anthropic' | 'openai' | 'openai-compatible' | 'simulated'
@@ -71,7 +79,6 @@ function loadConversations(): Conversation[] {
 }
 function saveConversations(list: Conversation[]) {
   try {
-    // Keep only last 50 conversations, max 10MB
     const trimmed = list.slice(-50)
     const json = JSON.stringify(trimmed)
     if (json.length < 10_000_000) {
@@ -106,7 +113,6 @@ function isPureGreeting(content: string): boolean {
 
 // ---- context window estimation ----
 function estimateTokens(text: string): number {
-  // Rough estimate: ~3 chars per token for Chinese, ~4 chars for English
   const chineseChars = (text.match(/[一-鿿㐀-䶿]/g) || []).length
   const otherChars = text.length - chineseChars
   return Math.ceil(chineseChars / 1.5 + otherChars / 3.5)
@@ -117,8 +123,10 @@ function uid(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
 }
 
-// ---- composable ----
-export function useAIChat() {
+// ---- singleton factory ----
+let _instance: ReturnType<typeof createAIChat> | null = null
+
+function createAIChat() {
   // config
   const config = ref<AIChatConfig>({
     provider: (loadStored('provider', 'simulated') as ModelProvider),
@@ -141,7 +149,6 @@ export function useAIChat() {
 
   const activeMessages = computed(() => activeConversation.value?.messages ?? [])
 
-  // estimated context window usage
   const contextStats = computed(() => {
     const msgs = activeMessages.value
     const totalTokens = msgs.reduce((sum, m) => sum + estimateTokens(m.content), 0)
@@ -176,6 +183,7 @@ export function useAIChat() {
       updatedAt: Date.now(),
       isFavorite: false,
       isPinned: false,
+      mode: 'quick',
     }
     conversations.value.unshift(conv)
     activeConversationId.value = conv.id
@@ -214,7 +222,6 @@ export function useAIChat() {
   function trimContext(conv: Conversation, maxTokens: number = 6000) {
     const msgs = conv.messages
     let totalTokens = 0
-    // Count from newest to oldest, keep what fits
     const kept: ChatMessage[] = []
     for (let i = msgs.length - 1; i >= 0; i--) {
       const tokens = estimateTokens(msgs[i].content)
@@ -222,7 +229,6 @@ export function useAIChat() {
         kept.unshift(msgs[i])
         totalTokens += tokens
       } else {
-        // If we can't even fit one message, summarize older ones
         if (kept.length === 0) {
           kept.unshift({
             id: msgs[i].id,
@@ -231,7 +237,6 @@ export function useAIChat() {
             timestamp: msgs[i].timestamp,
           })
         } else {
-          // Insert summarization marker
           const summaryTokens = msgs.slice(0, i + 1).reduce((s, m) => s + estimateTokens(m.content), 0)
           kept.unshift({
             id: uid(),
@@ -419,7 +424,6 @@ export function useAIChat() {
 
     if (!apiKey) throw new Error('API Key 未配置，请在设置中填写')
 
-    // Detect provider type from config or URL
     const isOpenAICompat = provider === 'openai' || provider === 'openai-compatible' ||
       apiBase.includes('deepseek') || apiBase.includes('openai') ||
       apiBase.includes('/v1')
@@ -428,7 +432,6 @@ export function useAIChat() {
     const chatMessages = messages.filter((m) => m.role !== 'system')
 
     if (isOpenAICompat) {
-      // ---- OpenAI-compatible format (DeepSeek, OpenAI, etc.) ----
       const body: Record<string, unknown> = {
         model,
         messages: [
@@ -462,7 +465,6 @@ export function useAIChat() {
         return data.choices?.[0]?.message?.content ?? JSON.stringify(data)
       }
 
-      // Streaming (OpenAI SSE format)
       const reader = response.body?.getReader()
       if (!reader) throw new Error('Stream not available')
       const decoder = new TextDecoder()
@@ -490,7 +492,6 @@ export function useAIChat() {
 
       return fullText
     } else {
-      // ---- Anthropic format ----
       const body: Record<string, unknown> = {
         model,
         max_tokens: 4096,
@@ -523,7 +524,6 @@ export function useAIChat() {
         return data.content?.[0]?.text ?? JSON.stringify(data)
       }
 
-      // Streaming (Anthropic SSE format)
       const reader = response.body?.getReader()
       if (!reader) throw new Error('Stream not available')
       const decoder = new TextDecoder()
@@ -555,6 +555,7 @@ export function useAIChat() {
   // ---- main send flow ----
   async function sendMessage(
     content: string,
+    attachments?: ChatAttachment[],
     options?: {
       conversationId?: string
       onThinkingStart?: () => void
@@ -575,7 +576,6 @@ export function useAIChat() {
 
     isStreaming.value = true
 
-    // Determine or create conversation
     let conv: Conversation
     if (conversationId) {
       conv = conversations.value.find((c) => c.id === conversationId)!
@@ -586,12 +586,12 @@ export function useAIChat() {
       conv = createConversation()
     }
 
-    // Add user message
     const userMsg: ChatMessage = {
       id: uid(),
       role: 'user',
       content,
       timestamp: Date.now(),
+      attachments: attachments && attachments.length ? attachments : undefined,
     }
     conv.messages.push(userMsg)
     if (!conv.title || conv.title === '新会话') {
@@ -599,7 +599,6 @@ export function useAIChat() {
     }
     conv.updatedAt = Date.now()
 
-    // Build thinking steps
     const steps = buildThinkingChain(content)
     currentThinking.value = steps
     onThinkingStart?.()
@@ -609,10 +608,8 @@ export function useAIChat() {
 
     try {
       if (config.value.provider === 'simulated' || !config.value.apiKey) {
-        // Simulated mode with thinking chain
         responseText = await runSimulatedThinking(steps, content)
       } else {
-        // Real API: run thinking steps quickly first
         for (let i = 0; i < steps.length; i++) {
           if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
           steps[i].status = 'running'
@@ -626,15 +623,12 @@ export function useAIChat() {
 
         onResponseStart?.()
 
-        // Build context messages
         const contextMessages = buildContextMessages(conv)
 
         if (onResponseChunk) {
           responseText = await callRealAPI(
             [...contextMessages, { role: 'user', content }],
-            (chunk) => {
-              onResponseChunk(chunk)
-            },
+            (chunk) => { onResponseChunk(chunk) },
             signal,
           )
         } else {
@@ -660,7 +654,6 @@ export function useAIChat() {
       }
     }
 
-    // Add assistant message
     const assistantMsg: ChatMessage = {
       id: uid(),
       role: 'assistant',
@@ -671,7 +664,6 @@ export function useAIChat() {
     conv.messages.push(assistantMsg)
     conv.updatedAt = Date.now()
 
-    // Trim context if needed
     const totalTokens = conv.messages.reduce((s, m) => s + estimateTokens(m.content), 0)
     if (totalTokens > 8000) {
       trimContext(conv, 6000)
@@ -685,7 +677,7 @@ export function useAIChat() {
   function buildContextMessages(conv: Conversation): { role: string; content: string }[] {
     return conv.messages
       .filter((m) => m.role !== 'system' || m.content.includes('上下文'))
-      .slice(-20) // Last 20 messages
+      .slice(-20)
       .map((m) => ({ role: m.role, content: m.content }))
   }
 
@@ -693,7 +685,6 @@ export function useAIChat() {
     isStreaming.value = false
   }
 
-  // ---- config helpers ----
   function updateConfig(partial: Partial<AIChatConfig>) {
     config.value = { ...config.value, ...partial }
   }
@@ -703,7 +694,6 @@ export function useAIChat() {
   }
 
   return {
-    // state
     config,
     conversations,
     activeConversationId,
@@ -713,7 +703,6 @@ export function useAIChat() {
     currentThinking,
     contextStats,
 
-    // actions
     createConversation,
     switchConversation,
     deleteConversation,
@@ -726,7 +715,11 @@ export function useAIChat() {
     updateConfig,
     isApiConfigured,
 
-    // helpers
     estimateTokens,
   }
+}
+
+export function useAIChat() {
+  if (!_instance) _instance = createAIChat()
+  return _instance
 }

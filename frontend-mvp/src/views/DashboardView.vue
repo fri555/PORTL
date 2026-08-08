@@ -12,6 +12,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import OrganizationScopeDrawer from '@/components/common/OrganizationScopeDrawer.vue'
+import { defaultOrganizationScopeId, findOrganizationScopeLabel } from '@/mock/organization'
 import { cn } from '@/lib/utils'
 
 // ---- sidebar tree ----
@@ -57,9 +59,10 @@ const myDashboards = ref<MyDashboard[]>([
 
 const expandedNodes = ref<Set<string>>(new Set(['off_root']))
 const selectedNode = ref<string>('off_general')
+const selectedOrganizationScope = ref(defaultOrganizationScopeId)
+const selectedOrganizationLabel = computed(() => findOrganizationScopeLabel(selectedOrganizationScope.value))
 const timeFilter = ref<'daily' | 'weekly' | 'monthly' | 'custom'>('monthly')
 const showCreateDialog = ref(false)
-const sidebarCollapsed = ref(false)
 const assistantRailCollapsed = ref(false)
 const mobileSidebarOpen = ref(false)
 
@@ -101,8 +104,96 @@ const selectedDashboardTitle = computed(() => {
   }
   const mine = myDashboards.value.find((d) => d.id === selectedNode.value)
   if (mine) return mine.name
-  return '数据看板'
+  return '经营指标'
 })
+
+type FocusMetric = {
+  label: string
+  value: string
+  unit?: string
+  yoy: string
+  mom: string
+  tone: 'blue' | 'green' | 'orange' | 'purple' | 'red' | 'slate'
+  summary: string
+  drill: ChartData[]
+}
+
+const metricToneClass: Record<FocusMetric['tone'], string> = {
+  blue: 'from-[#eef5ff] to-white text-[#1769e0]',
+  green: 'from-[#ecfdf5] to-white text-[#059669]',
+  orange: 'from-[#fff7ed] to-white text-[#ea580c]',
+  purple: 'from-[#f5f3ff] to-white text-[#7c3aed]',
+  red: 'from-[#fef2f2] to-white text-[#dc2626]',
+  slate: 'from-[#f8fafc] to-white text-[#334155]',
+}
+
+const organizationMetricSets: Record<string, FocusMetric[]> = {
+  management: [
+    { label: '集团 GMV', value: '12,850', unit: '万元', yoy: '+18.6%', mom: '+12.5%', tone: 'blue', summary: 'C端电商和B端团购共同拉动，本月活动期订单集中释放。', drill: [{ label: 'C端线上', value: 6850 }, { label: 'B端平台', value: 3920 }, { label: '线下/加盟', value: 2080 }] },
+    { label: '净利润', value: '2,340', unit: '万元', yoy: '+9.2%', mom: '+8.3%', tone: 'green', summary: '毛利率改善来自供应链议价和高毛利鞋服配占比提升。', drill: [{ label: '鞋类', value: 1320 }, { label: '服饰', value: 620 }, { label: '配件', value: 400 }] },
+    { label: '总订单', value: '48.6', unit: '万单', yoy: '+21.4%', mom: '+15.2%', tone: 'orange', summary: '淘天、京东、抖音活动订单增长明显，仓储履约压力上升。', drill: [{ label: '淘天', value: 18.5 }, { label: '京东', value: 11.2 }, { label: '抖音', value: 9.8 }, { label: 'B端', value: 9.1 }] },
+    { label: '库存周转', value: '28', unit: '天', yoy: '-4天', mom: '-3天', tone: 'purple', summary: '核心畅销款周转改善，但部分尺码仍有断码风险。', drill: [{ label: '跑鞋', value: 22 }, { label: '户外鞋', value: 31 }, { label: '服装', value: 35 }] },
+    { label: '履约及时率', value: '96.8', unit: '%', yoy: '+1.9pct', mom: '+0.8pct', tone: 'green', summary: '云仓波次优化后整体准时率提升，活动峰值仍需提前排班。', drill: [{ label: '华东仓', value: 97 }, { label: '华南仓', value: 96 }, { label: '华北仓', value: 94 }] },
+    { label: '售后率', value: '4.2', unit: '%', yoy: '-0.6pct', mom: '-0.3pct', tone: 'slate', summary: '尺码问题仍是主要售后原因，跑鞋品类需加强尺码推荐。', drill: [{ label: '尺码', value: 42 }, { label: '质量', value: 18 }, { label: '物流', value: 15 }, { label: '其他', value: 25 }] },
+  ],
+  'ye-sports': [
+    { label: 'C端线上 GMV', value: '6,850', unit: '万元', yoy: '+22.8%', mom: '+14.6%', tone: 'blue', summary: '幸运叶子、添柏岚、安德玛多平台促销拉动。', drill: [{ label: '幸运叶子', value: 3120 }, { label: '添柏岚', value: 1460 }, { label: '安德玛', value: 1280 }, { label: '茵特', value: 990 }] },
+    { label: '多平台订单', value: '31.8', unit: '万单', yoy: '+26.1%', mom: '+17.5%', tone: 'orange', summary: '淘天仍是主力，抖音直播贡献增量最快。', drill: [{ label: '淘天', value: 13.2 }, { label: '京东', value: 7.6 }, { label: '抖音', value: 8.1 }, { label: '得物', value: 2.9 }] },
+    { label: '直播转化率', value: '5.8', unit: '%', yoy: '+1.2pct', mom: '+0.7pct', tone: 'purple', summary: '直播间跑鞋和户外鞋爆款组合表现稳定。', drill: [{ label: '跑鞋', value: 6.4 }, { label: '户外鞋', value: 5.9 }, { label: '训练服', value: 4.8 }] },
+    { label: '缺货风险 SKU', value: '18', unit: '个', yoy: '-6', mom: '+4', tone: 'red', summary: '活动期热门尺码可售库存偏低，需要跨仓调拨。', drill: [{ label: '幸运叶子', value: 7 }, { label: '添柏岚', value: 5 }, { label: '安德玛', value: 4 }, { label: '茵特', value: 2 }] },
+  ],
+  'tianma-platform': [
+    { label: 'B端成交额', value: '3,920', unit: '万元', yoy: '+16.9%', mom: '+9.4%', tone: 'blue', summary: '团购销售和KA客户补货需求同步增长。', drill: [{ label: '团购销售', value: 1680 }, { label: 'KA事业部', value: 1220 }, { label: '平台销售', value: 1020 }] },
+    { label: '活跃客户', value: '1,286', unit: '家', yoy: '+11.3%', mom: '+4.2%', tone: 'green', summary: '平台活跃客户保持增长，重点客户复购率提升。', drill: [{ label: 'KA客户', value: 286 }, { label: '团购客户', value: 520 }, { label: '加盟/渠道', value: 480 }] },
+    { label: '补货需求', value: '438', unit: '条', yoy: '+19.8%', mom: '+12.1%', tone: 'orange', summary: '跑鞋、篮球鞋和团购服饰补货需求较集中。', drill: [{ label: '跑鞋', value: 146 }, { label: '篮球鞋', value: 118 }, { label: '团购服饰', value: 96 }, { label: '配件', value: 78 }] },
+    { label: '货源满足率', value: '93.5', unit: '%', yoy: '+2.4pct', mom: '+1.1pct', tone: 'purple', summary: '货源响应有所改善，但大促款仍需提前锁货。', drill: [{ label: '现货', value: 68 }, { label: '预售', value: 18 }, { label: '缺口', value: 7 }] },
+  ],
+  warehouse: [
+    { label: '当日出库单量', value: '8.6', unit: '万单', yoy: '+24.2%', mom: '+18.1%', tone: 'blue', summary: 'C端大促订单集中出库，波次压力偏高。', drill: [{ label: 'B2C', value: 5.8 }, { label: 'B2B', value: 1.9 }, { label: '代运营', value: 0.9 }] },
+    { label: '发货及时率', value: '96.8', unit: '%', yoy: '+1.9pct', mom: '+0.8pct', tone: 'green', summary: '整体及时率健康，晚间波次仍需加班保障。', drill: [{ label: '上午波次', value: 98 }, { label: '下午波次', value: 96 }, { label: '晚间波次', value: 93 }] },
+    { label: '库存准确率', value: '99.1', unit: '%', yoy: '+0.4pct', mom: '+0.2pct', tone: 'purple', summary: '盘点差异收敛，主要差异来自跨仓调拨在途。', drill: [{ label: '华东仓', value: 99.3 }, { label: '云仓', value: 98.9 }, { label: '代运营仓', value: 98.7 }] },
+    { label: '待处理售后', value: '1,428', unit: '件', yoy: '-8.6%', mom: '+3.2%', tone: 'red', summary: '活动售后略有抬头，尺码换货占比较高。', drill: [{ label: '换货', value: 620 }, { label: '退货', value: 540 }, { label: '质检', value: 268 }] },
+  ],
+  finance: [
+    { label: '收入确认', value: '11,960', unit: '万元', yoy: '+15.4%', mom: '+8.7%', tone: 'blue', summary: '线上平台结算节奏稳定，B端回款略滞后。', drill: [{ label: '线上C端', value: 6820 }, { label: 'B端平台', value: 3460 }, { label: '线下/加盟', value: 1680 }] },
+    { label: '毛利率', value: '39.1', unit: '%', yoy: '+1.5pct', mom: '+0.6pct', tone: 'green', summary: '高毛利户外鞋服配占比提升。', drill: [{ label: '鞋类', value: 41 }, { label: '服饰', value: 36 }, { label: '配件', value: 44 }] },
+    { label: '费用率', value: '21.3', unit: '%', yoy: '-0.8pct', mom: '-0.4pct', tone: 'purple', summary: '投放费用效率改善，仓配成本略升。', drill: [{ label: '营销', value: 11 }, { label: '仓配', value: 6 }, { label: '人工', value: 4 }] },
+    { label: '回款完成率', value: '94.6', unit: '%', yoy: '+2.1pct', mom: '+1.0pct', tone: 'orange', summary: 'KA客户回款需持续跟进。', drill: [{ label: 'C端平台', value: 98 }, { label: 'B端客户', value: 91 }, { label: '加盟', value: 93 }] },
+  ],
+  hr: [
+    { label: '人效产出', value: '18.6', unit: '万元/人', yoy: '+7.2%', mom: '+3.4%', tone: 'blue', summary: '线上销售与仓储协同效率提升。', drill: [{ label: '线上', value: 22 }, { label: 'B端', value: 18 }, { label: '仓储', value: 15 }] },
+    { label: '在招岗位', value: '42', unit: '个', yoy: '+6', mom: '+3', tone: 'orange', summary: '直播运营、数据分析和仓储管理岗位需求集中。', drill: [{ label: '直播运营', value: 12 }, { label: '数据分析', value: 8 }, { label: '仓储', value: 10 }, { label: '销售', value: 12 }] },
+    { label: '培训完成率', value: '86.5', unit: '%', yoy: '+9.1pct', mom: '+4.6pct', tone: 'green', summary: 'AI工具培训覆盖率提升。', drill: [{ label: 'COE', value: 92 }, { label: 'SSC', value: 88 }, { label: 'HRBP', value: 82 }] },
+    { label: '关键岗位稳定率', value: '97.2', unit: '%', yoy: '+1.1pct', mom: '+0.5pct', tone: 'purple', summary: '核心业务岗位整体稳定。', drill: [{ label: '管理岗', value: 98 }, { label: '运营岗', value: 96 }, { label: '仓储岗', value: 95 }] },
+  ],
+  brand: [
+    { label: '内容曝光', value: '1,286', unit: '万次', yoy: '+31.5%', mom: '+18.9%', tone: 'blue', summary: '户外鞋服场景内容和短视频素材表现较好。', drill: [{ label: '短视频', value: 720 }, { label: '图文', value: 286 }, { label: '直播切片', value: 280 }] },
+    { label: '品牌搜索指数', value: '118', unit: '', yoy: '+12.4%', mom: '+6.8%', tone: 'green', summary: '幸运叶子和添柏岚相关搜索增长明显。', drill: [{ label: '幸运叶子', value: 48 }, { label: '添柏岚', value: 32 }, { label: '安德玛', value: 24 }, { label: '茵特', value: 14 }] },
+    { label: '素材复用率', value: '64.2', unit: '%', yoy: '+8.8pct', mom: '+3.5pct', tone: 'purple', summary: '内容中心沉淀后，活动素材复用效率提升。', drill: [{ label: '商品图', value: 42 }, { label: '活动KV', value: 18 }, { label: '短视频', value: 4 }] },
+    { label: '活动转化贡献', value: '1,420', unit: '万元', yoy: '+20.2%', mom: '+10.6%', tone: 'orange', summary: '品牌内容对大促转化贡献提升。', drill: [{ label: '淘天', value: 620 }, { label: '抖音', value: 520 }, { label: '京东', value: 280 }] },
+  ],
+}
+
+function metricSetKey(scopeId: string) {
+  if (scopeId === 'management') return 'management'
+  if (scopeId === 'ye-sports' || ['dewu', 'b2c-online', 'live', 'digital-marketing', 'online-sales-3', 'badminton'].includes(scopeId)) return 'ye-sports'
+  if (scopeId === 'tianma-platform' || ['tt1', 'group-buying', 'ka', 'platform-sales', 'platform-sales-middle', 'platform-ops', 'sourcing'].includes(scopeId)) return 'tianma-platform'
+  if (scopeId === 'ecommerce-park' || scopeId === 'warehouse') return 'warehouse'
+  if (scopeId === 'finance-center' || ['finance-business', 'finance-accounting'].includes(scopeId)) return 'finance'
+  if (scopeId === 'hr-center' || ['coe', 'ssc', 'hrbp'].includes(scopeId)) return 'hr'
+  if (scopeId === 'brand-center' || ['brand', 'barrel'].includes(scopeId)) return 'brand'
+  return 'management'
+}
+
+const currentMetrics = computed(() => organizationMetricSets[metricSetKey(selectedOrganizationScope.value)])
+const metricScopeTitle = computed(() => `${selectedOrganizationLabel.value}重点指标`)
+
+function openMetricDrill(metric: FocusMetric) {
+  drillTitle.value = `${selectedOrganizationLabel.value} · ${metric.label}`
+  drillTypeChart.value = 'bar'
+  drillData.value = metric.drill
+  showDrillModal.value = true
+}
 
 function handleCreateDashboard() {
   if (!newDashboardForm.value.name.trim()) return
@@ -423,191 +514,14 @@ function maxVal(data: ChartData[]) { return Math.max(...data.map((d) => d.value)
 
 <template>
   <div class="relative flex h-[calc(100vh-4rem)] overflow-hidden">
-    <button
-      v-if="mobileSidebarOpen"
-      class="fixed inset-0 top-14 z-40 bg-zinc-950/30 md:hidden"
-      aria-label="关闭看板目录"
-      @click="mobileSidebarOpen = false"
-    />
-    <!-- Left Sidebar -->
-    <aside
-      class="fixed bottom-0 left-0 top-14 z-50 shrink-0 overflow-y-auto border-r bg-white p-3 transition-all duration-200 md:static md:z-auto md:block"
-      :class="[
-        mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
-        sidebarCollapsed ? 'w-64 md:w-20' : 'w-64 md:w-56',
-      ]"
-    >
-      <div class="mb-4 flex items-center justify-between gap-2">
-        <h2 class="flex min-w-0 items-center gap-2 text-sm font-semibold text-foreground">
-          <LayoutDashboard class="h-4 w-4 shrink-0 text-primary" />
-          <span v-if="!sidebarCollapsed" class="truncate">看板目录</span>
-        </h2>
-        <button
-          class="hidden rounded-md p-1.5 text-muted-foreground transition hover:bg-accent hover:text-foreground md:inline-flex"
-          :title="sidebarCollapsed ? '展开目录' : '收起目录'"
-          @click="sidebarCollapsed = !sidebarCollapsed"
-        >
-          <ChevronLeft class="h-5 w-5 transition" :class="sidebarCollapsed ? 'rotate-180' : ''" />
-        </button>
-      </div>
-
-      <!-- 官方看板 -->
-      <div>
-        <button
-          class="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-foreground hover:bg-accent"
-          :class="sidebarCollapsed ? 'justify-center' : ''"
-          @click="toggleNode('off_root')"
-        >
-          <ChevronDown v-if="expandedNodes.has('off_root')" :class="sidebarCollapsed ? 'h-5 w-5 text-muted-foreground' : 'h-3.5 w-3.5 text-muted-foreground'" />
-          <ChevronRight v-else :class="sidebarCollapsed ? 'h-5 w-5 text-muted-foreground' : 'h-3.5 w-3.5 text-muted-foreground'" />
-          <TrendingUp :class="sidebarCollapsed ? 'h-5 w-5 text-primary' : 'h-3.5 w-3.5 text-primary'" />
-          <span v-if="!sidebarCollapsed">{{ officialTree[0].label }}</span>
-        </button>
-        <div v-if="expandedNodes.has('off_root') && !sidebarCollapsed" class="ml-5 mt-1 space-y-0.5">
-          <button
-            v-for="child in officialTree[0].children"
-            :key="child.id"
-            :class="cn(
-              'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors',
-              selectedNode === child.id
-                ? 'bg-primary/10 text-primary font-medium'
-                : 'text-muted-foreground hover:bg-accent hover:text-foreground',
-            )"
-            @click="selectNode(child)"
-          >
-            {{ child.label }}
-          </button>
-        </div>
-      </div>
-
-      <!-- 我的看板 -->
-      <div class="mt-4">
-        <button
-          class="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-foreground hover:bg-accent"
-          :class="sidebarCollapsed ? 'justify-center' : ''"
-          @click="toggleNode('mine_root')"
-        >
-          <ChevronDown v-if="expandedNodes.has('mine_root')" :class="sidebarCollapsed ? 'h-5 w-5 text-muted-foreground' : 'h-3.5 w-3.5 text-muted-foreground'" />
-          <ChevronRight v-else :class="sidebarCollapsed ? 'h-5 w-5 text-muted-foreground' : 'h-3.5 w-3.5 text-muted-foreground'" />
-          <User :class="sidebarCollapsed ? 'h-5 w-5 text-indigo-500' : 'h-3.5 w-3.5 text-indigo-500'" />
-          <span v-if="!sidebarCollapsed">我的看板</span>
-        </button>
-        <div v-if="expandedNodes.has('mine_root') && !sidebarCollapsed" class="ml-5 mt-1 space-y-0.5">
-          <button
-            v-for="d in myDashboards"
-            :key="d.id"
-            :class="cn(
-              'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors text-left',
-              selectedNode === d.id
-                ? 'bg-primary/10 text-primary font-medium'
-                : 'text-muted-foreground hover:bg-accent hover:text-foreground',
-            )"
-            @click="selectMineNode(d.id)"
-          >
-            <BarChart3 :class="sidebarCollapsed ? 'h-5 w-5' : 'h-3 w-3'" />
-            <span v-if="!sidebarCollapsed">{{ d.name }}</span>
-          </button>
-          <button
-            class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-primary"
-            :class="sidebarCollapsed ? 'justify-center' : ''"
-            @click="showCreateDialog = true"
-          >
-            <Plus :class="sidebarCollapsed ? 'h-5 w-5' : 'h-3.5 w-3.5'" />
-            <span v-if="!sidebarCollapsed">新建看板</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- 共享看板 -->
-      <div class="mt-4">
-        <button
-          class="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-foreground hover:bg-accent"
-          :class="sidebarCollapsed ? 'justify-center' : ''"
-          @click="toggleNode('shared_root')"
-        >
-          <ChevronDown v-if="expandedNodes.has('shared_root')" :class="sidebarCollapsed ? 'h-5 w-5 text-muted-foreground' : 'h-3.5 w-3.5 text-muted-foreground'" />
-          <ChevronRight v-else :class="sidebarCollapsed ? 'h-5 w-5 text-muted-foreground' : 'h-3.5 w-3.5 text-muted-foreground'" />
-          <Users :class="sidebarCollapsed ? 'h-5 w-5 text-emerald-500' : 'h-3.5 w-3.5 text-emerald-500'" />
-          <span v-if="!sidebarCollapsed">共享看板</span>
-        </button>
-        <div v-if="expandedNodes.has('shared_root') && !sidebarCollapsed" class="ml-5 mt-1">
-          <p class="px-2 text-xs text-muted-foreground/60">暂无共享看板</p>
-        </div>
-      </div>
-    </aside>
-
-    <!-- Right Content -->
-      <div class="flex-1 overflow-y-auto bg-zinc-50/50 p-4 md:p-6">
+    <OrganizationScopeDrawer v-model="selectedOrganizationScope" context-label="仪表盘组织口径" />
+    <div class="min-w-0 flex-1 overflow-y-auto bg-zinc-50/50 p-4 md:p-6">
       <!-- Top Bar -->
-      <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div class="flex min-w-0 items-start gap-2">
-          <button
-            class="inline-flex rounded-md border bg-white p-2 text-muted-foreground md:hidden"
-            aria-label="打开看板目录"
-            @click="mobileSidebarOpen = true"
-          >
-            <LayoutDashboard class="h-4 w-4" />
-          </button>
-          <div class="min-w-0">
+      <div class="mb-6 flex flex-wrap items-center justify-between gap-3 pl-24">
+        <div class="min-w-0">
           <h1 class="truncate text-xl font-bold">{{ selectedDashboardTitle }}</h1>
-          <p class="text-sm text-muted-foreground">数据更新时间：2026-06-22 10:30</p>
-      </div>
-
-      <aside
-        class="sticky top-14 hidden h-[calc(100vh-3.5rem)] shrink-0 border-l bg-white/95 backdrop-blur 2xl:flex"
-        :class="assistantRailCollapsed ? 'w-16' : 'w-72'"
-      >
-        <div class="flex h-full w-full flex-col">
-          <div class="flex items-center justify-between border-b px-4 py-3">
-            <div v-if="!assistantRailCollapsed" class="min-w-0">
-              <p class="text-sm font-semibold text-zinc-950">数据助手</p>
-              <p class="text-xs text-muted-foreground">问数 / 查数 / 建仪表盘</p>
-            </div>
-            <button class="rounded-md p-1.5 text-muted-foreground hover:bg-zinc-100 hover:text-zinc-900" :title="assistantRailCollapsed ? '展开助手' : '收起助手'" @click="assistantRailCollapsed = !assistantRailCollapsed">
-              <ChevronLeft class="h-4 w-4 transition" :class="assistantRailCollapsed ? 'rotate-180' : ''" />
-            </button>
-          </div>
-
-          <div class="flex-1 space-y-3 overflow-y-auto p-3">
-            <button class="flex w-full items-center gap-3 rounded-xl border border-zinc-200 bg-white p-3 text-left shadow-sm transition hover:border-blue-200 hover:bg-blue-50/60" :class="assistantRailCollapsed ? 'justify-center px-2' : ''" @click="openQuickQuestion">
-              <MessageCircle class="h-5 w-5 shrink-0 text-blue-600" />
-              <span v-if="!assistantRailCollapsed" class="min-w-0">
-                <span class="block text-sm font-medium text-zinc-950">问数</span>
-                <span class="block text-xs text-zinc-500">直接问当前看板数据</span>
-              </span>
-            </button>
-            <button class="flex w-full items-center gap-3 rounded-xl border border-zinc-200 bg-white p-3 text-left shadow-sm transition hover:border-orange-200 hover:bg-orange-50/60" :class="assistantRailCollapsed ? 'justify-center px-2' : ''" @click="openQuickQuery">
-              <Search class="h-5 w-5 shrink-0 text-orange-600" />
-              <span v-if="!assistantRailCollapsed" class="min-w-0">
-                <span class="block text-sm font-medium text-zinc-950">查数</span>
-                <span class="block text-xs text-zinc-500">查看关键指标明细</span>
-              </span>
-            </button>
-            <button class="flex w-full items-center gap-3 rounded-xl border border-zinc-200 bg-white p-3 text-left shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/60" :class="assistantRailCollapsed ? 'justify-center px-2' : ''" @click="openQuickBuild">
-              <BarChart3 class="h-5 w-5 shrink-0 text-emerald-600" />
-              <span v-if="!assistantRailCollapsed" class="min-w-0">
-                <span class="block text-sm font-medium text-zinc-950">建仪表盘</span>
-                <span class="block text-xs text-zinc-500">创建新的业务看板</span>
-              </span>
-            </button>
-            <button class="flex w-full items-center gap-3 rounded-xl border border-zinc-200 bg-white p-3 text-left shadow-sm transition hover:border-violet-200 hover:bg-violet-50/60" :class="assistantRailCollapsed ? 'justify-center px-2' : ''" @click="openQuickAnalysis">
-              <Brain class="h-5 w-5 shrink-0 text-violet-600" />
-              <span v-if="!assistantRailCollapsed" class="min-w-0">
-                <span class="block text-sm font-medium text-zinc-950">数据分析</span>
-                <span class="block text-xs text-zinc-500">进入 AI 解析与追问</span>
-              </span>
-            </button>
-            <button class="flex w-full items-center gap-3 rounded-xl border border-zinc-200 bg-white p-3 text-left shadow-sm transition hover:border-amber-200 hover:bg-amber-50/60" :class="assistantRailCollapsed ? 'justify-center px-2' : ''" @click="openQuickStrategy">
-              <Sparkles class="h-5 w-5 shrink-0 text-amber-600" />
-              <span v-if="!assistantRailCollapsed" class="min-w-0">
-                <span class="block text-sm font-medium text-zinc-950">策略建议</span>
-                <span class="block text-xs text-zinc-500">自动生成经营建议</span>
-              </span>
-            </button>
-          </div>
+          <p class="text-sm text-muted-foreground">组织口径：{{ selectedOrganizationLabel }} · 数据更新时间：2026-06-22 10:30</p>
         </div>
-      </aside>
-    </div>
         <div class="flex flex-wrap items-center gap-2">
           <div class="flex items-center rounded-lg border bg-white p-0.5">
             <button
@@ -622,7 +536,7 @@ function maxVal(data: ChartData[]) { return Math.max(...data.map((d) => d.value)
               {{ tf === 'daily' ? '日' : tf === 'weekly' ? '周' : tf === 'monthly' ? '月' : '自定义' }}
             </button>
           </div>
-          <RouterLink :to="{ name: 'chat-bi' }">
+          <RouterLink :to="{ name: 'workspace-chat', query: { source: 'AI生成看板', prompt: '帮我基于当前组织口径生成一张经营看板' } }">
             <Button variant="outline" size="sm" class="gap-1.5">
               <Cpu class="h-3.5 w-3.5" /> AI生成看板
             </Button>
@@ -652,8 +566,43 @@ function maxVal(data: ChartData[]) { return Math.max(...data.map((d) => d.value)
         </template>
       </div>
 
+      <section data-testid="dashboard-metric-wall" class="space-y-4">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p class="text-xs font-medium text-muted-foreground">当前组织口径</p>
+            <h2 class="mt-1 text-2xl font-semibold tracking-tight text-[#111827]">{{ metricScopeTitle }}</h2>
+          </div>
+          <p class="text-xs text-muted-foreground">点击指标卡查看渠道、品类或部门拆解</p>
+        </div>
+
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          <button
+            v-for="metric in currentMetrics"
+            :key="metric.label"
+            type="button"
+            class="group min-h-44 rounded-[24px] border border-[#eaecf0] bg-gradient-to-br p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#d0d5dd] hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111827]"
+            :class="metricToneClass[metric.tone]"
+            @click="openMetricDrill(metric)"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <span class="text-sm font-semibold text-[#344054]">{{ metric.label }}</span>
+              <ChevronRight class="h-4 w-4 opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-70" />
+            </div>
+            <div class="mt-6 flex items-end gap-1">
+              <strong class="text-4xl font-semibold tracking-tight text-[#101828]">{{ metric.value }}</strong>
+              <span v-if="metric.unit" class="mb-1 text-sm font-medium text-[#667085]">{{ metric.unit }}</span>
+            </div>
+            <div class="mt-4 flex gap-2 text-xs">
+              <span class="rounded-full bg-white/70 px-2.5 py-1 font-semibold text-[#344054]">同比 {{ metric.yoy }}</span>
+              <span class="rounded-full bg-white/70 px-2.5 py-1 font-semibold text-[#344054]">环比 {{ metric.mom }}</span>
+            </div>
+            <p class="mt-4 line-clamp-2 text-xs leading-5 text-[#667085]">{{ metric.summary }}</p>
+          </button>
+        </div>
+      </section>
+
       <!-- ==================== 经营总览 ==================== -->
-      <template v-if="selectedNode === 'off_general' && drillLevel === 0">
+      <template v-if="false && selectedNode === 'off_general' && drillLevel === 0">
         <div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div
             v-for="kpi in generalKPIs"
@@ -730,7 +679,7 @@ function maxVal(data: ChartData[]) { return Math.max(...data.map((d) => d.value)
       </template>
 
       <!-- ==================== 零售销售 (Level 0) ==================== -->
-      <template v-if="selectedNode === 'off_retail' && drillLevel === 0">
+      <template v-if="false && selectedNode === 'off_retail' && drillLevel === 0">
         <div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div
             v-for="ch in channels"
@@ -797,7 +746,7 @@ function maxVal(data: ChartData[]) { return Math.max(...data.map((d) => d.value)
       </template>
 
       <!-- ==================== 零售销售 - Channel Level (Level 1) ==================== -->
-      <template v-if="selectedNode === 'off_retail' && drillLevel >= 1">
+      <template v-if="false && selectedNode === 'off_retail' && drillLevel >= 1">
         <div class="mb-6 grid gap-4 sm:grid-cols-3">
           <div class="rounded-xl border bg-white p-4 shadow-sm"><p class="text-xs text-muted-foreground">渠道销售额</p><p class="mt-1 text-xl font-bold">{{ drillChannel === 'douyin' ? '2,540' : drillChannel === 'tmall' ? '3,850' : drillChannel === 'jd' ? '2,980' : '3,480' }}<span class="text-sm font-normal text-muted-foreground"> 万元</span></p></div>
           <div class="rounded-xl border bg-white p-4 shadow-sm"><p class="text-xs text-muted-foreground">订单量</p><p class="mt-1 text-xl font-bold">{{ drillChannel === 'douyin' ? '98,000' : drillChannel === 'tmall' ? '145,000' : drillChannel === 'jd' ? '112,000' : '131,000' }}<span class="text-sm font-normal text-muted-foreground"> 单</span></p></div>
@@ -868,7 +817,7 @@ function maxVal(data: ChartData[]) { return Math.max(...data.map((d) => d.value)
       </template>
 
       <!-- ==================== 供应链 ==================== -->
-      <template v-if="selectedNode === 'off_supply'">
+      <template v-if="false && selectedNode === 'off_supply'">
         <div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div v-for="kpi in supplyKPIs" :key="kpi.label"
             class="rounded-xl border bg-white p-5 shadow-sm">
@@ -925,7 +874,7 @@ function maxVal(data: ChartData[]) { return Math.max(...data.map((d) => d.value)
       </template>
 
       <!-- ==================== 营销 ==================== -->
-      <template v-if="selectedNode === 'off_mkt'">
+      <template v-if="false && selectedNode === 'off_mkt'">
         <div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div v-for="kpi in mktKPIs" :key="kpi.label"
             class="rounded-xl border bg-white p-5 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
@@ -979,7 +928,7 @@ function maxVal(data: ChartData[]) { return Math.max(...data.map((d) => d.value)
       </template>
 
       <!-- ==================== AI运营 ==================== -->
-      <template v-if="selectedNode === 'off_ai'">
+      <template v-if="false && selectedNode === 'off_ai'">
         <div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div v-for="kpi in aiKPIs" :key="kpi.label"
             class="rounded-xl border bg-white p-5 shadow-sm cursor-pointer hover:shadow-md transition-shadow">
