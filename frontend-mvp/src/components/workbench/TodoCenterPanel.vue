@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { Bot, Check, ChevronDown, ClipboardList, ExternalLink, Filter, MessageCircle, Plus, RefreshCw, Search, Send, X } from 'lucide-vue-next'
+import { Bot, Check, ChevronDown, ClipboardList, ExternalLink, MessageCircle, Plus, RefreshCw, Search, Send, X } from 'lucide-vue-next'
 import { workbenchApprovals, workbenchTodoPressure, workbenchTodos } from '@/mock/workbench'
 import { fetchDwsTodoComments, publishDwsTodoComment } from '@/services/dws-workbench'
 import type { ApprovalItem, TodoComment, TodoItem } from '@/types/workbench'
 
 type ItemType = 'all' | 'approval' | 'task'
-type SharedScope = 'all' | 'pending' | 'done' | 'created' | 'participated'
 type WorkItem = { kind: 'approval'; item: ApprovalItem } | { kind: 'task'; item: TodoItem }
 
 const props = defineProps<{
@@ -22,7 +21,6 @@ const emit = defineEmits<{ refresh: [] }>()
 
 const query = ref('')
 const itemType = ref<ItemType>('all')
-const sharedScope = ref<SharedScope>('all')
 const todos = ref((props.todos ?? workbenchTodos).map((item) => ({ ...item })))
 const commentTodo = ref<TodoItem | null>(null)
 const todoComments = ref<TodoComment[]>([])
@@ -39,14 +37,10 @@ const createDescription = ref('')
 const itemTypes: Array<{ id: ItemType; label: string }> = [
   { id: 'all', label: '全部' }, { id: 'approval', label: '审批' }, { id: 'task', label: '任务' },
 ]
-const sharedTabs: Array<{ id: SharedScope; label: string }> = [
-  { id: 'all', label: '全部' }, { id: 'pending', label: '待处理的' }, { id: 'done', label: '已处理的' },
-  { id: 'created', label: '我创建的' }, { id: 'participated', label: '我参与的' },
-]
 
 const displayItems = computed<WorkItem[]>(() => {
-  const approvals: WorkItem[] = itemType.value === 'task' ? [] : (props.approvals ?? workbenchApprovals).filter(matchesApprovalScope).filter(matchesQuery).map((item) => ({ kind: 'approval', item }))
-  const tasks: WorkItem[] = itemType.value === 'approval' ? [] : todos.value.filter(matchesTodoScope).filter(matchesQuery).map((item) => ({ kind: 'task', item }))
+  const approvals: WorkItem[] = itemType.value === 'task' ? [] : (props.approvals ?? workbenchApprovals).filter(matchesQuery).map((item) => ({ kind: 'approval', item }))
+  const tasks: WorkItem[] = itemType.value === 'approval' ? [] : todos.value.filter(matchesQuery).map((item) => ({ kind: 'task', item }))
   return [...approvals, ...tasks].sort(compareItems)
 })
 const todayItemCount = computed(() => [
@@ -64,18 +58,15 @@ const liveWorkItemSummary = computed(() => {
   }
 })
 const kanbanColumns = computed(() => {
-  const pending: WorkItem[] = []
-  const progress: WorkItem[] = []
-  const done: WorkItem[] = []
-  displayItems.value.forEach((work, index) => {
-    if (isProcessed(work)) done.push(work)
-    else if (index < Math.ceil(displayItems.value.length * 0.6)) pending.push(work)
-    else progress.push(work)
-  })
+  const pending = displayItems.value.filter((work) => !isProcessed(work))
+  const done = displayItems.value.filter(isProcessed)
+  const created = displayItems.value.filter(isCreatedByMe)
+  const participated = displayItems.value.filter(isParticipatedByMe)
   return [
-    { id: 'pending', label: '待处理', items: pending, tone: 'bg-[#fffaf0]' },
-    { id: 'progress', label: '处理中', items: progress, tone: 'bg-[#f2f7ff]' },
-    { id: 'done', label: '已完成', items: done, tone: 'bg-[#f1fbf6]' },
+    { id: 'pending', label: '待处理的', items: pending, tone: 'bg-[#fffaf0]', showProgress: false, completed: 0 },
+    { id: 'done', label: '已处理的', items: done, tone: 'bg-[#f1fbf6]', showProgress: false, completed: done.length },
+    { id: 'created', label: '我创建的', items: created, tone: 'bg-[#f2f7ff]', showProgress: true, completed: created.filter(isProcessed).length },
+    { id: 'participated', label: '我参与的', items: participated, tone: 'bg-[#f7f4ff]', showProgress: true, completed: participated.filter(isProcessed).length },
   ] as const
 })
 
@@ -83,20 +74,6 @@ watch(() => props.todos, (value) => {
   todos.value = (value ?? workbenchTodos).map((item) => ({ ...item }))
 })
 
-function matchesApprovalScope(item: ApprovalItem) {
-  if (sharedScope.value === 'all') return true
-  if (sharedScope.value === 'pending') return item.status === '待审批'
-  if (sharedScope.value === 'done') return item.status !== '待审批'
-  if (sharedScope.value === 'created') return item.scope === 'initiated'
-  return item.scope === 'cc'
-}
-function matchesTodoScope(item: TodoItem) {
-  if (sharedScope.value === 'all') return true
-  if (sharedScope.value === 'pending') return !item.completed
-  if (sharedScope.value === 'done') return item.completed
-  if (sharedScope.value === 'created') return item.scopes.includes('created')
-  return item.scopes.includes('responsible') || item.scopes.includes('assigned')
-}
 function matchesQuery(item: object) {
   const keyword = query.value.trim().toLowerCase()
   return !keyword || Object.values(item).join(' ').toLowerCase().includes(keyword)
@@ -108,6 +85,9 @@ function compareItems(a: WorkItem, b: WorkItem) {
   return dueRank(a.item.due) - dueRank(b.item.due)
 }
 function isProcessed(work: WorkItem) { return work.kind === 'task' ? work.item.completed : work.item.status !== '待审批' }
+function isCreatedByMe(work: WorkItem) { return work.kind === 'task' ? work.item.scopes.includes('created') : work.item.scope === 'initiated' }
+function isParticipatedByMe(work: WorkItem) { return work.kind === 'task' ? work.item.scopes.includes('responsible') || work.item.scopes.includes('assigned') : work.item.scope === 'cc' }
+function completionRate(completed: number, total: number) { return total ? Math.round((completed / total) * 100) : 0 }
 function dueRank(due: string) {
   if (due.startsWith('明天 10')) return 4
   if (due.startsWith('明天')) return 5
@@ -181,7 +161,7 @@ async function publishComment() {
     <div class="flex flex-wrap items-start justify-between gap-4 pb-4">
       <div>
         <h2 class="workbench-card-title text-[14px] !text-xl font-semibold tracking-[-0.02em] text-[#17191e]">待办中心</h2>
-        <p class="mt-1 text-xs text-[#8a919b]">按任务状态集中管理，支持筛选、新增与进度跟踪</p>
+        <p class="mt-1 text-xs text-[#8a919b]">按处理状态与协作关系归集，一屏掌握个人任务进展</p>
       </div>
       <button data-testid="todo-create-task" type="button" class="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#1769e0] px-4 text-xs font-semibold text-white shadow-sm hover:bg-[#0f5cc8]" @click="createDrawerOpen = true"><Plus class="h-4 w-4" />新增任务</button>
     </div>
@@ -194,8 +174,7 @@ async function publishComment() {
     </div>
 
     <div class="flex flex-wrap items-center gap-2 border-y border-[#eef0f3] py-3">
-      <span class="inline-flex items-center gap-1 text-xs text-[#7b828d]"><Filter class="h-3.5 w-3.5" />筛选</span>
-      <button v-for="tab in sharedTabs" :key="tab.id" :data-testid="`todo-scope-${tab.id}`" class="rounded-lg border px-3 py-1.5 text-xs transition" :class="sharedScope === tab.id ? 'border-[#b9d0f3] bg-[#edf4ff] text-[#1769e0]' : 'border-[#e2e5e9] text-[#666e7a] hover:bg-[#f7f8fa]'" @click="sharedScope = tab.id">{{ tab.label }}</button>
+      <p class="text-xs text-[#7b828d]">固定四类看板 · 同一事项可同时出现在状态与协作看板中</p>
       <div data-testid="todo-pressure-summary" class="ml-auto text-[10px] text-[#8a919b]"><span v-if="dataMode">当前账号工作项 {{ liveWorkItemSummary.total }} 项 · 待处理 {{ liveWorkItemSummary.pending }}</span><span v-else>今日待决 8 项 · 今日优先 {{ workbenchTodoPressure.mustDoToday }} · 逾期 {{ workbenchTodoPressure.overdue }} · 我创建临期 3</span></div>
     </div>
 
@@ -204,10 +183,17 @@ async function publishComment() {
       <div v-if="loading" class="grid h-full min-h-[220px] place-items-center text-xs text-[#8b909a]">正在读取钉钉待办…</div>
       <div v-else-if="error" class="grid h-full min-h-[220px] place-items-center text-center"><div><ClipboardList class="mx-auto h-6 w-6 text-[#b2b7bf]" /><p class="mt-2 text-xs text-[#8b909a]">钉钉待办暂时不可用</p></div></div>
       <div v-else-if="!displayItems.length" class="grid h-full min-h-[220px] place-items-center text-center"><div><ClipboardList class="mx-auto h-6 w-6 text-[#b2b7bf]" /><p class="mt-2 text-xs text-[#8b909a]">{{ query ? '未找到匹配待办' : dataMode ? '当前钉钉账号暂无待办或待审批' : '当前筛选暂无待办' }}</p><button v-if="query" data-testid="clear-todo-search" type="button" class="mt-2 text-xs font-medium text-[#1769e0]" @click="query = ''">清空搜索</button></div></div>
-      <div v-else class="grid min-w-[900px] grid-cols-3 gap-4">
+      <div v-else class="grid min-w-[1180px] grid-cols-4 gap-4">
         <section v-for="column in kanbanColumns" :key="column.id" :data-testid="`todo-kanban-${column.id}`" class="overflow-hidden rounded-xl border border-[#dfe3e8] bg-[#fafbfc]">
-          <header class="flex items-center gap-2 border-b border-[#e2e6eb] px-4 py-3" :class="column.tone"><h3 class="text-sm font-semibold text-[#25282e]">{{ column.label }}</h3><span class="rounded-full bg-white px-2 py-0.5 text-[10px] text-[#707782] shadow-sm">{{ column.items.length }}</span></header>
+          <header class="border-b border-[#e2e6eb] px-4 py-3" :class="column.tone">
+            <div class="flex items-center gap-2"><h3 class="text-sm font-semibold text-[#25282e]">{{ column.label }}</h3><span class="rounded-full bg-white px-2 py-0.5 text-[10px] text-[#707782] shadow-sm">{{ column.items.length }}</span></div>
+            <div v-if="column.showProgress" :data-testid="`todo-progress-${column.id}`" class="mt-2.5">
+              <div class="mb-1.5 flex items-center justify-between text-[10px]"><span class="text-[#737b87]">完成进度</span><strong class="font-semibold text-[#3d4652]">{{ column.completed }}/{{ column.items.length }}</strong></div>
+              <div class="h-1.5 overflow-hidden rounded-full bg-white/90 ring-1 ring-black/[0.04]"><div class="h-full rounded-full bg-[#1769e0] transition-[width] duration-300" :style="{ width: `${completionRate(column.completed, column.items.length)}%` }" /></div>
+            </div>
+          </header>
           <div class="grid gap-3 p-3">
+      <div v-if="!column.items.length" class="grid min-h-[132px] place-items-center rounded-xl border border-dashed border-[#dfe3e8] bg-white/60 px-4 text-center text-xs text-[#9aa0aa]">暂无{{ column.label }}事项</div>
       <article v-for="work in column.items" :key="work.item.id" :data-testid="`work-item-${work.item.id}`" class="rounded-xl border border-[#e0e4e9] bg-white p-4 shadow-[0_2px_7px_rgba(15,23,42,0.025)] transition hover:border-[#b9c9df] hover:shadow-sm" :class="work.kind === 'task' && work.item.completed ? 'opacity-65' : ''">
         <div :data-testid="work.kind === 'task' ? `todo-item-${work.item.id}` : undefined">
           <div class="flex items-start gap-2">

@@ -105,13 +105,17 @@ describe('SystemPortalsView', () => {
     expect(wrapper.find('[data-testid="schedule-system-config"]').exists()).toBe(false)
   })
 
-  it('shows todo work in three kanban columns with a create-task drawer', async () => {
+  it('shows todo work in four fixed kanban columns with progress for collaboration boards', async () => {
     const wrapper = mountWorkbench()
 
     await wrapper.get('[data-testid="workbench-nav-todo"]').trigger('click')
     expect(wrapper.find('[data-testid="todo-kanban-pending"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="todo-kanban-progress"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="todo-kanban-done"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="todo-kanban-created"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="todo-kanban-participated"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="todo-kanban-progress"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="todo-progress-created"]').text()).toContain('1/4')
+    expect(wrapper.get('[data-testid="todo-progress-participated"]').text()).toContain('1/7')
 
     await wrapper.get('[data-testid="todo-create-task"]').trigger('click')
     expect(wrapper.get('[data-testid="todo-create-drawer"]').text()).toContain('新增任务')
@@ -1014,7 +1018,7 @@ describe('SystemPortalsView', () => {
     expect(wrapper.get('[data-testid="portal-monogram-tm-crm"]').text()).toBe('CRM')
   })
 
-  it('filters schedules, navigates calendar, and switches task scopes', async () => {
+  it('filters schedules, navigates calendar, and keeps todo scopes visible as fixed boards', async () => {
     const wrapper = mountWorkbench()
 
     await wrapper.get('[aria-label="搜索日程看板"]').setValue('供应链')
@@ -1032,14 +1036,25 @@ describe('SystemPortalsView', () => {
     expect(wrapper.find('[aria-label="回到今天"]').exists()).toBe(false)
 
     await wrapper.get('[data-testid="todo-type-task"]').trigger('click')
-    await wrapper.get('[data-testid="todo-scope-participated"]').trigger('click')
-    expect(wrapper.text()).toContain('客户反馈跟进')
-    expect(wrapper.text()).toContain('撰写项目需求文档')
-    await wrapper.get('[data-testid="todo-scope-created"]').trigger('click')
-    expect(wrapper.text()).toContain('设计评审材料准备')
+    expect(wrapper.get('[data-testid="todo-kanban-participated"]').text()).toContain('客户反馈跟进')
+    expect(wrapper.get('[data-testid="todo-kanban-participated"]').text()).toContain('撰写项目需求文档')
+    expect(wrapper.get('[data-testid="todo-kanban-created"]').text()).toContain('设计评审材料准备')
   })
 
-  it('uses one item-type control and one shared status tab bar', async () => {
+  it('searches only the authorized colleague list before adding a calendar', async () => {
+    const wrapper = mountWorkbench()
+
+    await wrapper.get('[data-testid="schedule-add-person"]').trigger('click')
+    await wrapper.get('[data-testid="schedule-person-search"]').setValue('技术')
+
+    expect(wrapper.find('[data-testid="schedule-person-option-zhao-liu"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="schedule-person-option-liu-yang"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="schedule-person-search"]').setValue('不存在')
+    expect(wrapper.get('[data-testid="schedule-person-empty"]').text()).toContain('未找到可查看的同事')
+  })
+
+  it('uses one item-type control with four fixed category boards', async () => {
     const wrapper = mountWorkbench()
 
     expect(wrapper.text()).toContain('采购预算申请')
@@ -1052,20 +1067,16 @@ describe('SystemPortalsView', () => {
     expect(approvalLink.find('.lucide-external-link').exists()).toBe(true)
     expect(wrapper.get('[data-testid="todo-item-todo-2"]').find('[aria-label^="完成任务"]').exists()).toBe(true)
     await wrapper.get('[data-testid="todo-type-approval"]').trigger('click')
-    await wrapper.get('[data-testid="todo-scope-done"]').trigger('click')
-    expect(wrapper.text()).toContain('合同用印申请')
-    expect(wrapper.text()).not.toContain('采购预算申请')
-    expect(wrapper.text()).toContain('审批通过')
-    await wrapper.get('[data-testid="todo-scope-created"]').trigger('click')
-    expect(wrapper.text()).toContain('外出申请')
-    await wrapper.get('[data-testid="todo-scope-participated"]').trigger('click')
-    expect(wrapper.text()).toContain('订单付款审核')
+    expect(wrapper.get('[data-testid="todo-kanban-done"]').text()).toContain('合同用印申请')
+    expect(wrapper.get('[data-testid="todo-kanban-pending"]').text()).toContain('采购预算申请')
+    expect(wrapper.get('[data-testid="todo-kanban-done"]').text()).toContain('审批通过')
+    expect(wrapper.get('[data-testid="todo-kanban-created"]').text()).toContain('外出申请')
+    expect(wrapper.get('[data-testid="todo-kanban-participated"]').text()).toContain('订单付款审核')
   })
 
   it('lets the creator review comments and confirm an editable AI follow-up draft', async () => {
     const wrapper = mountWorkbench()
 
-    await wrapper.get('[data-testid="todo-scope-created"]').trigger('click')
     expect(wrapper.get('[data-testid="todo-comments-todo-2"]').text()).toBe('跟进')
     await wrapper.get('[data-testid="todo-comments-todo-2"]').trigger('click')
     const panel = wrapper.get('[data-testid="todo-comments-floating"]')
@@ -1096,7 +1107,6 @@ describe('SystemPortalsView', () => {
     await flushPromises()
     await wrapper.get('[aria-label="刷新待办中心"]').trigger('click')
     await flushPromises()
-    await wrapper.get('[data-testid="todo-scope-created"]').trigger('click')
     await wrapper.get('[data-testid="todo-comments-dws-todo-task-live-1"]').trigger('click')
     await flushPromises()
     const panel = wrapper.get('[data-testid="todo-comments-floating"]')
@@ -1114,13 +1124,11 @@ describe('SystemPortalsView', () => {
     const wrapper = mountWorkbench()
 
     await wrapper.get('[data-testid="todo-type-approval"]').trigger('click')
-    await wrapper.get('[data-testid="todo-scope-done"]').trigger('click')
     expect(wrapper.text()).toContain('审批通过')
     expect(wrapper.text()).toContain('审批被拒绝')
     expect(wrapper.text()).toContain('已撤销')
 
     await wrapper.get('[data-testid="todo-type-task"]').trigger('click')
-    await wrapper.get('[data-testid="todo-scope-all"]').trigger('click')
     expect(wrapper.text()).toContain('未完成')
     expect(wrapper.text()).toContain('已完成')
     expect(wrapper.get('[data-testid="todo-scroll-area"]').text()).toContain('高')

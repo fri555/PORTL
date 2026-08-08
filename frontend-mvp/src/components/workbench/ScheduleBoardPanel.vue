@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { AudioLines, BrainCircuit, CalendarDays, ChevronLeft, ChevronRight, ExternalLink, GripVertical, MapPin, Plus, RefreshCw, Search, Settings2, Sparkles, StickyNote, Users, X } from 'lucide-vue-next'
 import { buildMonthDays, toDateKey } from '@/lib/workbench-calendar'
 import { workbenchSchedules } from '@/mock/workbench'
@@ -23,8 +23,10 @@ const now = new Date()
 const visibleMonth = ref(new Date(now.getFullYear(), now.getMonth(), 1))
 const selectedDate = ref(toDateKey(now))
 const scheduleQuery = ref('')
+const peopleQuery = ref('')
 const calendarCollapsed = ref(false)
 const addPeopleOpen = ref(false)
+const scheduleBoardViewport = ref<HTMLElement | null>(null)
 const addedPeople = ref<string[]>([])
 const hoveredInsight = ref<ScheduleItem | null>(null)
 const pinnedInsightId = ref<string | null>(null)
@@ -54,6 +56,11 @@ const calendarPeople = [
   { id: 'sun-qi', name: '孙琪', department: '财务中心', tone: 'bg-[#fff4e7] text-[#b96618]' },
   { id: 'wang-wu', name: '王五', department: '直播事业部', tone: 'bg-[#fff0ed] text-[#d84321]' },
 ]
+const filteredCalendarPeople = computed(() => {
+  const query = peopleQuery.value.trim().toLowerCase()
+  if (!query) return calendarPeople
+  return calendarPeople.filter((person) => `${person.name}${person.department}`.toLowerCase().includes(query))
+})
 const peerBoards = computed(() => addedPeople.value.map((id) => calendarPeople.find((person) => person.id === id)!).filter(Boolean))
 const scheduleBoards = computed(() => [
   {
@@ -70,16 +77,7 @@ const scheduleOverflowMode = computed(() => scheduleBoards.value.length > 4)
 const timelineHourHeight = 80
 const minimumScheduleHeight = 72
 const minimumVisualMinutes = (minimumScheduleHeight / timelineHourHeight) * 60
-const timelineBounds = computed(() => {
-  const schedules = scheduleBoards.value.flatMap((board) => board.schedules)
-  if (!schedules.length) return { startMinutes: 8 * 60, endMinutes: 20 * 60 }
-  const earliest = Math.min(...schedules.map((schedule) => toMinutes(schedule.start)))
-  const latest = Math.max(...schedules.map((schedule) => toMinutes(schedule.end)))
-  return {
-    startMinutes: Math.min(8 * 60, Math.floor(earliest / 60) * 60),
-    endMinutes: Math.max(20 * 60, Math.ceil(latest / 60) * 60),
-  }
-})
+const timelineBounds = computed(() => ({ startMinutes: 0, endMinutes: 24 * 60 }))
 const timelineHours = computed(() => Array.from(
   { length: Math.max(1, (timelineBounds.value.endMinutes - timelineBounds.value.startMinutes) / 60) },
   (_, index) => {
@@ -209,7 +207,24 @@ function addPerson(id: string) {
     emit('refresh')
   }
   addPeopleOpen.value = false
+  peopleQuery.value = ''
 }
+
+function togglePeoplePicker() {
+  addPeopleOpen.value = !addPeopleOpen.value
+  if (!addPeopleOpen.value) peopleQuery.value = ''
+}
+
+async function focusTimelineOnCurrentTime() {
+  if (selectedDate.value !== toDateKey(now)) return
+  await nextTick()
+  const viewport = scheduleBoardViewport.value
+  if (!viewport || currentTimeTop.value === null) return
+  viewport.scrollTop = Math.max(0, currentTimeTop.value + 56 - viewport.clientHeight * 0.4)
+}
+
+onMounted(focusTimelineOnCurrentTime)
+watch(selectedDate, focusTimelineOnCurrentTime)
 
 function removePerson(id: string) {
   addedPeople.value = addedPeople.value.filter((personId) => personId !== id)
@@ -372,10 +387,14 @@ function toggleScheduleDraft(schedule: ScheduleItem) {
           </div>
         </div>
         <div class="relative mt-6 border-t border-[#e2e6eb] pt-5">
-          <button data-testid="schedule-add-person" type="button" class="flex h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-[#cfd9e7] bg-white text-xs font-medium text-[#56606d] shadow-sm transition hover:border-[#9ebbe5] hover:text-[#1769e0]" @click="addPeopleOpen = !addPeopleOpen"><Users class="h-4 w-4" /><Plus class="h-3.5 w-3.5" />增加他人日程</button>
+          <button data-testid="schedule-add-person" type="button" class="flex h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-[#cfd9e7] bg-white text-xs font-medium text-[#56606d] shadow-sm transition hover:border-[#9ebbe5] hover:text-[#1769e0]" @click="togglePeoplePicker"><Users class="h-4 w-4" /><Plus class="h-3.5 w-3.5" />增加他人日程</button>
           <div v-if="addPeopleOpen" data-testid="schedule-person-picker" class="absolute left-0 top-12 z-40 w-full rounded-xl border border-[#e2e6eb] bg-white p-2 shadow-[0_18px_50px_rgba(15,23,42,0.16)]">
             <p class="px-2 py-1.5 text-[10px] font-semibold text-[#9298a2]">选择同事</p>
-            <button v-for="person in calendarPeople" :key="person.id" :data-testid="`schedule-person-option-${person.id}`" type="button" :disabled="addedPeople.includes(person.id)" class="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left hover:bg-[#f6f8fb] disabled:opacity-40" @click="addPerson(person.id)"><span class="grid h-7 w-7 place-items-center rounded-full text-[10px] font-semibold" :class="person.tone">{{ person.name.slice(-1) }}</span><span class="min-w-0"><strong class="block text-xs text-[#343941]">{{ person.name }}</strong><small class="text-[10px] text-[#999fa8]">{{ person.department }}</small></span></button>
+            <label class="relative mb-1 block"><Search class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#9ba1aa]" /><input v-model="peopleQuery" data-testid="schedule-person-search" aria-label="搜索可查看同事" class="h-8 w-full rounded-lg border border-[#dfe4ea] bg-[#f8f9fa] pl-8 pr-7 text-xs outline-none focus:border-[#8fb5f3] focus:bg-white" placeholder="搜索姓名或部门" /><button v-if="peopleQuery" type="button" aria-label="清空同事搜索" class="absolute right-2 top-1/2 -translate-y-1/2 text-[#9aa0aa]" @click="peopleQuery = ''"><X class="h-3.5 w-3.5" /></button></label>
+            <div class="max-h-56 overflow-y-auto">
+              <button v-for="person in filteredCalendarPeople" :key="person.id" :data-testid="`schedule-person-option-${person.id}`" type="button" :disabled="addedPeople.includes(person.id)" class="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left hover:bg-[#f6f8fb] disabled:opacity-40" @click="addPerson(person.id)"><span class="grid h-7 w-7 place-items-center rounded-full text-[10px] font-semibold" :class="person.tone">{{ person.name.slice(-1) }}</span><span class="min-w-0"><strong class="block text-xs text-[#343941]">{{ person.name }}</strong><small class="text-[10px] text-[#999fa8]">{{ person.department }}</small></span></button>
+              <p v-if="!filteredCalendarPeople.length" data-testid="schedule-person-empty" class="px-2 py-4 text-center text-xs text-[#969ca5]">未找到可查看的同事</p>
+            </div>
           </div>
         </div>
         <div class="mt-3">
@@ -400,7 +419,7 @@ function toggleScheduleDraft(schedule: ScheduleItem) {
         <div v-if="loading" class="grid flex-1 place-items-center text-xs text-[#8b909a]">正在读取钉钉日程…</div>
         <div v-else-if="error" class="grid flex-1 place-items-center text-center"><div><CalendarDays class="mx-auto h-6 w-6 text-[#b6bac2]" /><p class="mt-2 text-xs text-[#8b909a]">钉钉日程暂时不可用</p></div></div>
         <div v-else data-testid="schedule-board-lane" data-max-visible="4" class="min-h-0 flex-1 px-5 pb-5 pt-4">
-          <div data-testid="schedule-board-viewport" :data-layout-mode="scheduleOverflowMode ? 'overflow' : 'adaptive'" class="elegant-scrollbar schedule-board-container h-full min-h-0 overflow-auto rounded-xl border border-[#dfe4ea] bg-[#fafbfc]">
+          <div ref="scheduleBoardViewport" data-testid="schedule-board-viewport" :data-layout-mode="scheduleOverflowMode ? 'overflow' : 'adaptive'" class="elegant-scrollbar schedule-board-container h-full min-h-0 overflow-auto rounded-xl border border-[#dfe4ea] bg-[#fafbfc]">
             <div v-if="selectedSchedules.length" data-testid="schedule-board-track" class="schedule-board-track schedule-board-track--single-row min-h-full" :class="scheduleOverflowMode ? 'schedule-board-track--overflow' : 'schedule-board-track--adaptive'" :style="{ '--board-count': scheduleBoards.length, '--column-min-width': `${scheduleColumnMinWidth}px`, '--track-min-width': `${68 + scheduleBoards.length * scheduleColumnMinWidth}px` }">
               <aside data-testid="schedule-time-axis" class="schedule-time-axis sticky left-0 z-30 flex min-w-0 flex-col border-r border-[#e3e7ec] bg-[#f7f8fa]">
                 <div class="sticky top-0 z-20 grid h-14 shrink-0 place-items-center border-b border-[#e3e7ec] bg-[#f2f4f7] text-[9px] font-semibold tracking-[0.12em] text-[#9aa0a9]">时间</div>
