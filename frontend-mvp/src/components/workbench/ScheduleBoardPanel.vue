@@ -190,8 +190,11 @@ function changeMonth(offset: number) {
 }
 
 function selectDay(date: Date) {
-  selectedDate.value = toDateKey(date)
+  const nextDate = toDateKey(date)
+  const changed = nextDate !== selectedDate.value
+  selectedDate.value = nextDate
   visibleMonth.value = new Date(date.getFullYear(), date.getMonth(), 1)
+  if (changed) emit('refresh')
 }
 
 function changeSelectedDay(offset: number) {
@@ -201,7 +204,10 @@ function changeSelectedDay(offset: number) {
 }
 
 function addPerson(id: string) {
-  if (!addedPeople.value.includes(id)) addedPeople.value = [...addedPeople.value, id]
+  if (!addedPeople.value.includes(id)) {
+    addedPeople.value = [...addedPeople.value, id]
+    emit('refresh')
+  }
   addPeopleOpen.value = false
 }
 
@@ -386,7 +392,7 @@ function toggleScheduleDraft(schedule: ScheduleItem) {
           </div>
           <div class="flex items-center gap-2">
             <button v-if="canManagePermissions" data-testid="schedule-system-config" type="button" class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#dfe4ea] bg-white px-3 text-xs font-medium text-[#56606d] hover:border-[#b9cff0] hover:text-[#1769e0]" @click="permissionDialogOpen = true"><Settings2 class="h-4 w-4" />系统配置</button>
-            <button data-testid="schedule-refresh" type="button" :disabled="refreshing" aria-label="刷新日程看板" class="grid h-9 w-9 place-items-center rounded-lg border border-[#dfe4ea] text-[#68707b] hover:bg-[#f6f7f9]" @click="emit('refresh')"><RefreshCw class="h-4 w-4" :class="refreshing ? 'animate-spin' : ''" /></button>
+            <button data-testid="schedule-refresh" type="button" :disabled="refreshing" aria-label="刷新日程看板" title="跳过15分钟缓存，仅刷新当前选中日及已展示人员" class="grid h-9 w-9 place-items-center rounded-lg border border-[#dfe4ea] text-[#68707b] hover:bg-[#f6f7f9]" @click="emit('refresh')"><RefreshCw class="h-4 w-4" :class="refreshing ? 'animate-spin' : ''" /></button>
             <label class="relative w-[220px] max-w-[38vw]"><Search class="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#9ba1aa]" /><input v-model="scheduleQuery" aria-label="搜索日程看板" class="h-9 w-full rounded-lg border border-[#dfe4ea] bg-[#f8f9fa] pl-8 pr-8 text-xs outline-none focus:border-[#8fb5f3] focus:bg-white" placeholder="搜索日程" /><button v-if="scheduleQuery" data-testid="clear-schedule-search" type="button" aria-label="清空日程搜索" class="absolute right-2 top-1/2 -translate-y-1/2 text-[#9aa0aa]" @click="scheduleQuery = ''"><X class="h-3.5 w-3.5" /></button></label>
           </div>
         </header>

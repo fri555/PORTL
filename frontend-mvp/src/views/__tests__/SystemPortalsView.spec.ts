@@ -77,13 +77,9 @@ describe('SystemPortalsView', () => {
 
     await wrapper.get('[data-testid="schedule-permission-user-chen-le"]').get('button').trigger('click')
     expect(wrapper.get('[data-testid="schedule-permission-dialog"]').text()).toContain('陈乐 · 可见范围')
-    expect(wrapper.get('[aria-label="修改刘洋的角色权限"]').text()).toContain('可查看')
-    await wrapper.get('[aria-label="修改刘洋的角色权限"]').setValue('manage')
-    expect((wrapper.get('[aria-label="修改刘洋的角色权限"]').element as HTMLSelectElement).value).toBe('manage')
-    expect(wrapper.get('[data-testid="schedule-permission-scope-help"]').text()).toContain('不代表可以修改他人日程')
-    expect(wrapper.get('[data-testid="schedule-permission-save"]').attributes('disabled')).toBeUndefined()
-    await wrapper.get('[data-testid="schedule-permission-save"]').trigger('click')
-    expect(wrapper.get('[data-testid="schedule-permission-save-feedback"]').text()).toContain('已保存')
+    expect(wrapper.find('[aria-label="修改刘洋的角色权限"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="schedule-permission-scope-help"]').text()).toContain('所有配置均为可查看权限')
+    expect(wrapper.get('[data-testid="schedule-permission-save"]').attributes('disabled')).toBe('')
 
     await wrapper.get('[data-testid="schedule-permission-add-scope"]').trigger('click')
     const dialog = wrapper.get('[data-testid="schedule-permission-dialog"]')
@@ -97,6 +93,9 @@ describe('SystemPortalsView', () => {
     await wrapper.get('[data-testid="schedule-permission-confirm-scope"]').trigger('click')
 
     expect(wrapper.get('[data-testid="schedule-permission-dialog"]').text()).toContain('林夏')
+    expect(wrapper.get('[data-testid="schedule-permission-save"]').attributes('disabled')).toBeUndefined()
+    await wrapper.get('[data-testid="schedule-permission-save"]').trigger('click')
+    expect(wrapper.get('[data-testid="schedule-permission-save-feedback"]').text()).toContain('已保存')
   })
 
   it('only exposes schedule permission configuration to administrators', async () => {
