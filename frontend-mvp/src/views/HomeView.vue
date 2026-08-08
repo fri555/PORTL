@@ -111,6 +111,7 @@ type AttachmentNode = {
   meta?: string
 }
 const store = useAppStore()
+const figmaAssetBase = `${import.meta.env.BASE_URL}assets/figma`
 const route = useRoute()
 
 const query = ref('')
@@ -173,7 +174,7 @@ const isProgrammaticScroll = ref(false)
 const userScrollIntent = ref(false)
 let generationToken = 0
 const generationDelayFactor = import.meta.env.MODE === 'test' ? 0.001 : 1
-const ponyAvatarUrl = `${import.meta.env.BASE_URL}assets/pony-avatar.png`
+const ponyAvatarUrl = `${import.meta.env.BASE_URL}assets/figma/pony.png`
 const expertAvatarUrls = {
   solution: `${import.meta.env.BASE_URL}assets/expert-solution.png`,
   analysis: `${import.meta.env.BASE_URL}assets/expert-analysis.png`,
@@ -595,25 +596,22 @@ const generatedArtifactCards: GeneratedArtifact[] = [
 // 日常办公模式「快捷指令区」（PRD P0-4）：生成钉钉待办 / 生成需求草稿 / 封装成技能（提示词预填）
 const quickInstructionCases: CaseItem[] = [
   {
-    title: '生成钉钉待办',
-    icon: CheckCircle2,
-    desc: '把任务一键沉淀为钉钉待办清单',
-    prompt: '帮我把以下任务生成钉钉待办清单，每项标注负责人和截止时间：',
-    kb: '钉钉待办规则',
+    title: '查知识库',
+    icon: Database,
+    desc: '查制度、流程、产品资料',
+    prompt: '请帮我从知识库查询：',
   },
   {
-    title: '生成需求草稿',
+    title: '客诉分析报告',
     icon: FileText,
-    desc: '按模板快速产出结构化需求',
-    prompt: '帮我写一份需求草稿，包含背景、目标、范围、关键流程和验收标准。',
-    kb: '需求模板库',
+    desc: '把材料整理成结构化内容',
+    prompt: '请帮我将以下客诉材料整理成分析报告：',
   },
   {
-    title: '封装成技能',
-    icon: Sparkles,
-    desc: '把重复流程沉淀为可复用技能',
-    prompt: '把这段工作流程封装成一个可复用的技能，说明触发条件、输入和产出。',
-    kb: '技能模板库',
+    title: '建待办',
+    icon: History,
+    desc: '生成钉钉待办草稿',
+    prompt: '请帮我创建一个项目跟进待办：',
   },
 ]
 
@@ -1586,11 +1584,14 @@ onBeforeUnmount(() => {
     </div>
     <div class="relative mx-auto min-h-[calc(100vh-3.5rem)] w-full max-w-[1800px] md:min-h-[calc(100vh-4rem)]">
       <aside
-        class="fixed inset-y-0 left-0 z-50 flex w-[270px] flex-col border-r border-[#eaeaea] bg-white transition-transform duration-300 lg:top-16 lg:h-[calc(100vh-4rem)]"
+        class="fixed inset-y-0 left-0 z-50 flex w-[270px] flex-col border-r border-[#eaeaea] bg-white transition-transform duration-300 lg:top-14 lg:h-[calc(100vh-3.5rem)]"
         :class="showHistory ? 'translate-x-0' : '-translate-x-full'"
       >
-        <div data-testid="home-sidebar-subheader" class="flex items-center justify-between gap-2 border-b border-zinc-100 px-3 py-3">
-          <div class="group/title min-w-0 flex-1">
+        <div data-testid="home-sidebar-subheader" class="flex h-12 items-center gap-0.5 px-4 pt-1">
+          <button type="button" class="grid h-8 w-8 place-items-center rounded-lg text-[#111] hover:bg-[#f7f7f9]" aria-label="搜索历史会话" @click="openHistoryBrowser">
+            <Search class="h-4 w-4" />
+          </button>
+          <div class="hidden group/title min-w-0 flex-1">
             <div v-if="editingSidebarTitle" class="flex items-center gap-1">
               <input
                 v-model="sidebarTitleDraft"
@@ -1612,26 +1613,26 @@ onBeforeUnmount(() => {
           <button
             type="button"
             data-testid="home-sidebar-toggle"
-            class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-500 hover:bg-zinc-50"
+            class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#111] hover:bg-[#f7f7f9]"
             aria-label="收起历史对话栏"
             @click="showHistory = false"
           >
             <ChevronLeft class="h-4 w-4" />
           </button>
         </div>
-        <div class="space-y-3 border-b border-zinc-100 p-3">
+        <div class="px-3 pt-3">
           <div class="grid gap-1">
-            <button type="button" class="flex min-h-[38px] items-center gap-2 rounded-lg px-2.5 text-left text-xs font-medium text-zinc-600 transition hover:bg-zinc-50 hover:text-zinc-900" @click="newTask">
+            <button type="button" class="flex h-9 items-center justify-center gap-2 rounded-lg bg-[#111] px-3 text-sm font-medium text-white transition hover:bg-[#333]" @click="newTask">
               <Plus class="h-3.5 w-3.5" />
-              <span class="min-w-0 flex-1">新对话</span>
+              <span>新对话</span>
             </button>
-            <button type="button" class="flex min-h-[38px] items-center gap-2 rounded-lg px-2.5 text-left text-xs font-medium text-zinc-600 transition hover:bg-zinc-50 hover:text-zinc-900" @click="openHistoryBrowser">
+            <button type="button" class="hidden min-h-[38px] items-center gap-2 rounded-lg px-2.5 text-left text-xs font-medium text-zinc-600 transition hover:bg-zinc-50 hover:text-zinc-900" @click="openHistoryBrowser">
               <History class="h-3.5 w-3.5" />
               <span class="min-w-0 flex-1">历史会话</span>
             </button>
           </div>
         </div>
-        <div class="border-b border-zinc-100 px-3 py-2">
+        <div class="hidden border-b border-zinc-100 px-3 py-2">
           <label class="flex h-8 items-center gap-2 rounded-lg bg-zinc-50 px-2.5 text-xs text-zinc-400 ring-1 ring-zinc-200/0 focus-within:ring-blue-300">
             <Search class="h-3.5 w-3.5 shrink-0" />
             <input v-model="conversationSearch" class="min-w-0 flex-1 bg-transparent outline-none placeholder:text-zinc-300" placeholder="搜索会话..." />
@@ -1640,7 +1641,7 @@ onBeforeUnmount(() => {
             </button>
           </label>
         </div>
-        <div class="flex-1 overflow-y-auto p-2">
+        <div class="hidden flex-1 overflow-y-auto p-2">
           <div v-for="group in sidebarConversationGroups" :key="group.key" class="mb-4">
             <button type="button" class="mb-1 flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-[11px] font-medium text-zinc-400 transition hover:bg-zinc-50 hover:text-zinc-700" :aria-expanded="!isSidebarGroupCollapsed(group.key)" @click="toggleSidebarGroup(group.key)">
               <span class="inline-flex min-w-0 items-center gap-1.5">
@@ -1709,6 +1710,11 @@ onBeforeUnmount(() => {
             </template>
           </div>
         </div>
+        <div class="flex flex-1 flex-col items-center justify-center pb-24 text-center">
+          <img :src="`${figmaAssetBase}/chat-empty.png`" alt="" class="h-20 w-20 object-contain" />
+          <p class="mt-1 text-sm font-medium leading-[22px] text-[#111]">暂无对话内容</p>
+          <p class="text-xs leading-5 text-[#999]">快来与我进行对话吧～</p>
+        </div>
       </aside>
 
       <main class="flex min-h-[calc(100vh-3.5rem)] flex-col px-[clamp(12px,2.2vw,34px)] py-[clamp(10px,1.4vw,18px)] md:min-h-[calc(100vh-4rem)]">
@@ -1716,15 +1722,15 @@ onBeforeUnmount(() => {
         <section
           v-if="!isChatActive && !showHistoryBrowser"
           data-testid="home-hero-section"
-          class="mx-auto flex flex-1 flex-col items-center justify-start pb-[clamp(18px,3vw,36px)] pt-[clamp(72px,12vh,134px)] transition-[width,transform] duration-300"
+          class="mx-auto flex flex-1 flex-col items-center justify-start pb-9 pt-[210px] transition-[width,transform] duration-300"
           :style="homeHeroStyle"
         >
-          <div class="mb-6 text-center">
-            <img :src="ponyAvatarUrl" alt="小马头像" class="mx-auto mb-4 h-[clamp(78px,5.6vw,104px)] w-[clamp(78px,5.6vw,104px)] object-contain drop-shadow-[0_14px_24px_rgba(15,23,42,0.1)]" />
-            <h1 class="text-[clamp(22px,1.5vw,26px)] font-semibold leading-tight tracking-normal text-zinc-950">小马在线，有事随时说</h1>
+          <div class="relative mb-8 flex h-20 items-center justify-center text-center">
+            <h1 class="text-[30px] font-semibold leading-[42px] text-[#111]">小马在线，有事随时说！</h1>
+            <img :src="ponyAvatarUrl" alt="小马头像" class="ml-5 h-20 w-20 object-contain" />
           </div>
 
-          <div data-testid="hero-composer" class="composer-shell mx-auto min-h-[112px] w-full max-w-[800px] rounded-[24px] border border-[#e5e5e5] bg-white p-4 shadow-[0_24px_20px_-28px_rgba(0,0,0,0.16)]" @pointermove="updateComposerGlow" @pointerleave="resetComposerGlow">
+          <div data-testid="hero-composer" class="composer-shell mx-auto h-[150px] w-full max-w-[840px] rounded-2xl border border-[#e5e5e5] bg-white p-3 shadow-[0_24px_20px_-24px_rgba(0,0,0,0.16)]" @pointermove="updateComposerGlow" @pointerleave="resetComposerGlow">
             <div class="flex items-start gap-2 px-2">
               <div v-if="runMode === 'task' && selectedExpert" class="mt-2 inline-flex max-w-[180px] shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-medium" :style="{ borderColor: (selectedExpert.accent || '#0a0a0a') + '40', backgroundColor: (selectedExpert.accent || '#0a0a0a') + '12', color: selectedExpert.accent || '#0a0a0a' }">
                 <Sparkles class="h-3.5 w-3.5 shrink-0" />
@@ -1737,7 +1743,7 @@ onBeforeUnmount(() => {
                 ref="composer"
                 v-model="query"
                 rows="1"
-                class="max-h-[168px] min-h-10 flex-1 resize-none bg-transparent py-2 text-base leading-7 outline-none placeholder:text-zinc-400"
+                class="max-h-[76px] min-h-[76px] flex-1 resize-none bg-transparent px-0 py-0 text-sm leading-[26px] outline-none placeholder:text-[#bebebe]"
                 :placeholder="placeholder"
                 :disabled="isThinking"
                 @input="resizeComposer"
@@ -1763,10 +1769,10 @@ onBeforeUnmount(() => {
 
 
 
-            <div class="flex flex-wrap items-center gap-2 border-t border-transparent px-2 pt-3">
+            <div class="flex flex-wrap items-center gap-5 border-t border-transparent px-0 pt-3">
               <div class="relative">
                 <button
-                  class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
+                  class="inline-flex h-8 w-8 items-center justify-center rounded-lg border-0 bg-[#f7f7f9] text-[#111] hover:bg-[#eeeef1]"
                   aria-label="添加附件"
                   @mouseenter="showUploadTip = true"
                   @mouseleave="showUploadTip = false"
@@ -1782,14 +1788,14 @@ onBeforeUnmount(() => {
                 </div>
               </div>
               <button
-                class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium"
+                class="order-3 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium"
                 :class="webSearchEnabled ? 'border-blue-100 bg-[#f1f7ff] text-blue-600' : 'border-zinc-200 bg-zinc-50 text-zinc-400'"
                 @click="webSearchEnabled = !webSearchEnabled"
               >
                 <Globe2 class="h-3.5 w-3.5" />
-                联网
+                联网查询
               </button>
-              <div class="relative">
+              <div class="relative order-2">
                 <button
                   type="button"
                   class="inline-flex h-8 items-center gap-1.5 px-2 text-xs font-medium transition"
@@ -1857,7 +1863,7 @@ onBeforeUnmount(() => {
           </div>
 
           <Transition name="recommend">
-            <div v-if="showRecommendations" data-testid="home-case-section" class="mt-5 w-full">
+            <div v-if="showRecommendations" data-testid="home-case-section" class="mt-[22px] w-full">
               <div v-if="runMode === 'task' && !selectedExpert" class="mx-auto w-full max-w-[920px]">
                 <div class="grid grid-cols-3 gap-3">
                   <button
@@ -1939,23 +1945,21 @@ onBeforeUnmount(() => {
 
               <div
                 v-else
-                class="mx-auto w-full max-w-[920px]"
+                class="mx-auto w-full max-w-[762px]"
               >
                 <div class="grid grid-cols-3 gap-3">
                   <button
                     v-for="(item, i) in quickInstructionCases"
                     :key="item.title"
                     type="button"
-                    class="group flex min-h-[96px] items-center rounded-2xl border border-zinc-200 bg-white p-4 text-left transition hover:border-zinc-300 hover:bg-zinc-50"
+                    class="group flex h-[74px] items-center rounded-xl border border-[#f2f2f2] bg-white p-4 text-left shadow-[0_18px_18px_-25px_rgba(0,0,0,0.16)] transition hover:border-[#d8d8d8]"
                     @click="fillPrompt(item, runMode); showRecommendations = true"
                   >
                     <div class="flex w-full items-center gap-3">
-                      <div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl" :class="i % 3 === 0 ? 'bg-[#ff5530]/10 text-[#ff5530]' : i % 3 === 1 ? 'bg-[#ea5ec1]/10 text-[#ea5ec1]' : 'bg-[#1456f0]/10 text-[#1456f0]'">
-                        <component :is="'icon' in item ? item.icon : FileText" class="h-5 w-5" />
-                      </div>
+                      <img :src="`${figmaAssetBase}/quick-${i === 0 ? 'knowledge' : i === 1 ? 'report' : 'calendar'}.png`" alt="" class="h-10 w-10 shrink-0 object-contain" />
                       <div class="min-w-0">
-                        <div class="truncate font-semibold text-sm text-zinc-950">{{ item.title }}</div>
-                        <div class="mt-1 line-clamp-2 text-xs leading-5 text-zinc-500">{{ item.desc }}</div>
+                        <div class="truncate text-sm font-medium leading-[22px] text-[#111]">{{ item.title }}</div>
+                        <div class="line-clamp-1 text-xs leading-5 text-[#999]">{{ item.desc }}</div>
                         <div v-if="item.kb" class="mt-1 text-[11px] text-blue-500">引用 {{ item.kb }}</div>
                       </div>
                     </div>

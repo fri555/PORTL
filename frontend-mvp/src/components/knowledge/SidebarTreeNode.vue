@@ -20,12 +20,14 @@ interface Props {
   depth: number
   expandedIds: string[]
   selectedKbId: string | null
-  hoveredNodeId: string
   userRole?: string
+  activeSpace?: 'public' | 'personal'
   getKbVisibility?: (kbId: string) => 'public' | 'dept' | 'personal' | 'custom' | null
   getKbDocCount?: (kbId: string) => number
 }
 const props = withDefaults(defineProps<Props>(), { depth: 0 })
+
+const isHovered = ref(false)
 
 interface Emits {
   (e: 'toggle', node: TreeNode): void
@@ -54,9 +56,9 @@ const isBuiltIn = computed(() => isKB.value && props.node.isBuiltIn)
 const indentPx = computed(() => props.depth * 16 + 4)
 
 // 权限派生
-const canEdit = computed(() => ['EDITOR', 'MANAGER', 'OWNER'].includes(props.userRole || ''))
-const canManage = computed(() => ['MANAGER', 'OWNER'].includes(props.userRole || ''))
-const canDelete = computed(() => ['MANAGER', 'OWNER'].includes(props.userRole || ''))
+const canEdit = computed(() => props.userRole === 'admin')
+const canManage = computed(() => props.userRole === 'admin')
+const canDelete = computed(() => props.userRole === 'admin' && !isBuiltIn.value)
 
 const docCount = computed(() => {
   if (isKB.value && props.getKbDocCount && props.node.kbId) {
@@ -120,8 +122,8 @@ function onAction(action: string) {
       class="group relative flex items-center rounded-md transition-colors"
       :class="[isSelected ? 'bg-blue-50 text-blue-700' : 'hover:bg-[#f7f8fa]']"
       :style="{ paddingLeft: `${indentPx}px` }"
-      @mouseenter="emit('update:hovered', node.id)"
-      @mouseleave="emit('update:hovered', '')"
+      @mouseenter="isHovered = true"
+      @mouseleave="isHovered = false"
       @contextmenu.prevent="emit('context-menu', $event, node.id)"
     >
       <button
@@ -162,71 +164,23 @@ function onAction(action: string) {
         <span v-if="docCount > 0" class="shrink-0 text-[10px] text-zinc-400">({{ docCount }})</span>
       </button>
 
-      <!-- hover 操作信息区：角色标签 + 操作按钮 — 按角色控制显隐 -->
+      <!-- hover 操作信息区：角色标签 + ⋮ 圆形菜单 -->
       <div
-        v-if="hoveredNodeId === node.id"
-        class="absolute right-1 top-1/2 z-10 hidden -translate-y-1/2 items-center gap-0.5 rounded-lg bg-white pl-1.5 shadow-sm group-hover:flex"
+        v-if="isHovered"
+        class="absolute right-1 top-1/2 z-10 hidden -translate-y-1/2 items-center gap-0.5 rounded-full bg-white pl-2 pr-0.5 shadow-sm group-hover:flex"
         :class="isSelected ? 'bg-blue-50' : ''"
         @click.stop
       >
-        <!-- 角色标签（第一个显示，不带背景色区隔） -->
+        <!-- 角色标签 -->
         <span
           v-if="userRole"
-          class="shrink-0 rounded px-1 py-0.5 text-[9px] font-medium"
+          class="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-medium"
           :class="canEdit ? 'text-[#1456f0] bg-blue-50' : 'text-zinc-500 bg-zinc-50'"
-        >{{ userRole === 'OWNER' ? '完全管理' : userRole === 'MANAGER' ? '可管理' : userRole === 'EDITOR' ? '可编辑' : '可查看' }}</span>
+        >{{ canEdit ? '可管理' : '可查看' }}</span>
 
-        <!-- 预览（所有人都可以） -->
+        <!-- ⋮ 按钮（圆形）所有人可操作 -->
         <button
-          v-if="isFile"
-          class="inline-flex h-6 w-6 items-center justify-center rounded text-zinc-400 hover:text-[#1456f0] hover:bg-blue-50"
-          title="预览"
-          @click="emit('preview', node)"
-        >
-          <Eye class="h-3.5 w-3.5" />
-        </button>
-
-        <!-- 可编辑操作（EDITOR/MANAGER/OWNER） -->
-        <template v-if="canEdit">
-          <button
-            v-if="isKB"
-            class="inline-flex h-6 w-6 items-center justify-center rounded text-zinc-400 hover:text-[#1456f0] hover:bg-blue-50"
-            title="权限配置"
-            @click="emit('settings', node)"
-          >
-            <Settings class="h-3.5 w-3.5" />
-          </button>
-          <button
-            v-if="isKB"
-            class="inline-flex h-6 w-6 items-center justify-center rounded text-zinc-400 hover:text-[#1456f0] hover:bg-blue-50"
-            title="新建文件夹"
-            @click="emit('create-folder', node.id ?? '')"
-          >
-            <Folder class="h-3.5 w-3.5" />
-          </button>
-          <button
-            v-if="isFolder && !isKB"
-            class="inline-flex h-6 w-6 items-center justify-center rounded text-zinc-400 hover:text-[#1456f0] hover:bg-blue-50"
-            title="权限配置"
-            @click="emit('settings', node)"
-          >
-            <Settings class="h-3.5 w-3.5" />
-          </button>
-        </template>
-
-        <!-- 可删除（MANAGER/OWNER） -->
-        <button
-          v-if="isFile && canDelete"
-          class="inline-flex h-6 w-6 items-center justify-center rounded text-zinc-400 hover:text-red-500 hover:bg-red-50"
-          title="删除"
-          @click="emit('delete', node)"
-        >
-          <Trash2 class="h-3.5 w-3.5" />
-        </button>
-
-        <!-- ⋮ 菜单（所有人都可以） -->
-        <button
-          class="inline-flex h-6 w-6 items-center justify-center rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100"
+          class="inline-flex h-6 w-6 items-center justify-center rounded-full text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100"
           title="更多操作"
           @click="onMenuOpen"
         >
@@ -243,7 +197,6 @@ function onAction(action: string) {
         :depth="depth + 1"
         :expanded-ids="expandedIds"
         :selected-kb-id="selectedKbId"
-        :hovered-node-id="hoveredNodeId"
         :user-role="userRole"
         :get-kb-visibility="getKbVisibility"
         :get-kb-doc-count="getKbDocCount"
@@ -269,21 +222,18 @@ function onAction(action: string) {
         >
           <div class="px-3 py-2 text-xs font-semibold text-zinc-400">{{ node.label }}</div>
           <template v-if="isKB">
-            <button class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="onAction('select')"><BookOpen class="h-4 w-4 text-[#ff5530]" />打开</button>
-            <button v-if="canEdit" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="onAction('create-folder')"><Folder class="h-4 w-4" />新建文件夹</button>
-            <button v-if="canEdit" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="onAction('settings')"><Settings class="h-4 w-4 text-[#1456f0]" />权限配置</button>
-            <button v-if="canDelete && !isBuiltIn" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="onAction('delete')"><Trash2 class="h-4 w-4" />删除</button>
+            <button v-if="canEdit" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-50" @click="onAction('create-folder')"><Folder class="h-3.5 w-3.5" />新建文件夹</button>
+            <button v-if="canEdit" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-50" @click="onAction('rename')"><Pencil class="h-3.5 w-3.5" />重命名</button>
+            <button v-if="canDelete && !isBuiltIn" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50" @click="onAction('delete')"><Trash2 class="h-3.5 w-3.5" />删除</button>
+            <button v-if="canEdit && activeSpace === 'public'" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-50" @click="onAction('settings')"><Settings class="h-3.5 w-3.5 text-[#1456f0]" />设置</button>
           </template>
           <template v-else-if="isFolder">
-            <button class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="onAction('select')"><Folder class="h-4 w-4" />打开</button>
-            <button v-if="canEdit && node.kbId" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="onAction('create-folder')"><Folder class="h-4 w-4" />新建文件夹</button>
-            <button v-if="canEdit" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="onAction('settings')"><Settings class="h-4 w-4 text-[#1456f0]" />权限配置</button>
-            <button v-if="canEdit" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="onAction('rename')"><BookOpen class="h-4 w-4" />重命名</button>
-            <button v-if="canDelete" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="onAction('delete')"><Trash2 class="h-4 w-4" />删除</button>
+            <button v-if="canEdit" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-50" @click="onAction('rename')"><Pencil class="h-3.5 w-3.5" />重命名</button>
+            <button v-if="canDelete" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50" @click="onAction('delete')"><Trash2 class="h-3.5 w-3.5" />删除</button>
           </template>
           <template v-else>
-            <button class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="onAction('preview')"><Eye class="h-4 w-4" />预览</button>
-            <button v-if="canDelete" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="onAction('delete')"><Trash2 class="h-4 w-4" />删除</button>
+            <button class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-50" @click="onAction('preview')"><Eye class="h-3.5 w-3.5" />预览</button>
+            <button v-if="canDelete" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50" @click="onAction('delete')"><Trash2 class="h-3.5 w-3.5" />删除</button>
           </template>
         </div>
       </div>

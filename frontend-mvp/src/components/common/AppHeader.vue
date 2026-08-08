@@ -6,11 +6,13 @@ import {
   BookOpen,
   Brain,
   BriefcaseBusiness,
+  CircleHelp,
   ChevronDown,
   ChevronRight,
   LogOut,
   MessageSquareText,
   RefreshCw,
+  Settings,
   User,
   Plus,
   X,
@@ -32,6 +34,7 @@ import {
 
 const store = useAppStore()
 const router = useRouter()
+const figmaAssetBase = `${import.meta.env.BASE_URL}assets/figma`
 const memoryEnabled = ref(true)
 const showProfileModal = ref(false)
 const profileName = ref('')
@@ -40,15 +43,18 @@ const profileUploadError = ref('')
 const profileFileInput = ref<HTMLInputElement | null>(null)
 
 const navItems = [
-  { label: '知识中心', to: '/knowledge' },
+  { label: '天马智擎', to: '/' },
   { label: '工作台', to: '/portals' },
-  { label: 'AI 治理', to: '/admin/governance' },
+  { label: '仪表盘', to: '/dashboards' },
+  { label: '知识中心', to: '/knowledge' },
+  { label: '设置', to: '/settings' },
 ]
 
 const mobileNavItems = [
   { label: '工作区', to: '/', icon: MessageSquareText },
+  { label: '仪表盘', to: '/dashboards', icon: BriefcaseBusiness },
   { label: '知识中心', to: '/knowledge', icon: BookOpen },
-  { label: '工作台', to: '/portals', icon: BriefcaseBusiness },
+  { label: '设置', to: '/settings', icon: Settings },
 ]
 
 function logout() {
@@ -110,52 +116,53 @@ function saveProfile() {
 </script>
 
 <template>
-  <header class="sticky top-0 z-40 border-b border-zinc-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85">
-    <div class="flex h-14 w-full items-center gap-[clamp(8px,1vw,14px)] px-[clamp(6px,0.8vw,12px)] md:h-16">
+  <header class="sticky top-0 z-40 border-b border-[#eaeaea] bg-white">
+    <div class="flex h-14 w-full items-center px-6">
       <div class="flex shrink-0 items-center gap-3">
         <RouterLink
           :to="{ name: 'home' }"
           data-testid="header-brand-anchor"
-          class="flex shrink-0 items-center gap-2 no-underline"
+          class="flex shrink-0 items-center no-underline"
           aria-label="回到天马智擎首页"
           @click="handleBrandClick"
         >
-          <span class="relative flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 bg-white shadow-sm">
-            <span class="absolute left-2 top-2 h-2 w-2 rounded-full bg-orange-500" />
-            <span class="absolute bottom-2 right-2 h-3.5 w-1.5 rounded-full bg-blue-600" />
-          </span>
-          <span class="text-base font-bold tracking-tight text-zinc-950 md:text-lg">天马智擎</span>
+          <img :src="`${figmaAssetBase}/tianma-logo.png`" alt="Tianma" class="h-4 w-[68px] object-contain" />
         </RouterLink>
       </div>
 
-      <nav class="hidden items-center gap-1 md:flex" aria-label="主导航">
+      <nav class="ml-12 hidden h-full items-center gap-10 md:flex" aria-label="主导航">
         <RouterLink
           v-for="item in navItems"
           :key="item.to"
           :to="item.to"
-          class="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-950"
-          active-class="bg-zinc-100 text-zinc-950"
+          class="relative flex h-full items-center px-0 text-base font-normal text-[#888] transition hover:text-[#111] after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:scale-x-0 after:bg-[#111] after:transition-transform"
+          exact-active-class="!font-medium !text-[#111] after:scale-x-100"
         >
           {{ item.label }}
         </RouterLink>
       </nav>
 
-      <div class="ml-auto flex shrink-0 items-center gap-2">
+      <div class="ml-auto flex shrink-0 items-center gap-4">
         <!-- Coins -->
         <div class="group relative">
           <button
             type="button"
-            class="flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
+            class="flex items-center gap-1.5 border-0 bg-transparent px-0 py-1 text-sm font-normal text-[#111] transition hover:opacity-70"
             aria-label="我的金币"
           >
-            <span class="h-3.5 w-3.5 rounded-full bg-amber-400 text-[9px] leading-3.5 text-white">¥</span>
-            776
+            <span class="grid h-5 w-5 place-items-center rounded-full bg-[#ffab24] text-[11px] text-white">★</span>
+            178
           </button>
           <div class="pointer-events-none absolute right-0 top-11 z-50 hidden w-60 rounded-xl border border-zinc-200 bg-white p-3 text-left shadow-xl group-hover:block">
             <div class="text-xs font-semibold text-zinc-900">金币使用说明</div>
             <p class="mt-1 text-[11px] leading-5 text-zinc-500">金币用于抵扣 AI 对话、知识库检索与方案生成的算力消耗。当前余额 776，可在「设置 - 账户」中充值或查看明细。</p>
           </div>
         </div>
+
+        <button type="button" class="grid h-8 w-8 place-items-center text-[#999] transition hover:text-[#111]" aria-label="帮助">
+          <CircleHelp class="h-4 w-4" />
+        </button>
+        <span class="h-5 w-px bg-[#e5e5e5]" />
 
         <DropdownMenu>
           <DropdownMenuTrigger as-child>
