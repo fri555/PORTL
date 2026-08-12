@@ -2,6 +2,8 @@ import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router
 import { useAppStore } from '@/stores/app'
 import HomeView from '@/views/HomeView.vue'
 
+const SettingsManagementView = () => import('@/views/SettingsManagementView.vue')
+
 const routes = [
   { path: '/auth/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { title: '登录' } },
   { path: '/', name: 'home', component: HomeView, meta: { title: 'AI 对话' } },
@@ -9,7 +11,11 @@ const routes = [
   { path: '/portals', name: 'portals', component: () => import('@/views/SystemPortalsView.vue'), meta: { title: '工作台' } },
   { path: '/dashboards', name: 'dashboards', component: () => import('@/views/DashboardView.vue'), meta: { title: '仪表盘' } },
   { path: '/knowledge', name: 'knowledge', component: () => import('@/views/KnowledgeBaseView.vue'), meta: { title: '知识中心' } },
-  { path: '/settings', name: 'settings', component: () => import('@/views/SettingsManagementView.vue'), meta: { title: '设置' } },
+  { path: '/settings', name: 'settings', redirect: '/settings/agents', meta: { title: '设置' } },
+  { path: '/settings/quota', name: 'settings-quota', redirect: '/settings/agents', meta: { title: '智能体管理' } },
+  { path: '/settings/models', name: 'settings-models', redirect: '/settings/agents', meta: { title: '智能体管理' } },
+  { path: '/settings/tools', name: 'settings-tools', redirect: '/settings/agents', meta: { title: '智能体管理' } },
+  { path: '/settings/agents', name: 'settings-agents', component: SettingsManagementView, meta: { title: '智能体管理' } },
   { path: '/admin/feedback', name: 'admin-feedback', component: () => import('@/views/FeedbackAdminView.vue'), meta: { title: '建议箱' } },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]

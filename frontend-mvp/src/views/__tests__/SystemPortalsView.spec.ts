@@ -39,6 +39,7 @@ describe('workbench routes', () => {
     expect(router.resolve('/portals').name).toBe('portals')
     expect(router.resolve('/dashboards').name).toBe('dashboards')
     expect(router.resolve('/settings').name).toBe('settings')
+    expect(router.resolve('/settings/agents').name).toBe('settings-agents')
   })
 })
 

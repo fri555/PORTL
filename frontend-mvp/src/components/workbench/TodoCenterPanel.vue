@@ -185,7 +185,7 @@ async function publishComment() {
       <div v-else-if="!displayItems.length" class="grid h-full min-h-[220px] place-items-center text-center"><div><ClipboardList class="mx-auto h-6 w-6 text-[#b2b7bf]" /><p class="mt-2 text-xs text-[#8b909a]">{{ query ? '未找到匹配待办' : dataMode ? '当前钉钉账号暂无待办或待审批' : '当前筛选暂无待办' }}</p><button v-if="query" data-testid="clear-todo-search" type="button" class="mt-2 text-xs font-medium text-[#1769e0]" @click="query = ''">清空搜索</button></div></div>
       <div v-else class="grid min-w-[1180px] grid-cols-4 gap-4">
         <section v-for="column in kanbanColumns" :key="column.id" :data-testid="`todo-kanban-${column.id}`" class="overflow-hidden rounded-xl border border-[#dfe3e8] bg-[#fafbfc]">
-          <header class="border-b border-[#e2e6eb] px-4 py-3" :class="column.tone">
+          <header class="min-h-[84px] border-b border-[#e2e6eb] px-4 py-3" :class="column.tone">
             <div class="flex items-center gap-2"><h3 class="text-sm font-semibold text-[#25282e]">{{ column.label }}</h3><span class="rounded-full bg-white px-2 py-0.5 text-[10px] text-[#707782] shadow-sm">{{ column.items.length }}</span></div>
             <div v-if="column.showProgress" :data-testid="`todo-progress-${column.id}`" class="mt-2.5">
               <div class="mb-1.5 flex items-center justify-between text-[10px]"><span class="text-[#737b87]">完成进度</span><strong class="font-semibold text-[#3d4652]">{{ column.completed }}/{{ column.items.length }}</strong></div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   Bot,
   Check,
@@ -20,6 +21,7 @@ import {
   Wrench,
   X,
 } from 'lucide-vue-next'
+import AgentSettingsView from '@/components/settings/AgentSettingsView.vue'
 
 type SettingDomain = 'quota' | 'model' | 'tool' | 'agent'
 type Status = 'active' | 'paused' | 'draft'
@@ -37,7 +39,30 @@ type SettingRecord = {
   tags: string[]
 }
 
-const activeDomain = ref<SettingDomain>('quota')
+const route = useRoute()
+const router = useRouter()
+
+const routeDomainMap: Record<string, SettingDomain> = {
+  quota: 'quota',
+  models: 'model',
+  tools: 'tool',
+  agents: 'agent',
+}
+
+const domainRouteMap: Record<SettingDomain, string> = {
+  quota: '/settings/quota',
+  model: '/settings/models',
+  tool: '/settings/tools',
+  agent: '/settings/agents',
+}
+
+function getDomainFromRoute() {
+  const segments = route.path.split('/').filter(Boolean)
+  const slug = segments[segments.length - 1] ?? ''
+  return routeDomainMap[slug] ?? 'quota'
+}
+
+const activeDomain = ref<SettingDomain>(getDomainFromRoute())
 const query = ref('')
 const statusFilter = ref<'all' | Status>('all')
 const viewMode = ref<'card' | 'list'>('card')
@@ -146,6 +171,29 @@ const summary = computed(() => ({
   draft: activeRecords.value.filter((item) => item.status === 'draft').length,
 }))
 const pageTitle = computed(() => formMode.value ? `${formMode.value === 'create' ? '新建' : '编辑'}${currentMeta.value.label.replace('管理', '')}` : currentMeta.value.label)
+const agentPublishSummary = computed(() => {
+  const agentRecords = records.agent
+  const activeAgents = agentRecords.filter((item) => item.status === 'active')
+  return [
+    { label: '已发布', value: `${activeAgents.length}/${agentRecords.length}`, detail: '仅启用中的智能体对员工可见' },
+    { label: '待审核', value: String(agentRecords.filter((item) => item.status === 'draft').length), detail: '草稿需补齐 Prompt、工具和知识引用' },
+    { label: '能力池', value: '6', detail: '工具、知识库和执行器统一授权' },
+  ]
+})
+
+watch(
+  () => route.path,
+  () => {
+    const nextDomain = getDomainFromRoute()
+    if (nextDomain !== activeDomain.value) {
+      activeDomain.value = nextDomain
+      query.value = ''
+      statusFilter.value = 'all'
+      menuId.value = ''
+      closeForm()
+    }
+  },
+)
 
 function notify(message: string) {
   toast.value = message
@@ -159,6 +207,9 @@ function switchDomain(domain: SettingDomain) {
   statusFilter.value = 'all'
   menuId.value = ''
   closeForm()
+  if (route.path !== domainRouteMap[domain]) {
+    router.push(domainRouteMap[domain])
+  }
 }
 
 function resetDraft() {
@@ -267,7 +318,8 @@ function statusClass(status: Status) {
 </script>
 
 <template>
-  <div class="min-h-[calc(100vh-3.5rem)] bg-[#f6f6f7] text-[#111]">
+  <AgentSettingsView v-if="activeDomain === 'agent'" />
+  <div v-else class="min-h-[calc(100vh-3.5rem)] bg-[#f6f6f7] text-[#111]">
     <div class="flex min-h-[calc(100vh-3.5rem)] w-full">
       <aside class="hidden w-[256px] shrink-0 border-r border-[#e5e5e7] bg-white px-3 py-5 lg:block">
         <div class="px-2">
@@ -281,6 +333,7 @@ function statusClass(status: Status) {
             type="button"
             class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition"
             :class="activeDomain === key ? 'bg-[#111] text-white' : 'text-zinc-600 hover:bg-[#f4f4f5] hover:text-zinc-950'"
+            :aria-current="activeDomain === key ? 'page' : undefined"
             @click="switchDomain(key as SettingDomain)"
           >
             <component :is="meta.icon" class="h-4 w-4" />
