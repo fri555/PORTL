@@ -1185,10 +1185,7 @@ function exportAudit() {
           <div>
             <span class="personal-breadcrumb">我的用量</span>
             <h1>个人消耗明细</h1>
-            <p>查看每次请求产生的 Token、费用与智能体消耗</p>
-            <p class="freshness-note">
-              数据更新：请求完成后实时初算，次日重算前一日 Token · 最近更新 2026-09-17 09:10
-            </p>
+            <p>查看每次请求产生的费用与智能体消耗</p>
           </div>
           <div class="personal-actions">
             <div role="tablist" aria-label="个人明细时间范围" class="segmented">
