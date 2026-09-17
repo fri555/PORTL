@@ -15,11 +15,10 @@ const chat = useChatController()
 
 const filterOpen = ref(false)
 
-const modeFilters: { value: 'all' | 'quick' | 'task' | 'schedule'; label: string }[] = [
+const modeFilters: { value: 'all' | 'quick' | 'task'; label: string }[] = [
   { value: 'all', label: '全部对话' },
   { value: 'quick', label: '日常办公' },
   { value: 'task', label: '专家模式' },
-  { value: 'schedule', label: '定时任务' },
 ]
 
 function statusBadge(convId: string, hasAssistant: boolean) {

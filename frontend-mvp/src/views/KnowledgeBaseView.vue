@@ -1,686 +1,576 @@
 <script setup lang="ts">
-/**
- * KnowledgeBaseView.vue — 知识中心主视图（编排器模式）
- *
- * 架构：composable 管理全部状态 + 内联关键模板 + 子组件处理独立功能
- * 相比旧版 3766 行单体组件，精简了约 80%（移除权限管理、审计日志、回收站等非MVP代码）
- */
-import { computed, ref, type ComponentPublicInstance } from 'vue'
-import {
-  AlertTriangle, ArrowUp, BookOpen, CheckCircle2, CheckSquare, ChevronLeft, ChevronsRight,
-  Copy, Database, Eye, File, FileSpreadsheet, FileText, Folder, LayoutGrid, List, MessageSquareText, MoreVertical,
-  Pencil, Quote, RotateCw, Plus, Search, Square, Trash2, Upload, X, Settings,
-} from 'lucide-vue-next'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
-import KbFileGridItem from '@/components/knowledge/KbFileGridItem.vue'
-import SidebarTreeNode from '@/components/knowledge/SidebarTreeNode.vue'
-import SearchDialog from '@/components/knowledge/SearchDialog.vue'
-import TaskCenterPanel from '@/components/knowledge/TaskCenterPanel.vue'
-import ThinkingChain from '@/components/workspace/ThinkingChain.vue'
-import { useKnowledgeBase } from '@/composables/useKnowledgeBase'
-import type { TreeNode, DocItem } from '@/types/knowledge'
+import { computed, ref } from 'vue'
+import { Bot, FileText, FolderPlus, PanelLeftOpen, Plus, Search, Upload, X } from 'lucide-vue-next'
+import KnowledgeDialogs from '@/components/knowledge/source-clone/KnowledgeDialogs.vue'
+import KnowledgeQaPanel from '@/components/knowledge/source-clone/KnowledgeQaPanel.vue'
+import KnowledgeSidebar from '@/components/knowledge/source-clone/KnowledgeSidebar.vue'
+import KnowledgeTable from '@/components/knowledge/source-clone/KnowledgeTable.vue'
+import { sourceKnowledgeBases } from '@/mock/knowledge-source'
+import type {
+  KnowledgeDialogKind,
+  KnowledgeSpace,
+  SourceKnowledgeBase,
+  SourceKnowledgeNavigation,
+  SourceKnowledgeNode,
+} from '@/types/knowledge-source'
 
-const kb = useKnowledgeBase()
-const searchOpen = ref(false)
-const kbRowMenuId = ref('')
-const fileRowMenuId = ref('')
+const items = ref<SourceKnowledgeBase[]>(sourceKnowledgeBases.map((item) => ({ ...item })))
+const activeSpace = ref<KnowledgeSpace>('public')
+const sidebarOpen = ref(false)
+const qaOpen = ref(false)
+const selected = ref<SourceKnowledgeBase | null>(null)
+const nodePath = ref<SourceKnowledgeNode[]>([])
+const previewNode = ref<SourceKnowledgeNode | null>(null)
+const dialog = ref<KnowledgeDialogKind>(null)
+const dialogTarget = ref<SourceKnowledgeBase | SourceKnowledgeNode | null>(null)
+const query = ref('')
 
-// ── QA 文本域引用 ──
-const qaTextarea = ref<ComponentPublicInstance | null>(null)
-
-function resizeQaTextarea() {
-  const el = qaTextarea.value?.$el ?? qaTextarea.value
-  if (!(el instanceof HTMLTextAreaElement)) return
-  el.style.height = 'auto'
-  el.style.height = Math.min(el.scrollHeight, 192) + 'px'
-}
-
-// ── 面包屑 ──
-const breadcrumbTrail = computed(() => {
-  const trail: { label: string; onClick?: () => void }[] = [{ label: kb.activeSpace.value === 'public' ? '公共空间' : '个人空间', onClick: () => kb.deselectKb() }]
-  if (kb.selectedKb.value) trail.push({ label: kb.selectedKb.value.name })
-  else if (kb.activeNode.value) trail.push({ label: kb.activeNode.value.label })
-  return trail
+const visibleItems = computed(() => {
+  const keyword = query.value.trim().toLowerCase()
+  const scoped = items.value.filter((item) => item.space === activeSpace.value)
+  return keyword ? scoped.filter((item) => item.name.toLowerCase().includes(keyword)) : scoped
 })
 
-function getFileIcon(f: string) {
-  if (f === 'XLSX' || f === 'XLS') return FileSpreadsheet
-  if (f === 'DOCX' || f === 'MD' || f === 'PDF' || f === 'PPTX') return FileText
-  return File
-}
-function getIconColor(f: string) {
-  if (f === 'XLSX' || f === 'XLS') return 'text-emerald-500 bg-emerald-50'
-  if (f === 'DOCX') return 'text-blue-500 bg-blue-50'
-  if (f === 'PDF') return 'text-red-500 bg-red-50'
-  if (f === 'MD') return 'text-violet-500 bg-violet-50'
-  if (f === 'PPTX') return 'text-orange-500 bg-orange-50'
-  return 'text-zinc-500 bg-zinc-50'
+const currentNodes = computed(() => {
+  if (!selected.value) return []
+  return nodePath.value.length
+    ? nodePath.value[nodePath.value.length - 1].children ?? []
+    : selected.value.nodes ?? []
+})
+
+const selectedTreeId = computed(() => nodePath.value.at(-1)?.id ?? selected.value?.id)
+const uploadDestinations = computed(() => items.value.flatMap((knowledgeBase) => {
+  const destinations = [{ id: knowledgeBase.id, name: knowledgeBase.name }]
+  function appendFolders(nodes: SourceKnowledgeNode[], prefix: string) {
+    for (const node of nodes) {
+      if (node.kind !== 'folder') continue
+      const name = `${prefix} / ${node.name}`
+      destinations.push({ id: node.id, name })
+      appendFolders(node.children ?? [], name)
+    }
+  }
+  appendFolders(knowledgeBase.nodes ?? [], knowledgeBase.name)
+  return destinations
+}))
+function openDialog(
+  kind: Exclude<KnowledgeDialogKind, null>,
+  target: SourceKnowledgeBase | SourceKnowledgeNode | null = null,
+) {
+  dialogTarget.value = target
+  dialog.value = kind
 }
 
-// ── 用户切换菜单 ──
+function closeDialog() {
+  dialog.value = null
+  dialogTarget.value = null
+}
+
+function openFolderDialog() {
+  openDialog('folder', nodePath.value.at(-1) ?? selected.value)
+}
+
+function openUploadDialog() {
+  openDialog('upload', nodePath.value.at(-1) ?? selected.value)
+}
+
+function selectItem(item: SourceKnowledgeBase | string) {
+  const next = typeof item === 'string' ? items.value.find((entry) => entry.id === item) : item
+  selected.value = next ?? null
+  nodePath.value = []
+  previewNode.value = null
+  if (window.matchMedia?.('(max-width: 640px)').matches) sidebarOpen.value = false
+}
+
+function handleAction(payload: {
+  kind: 'preview' | 'rename' | 'permission' | 'delete'
+  target: SourceKnowledgeBase | SourceKnowledgeNode
+}) {
+  if (payload.kind === 'preview' && 'kind' in payload.target) {
+    previewNode.value = payload.target
+    qaOpen.value = false
+    return
+  }
+  openDialog(payload.kind as 'rename' | 'permission' | 'delete', payload.target)
+}
+
+function findNodePath(nodes: SourceKnowledgeNode[], nodeId: string, path: SourceKnowledgeNode[] = []): SourceKnowledgeNode[] | null {
+  for (const node of nodes) {
+    const next = [...path, node]
+    if (node.id === nodeId) return next
+    const nested = node.children ? findNodePath(node.children, nodeId, next) : null
+    if (nested) return nested
+  }
+  return null
+}
+
+function navigateNode(node: SourceKnowledgeNode) {
+  if (!selected.value) return
+  if (node.kind === 'file') {
+    previewNode.value = node
+    qaOpen.value = false
+    return
+  }
+  nodePath.value = findNodePath(selected.value.nodes ?? [], node.id) ?? []
+  previewNode.value = null
+}
+
+function navigateSidebar(payload: SourceKnowledgeNavigation) {
+  const knowledgeBase = items.value.find((item) => item.id === payload.kbId)
+  if (!knowledgeBase) return
+  selected.value = knowledgeBase
+  nodePath.value = []
+  previewNode.value = null
+  if (payload.nodeId) {
+    const path = findNodePath(knowledgeBase.nodes ?? [], payload.nodeId) ?? []
+    const node = path.at(-1)
+    if (node?.kind === 'file') {
+      previewNode.value = node
+      qaOpen.value = false
+    }
+    else nodePath.value = path
+  }
+}
+
+function switchSpace(space: KnowledgeSpace) {
+  activeSpace.value = space
+  selected.value = null
+  nodePath.value = []
+  previewNode.value = null
+}
+
+function goRoot() {
+  selected.value = null
+  nodePath.value = []
+  previewNode.value = null
+}
+
+function goBreadcrumb(index: number) {
+  nodePath.value = nodePath.value.slice(0, index + 1)
+  previewNode.value = null
+}
+
+function createKnowledge(payload: { name: string; space: KnowledgeSpace }) {
+  items.value.unshift({
+    id: `local-${Date.now()}`,
+    name: payload.name,
+    owner: '当前用户',
+    createdAt: '刚刚',
+    space: payload.space,
+    nodes: [],
+  })
+  closeDialog()
+}
+
+function renameKnowledge(name: string) {
+  if (dialogTarget.value) {
+    dialogTarget.value.name = name
+  }
+  closeDialog()
+}
+
+function deleteKnowledge() {
+  if (dialogTarget.value) {
+    if ('space' in dialogTarget.value) {
+      items.value = items.value.filter((item) => item.id !== dialogTarget.value?.id)
+      if (selected.value?.id === dialogTarget.value.id) goRoot()
+    } else if (selected.value) {
+      removeNode(selected.value.nodes ?? [], dialogTarget.value.id)
+      nodePath.value = nodePath.value.filter((node) => node.id !== dialogTarget.value?.id)
+      if (previewNode.value?.id === dialogTarget.value.id) previewNode.value = null
+    }
+  }
+  closeDialog()
+}
+
+function removeNode(nodes: SourceKnowledgeNode[], id: string): boolean {
+  const index = nodes.findIndex((node) => node.id === id)
+  if (index >= 0) {
+    nodes.splice(index, 1)
+    return true
+  }
+  return nodes.some((node) => node.children && removeNode(node.children, id))
+}
+
+function createFolder(payload: { name: string }) {
+  if (!selected.value) return
+  currentNodes.value.push({
+    id: `local-folder-${Date.now()}`,
+    name: payload.name,
+    kind: 'folder',
+    owner: '当前用户',
+    updatedAt: '刚刚',
+    children: [],
+  })
+  closeDialog()
+}
+
+function uploadFiles(files: File[], destinationId: string, options: { monthlyReport: boolean }) {
+  const destination = findUploadDestination(destinationId)
+  if (!destination) return
+  const next = files.map<SourceKnowledgeNode>((file, index) => ({
+    id: `local-file-${Date.now()}-${index}`,
+    name: file.name,
+    kind: 'file',
+    owner: '当前用户',
+    updatedAt: '刚刚',
+    format: file.name.split('.').pop()?.toUpperCase() ?? 'FILE',
+    size: `${Math.max(1, Math.round(file.size / 1024))} KB${options.monthlyReport && /\.xlsx?$/i.test(file.name) ? ' · 月报解析' : /\.pptx?$/i.test(file.name) ? ' · PPT解析' : ''}`,
+  }))
+  destination.push(...next)
+  closeDialog()
+}
+
+function findUploadDestination(destinationId: string): SourceKnowledgeNode[] | null {
+  for (const knowledgeBase of items.value) {
+    if (knowledgeBase.id === destinationId) return knowledgeBase.nodes ?? (knowledgeBase.nodes = [])
+    const folder = findFolder(knowledgeBase.nodes ?? [], destinationId)
+    if (folder) return folder.children ?? (folder.children = [])
+  }
+  return null
+}
+
+function findFolder(nodes: SourceKnowledgeNode[], id: string): SourceKnowledgeNode | null {
+  for (const node of nodes) {
+    if (node.kind === 'folder' && node.id === id) return node
+    const nested = node.children ? findFolder(node.children, id) : null
+    if (nested) return nested
+  }
+  return null
+}
+
+function savePermission() {
+  closeDialog()
+}
 </script>
 
 <template>
-  <div class="flex h-[calc(100vh-4rem)] bg-zinc-50 text-zinc-950">
-    <!-- 侧栏折叠时的展开按钮 -->
-    <div v-if="!kb.sidebarVisible.value" class="fixed left-3 top-[4.75rem] z-40 flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white/95 p-1 shadow-sm backdrop-blur">
-      <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-xl text-zinc-600 transition hover:bg-zinc-100" aria-label="展开侧边栏" @click="kb.sidebarVisible.value = true">
-        <ChevronsRight class="h-4 w-4" />
-      </button>
-    </div>
+  <main class="knowledge-page" data-testid="knowledge-main-pane">
+    <div class="knowledge-shell" :class="{ 'sidebar-is-open': sidebarOpen, 'qa-is-open': qaOpen || previewNode }">
+      <KnowledgeSidebar
+        :open="sidebarOpen"
+        :items="items"
+        :selected-id="selectedTreeId"
+        @close="sidebarOpen = false"
+        @create="openDialog('create')"
+        @navigate="navigateSidebar"
+        @space-change="switchSpace"
+      />
 
-    <!-- 左侧边栏 -->
-    <aside
-      class="fixed inset-y-0 left-0 z-50 flex w-[clamp(286px,21vw,400px)] flex-col overflow-hidden border-r border-zinc-200 bg-white transition-transform duration-300 lg:top-16 lg:h-[calc(100vh-4rem)]"
-      :class="kb.sidebarVisible.value ? 'translate-x-0' : '-translate-x-full'"
-    >
-      <div data-testid="knowledge-sidebar-subheader" class="border-b border-zinc-100 px-3 py-3">
-        <div class="flex items-center justify-between">
-          <div class="text-sm font-semibold text-zinc-900">知识中心</div>
-          <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-500 shadow-sm hover:bg-zinc-50" aria-label="折叠侧边栏" @click="kb.sidebarVisible.value = false">
-            <ChevronLeft class="h-4 w-4" />
-          </button>
-        </div>
-        <!-- 搜索框 -->
-        <div class="relative mt-2">
-          <Search class="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-300" />
-          <input
-            type="text"
-            placeholder="搜索知识库、文件..."
-            class="h-8 w-full rounded-lg border border-zinc-200 bg-[#f7f8fa] pl-8 pr-3 text-xs text-zinc-600 placeholder:text-zinc-300 focus:border-[#1456f0] focus:bg-white focus:outline-none cursor-pointer"
-            readonly
-            @click="searchOpen = true"
-          />
-        </div>
-        <!-- 空间切换：横向 pill -->
-        <div class="mt-2 flex gap-1 rounded-lg bg-[#f7f8fa] p-0.5">
-          <button
-            type="button"
-            class="flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition"
-            :class="kb.activeSpace.value === 'public' ? 'bg-white text-[#1456f0] shadow-sm' : 'text-zinc-500 hover:text-zinc-700'"
-            @click="kb.switchSpace('public')"
-          >公共空间</button>
-          <button
-            type="button"
-            class="flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition"
-            :class="kb.activeSpace.value === 'personal' ? 'bg-white text-[#1456f0] shadow-sm' : 'text-zinc-500 hover:text-zinc-700'"
-            @click="kb.switchSpace('personal')"
-          >个人空间</button>
-        </div>
-      </div>
-
-      <!-- 操作按钮 -->
-      <div class="border-b border-zinc-100 px-2 py-2">
-        <Button v-if="kb.isAdmin.value || kb.activeSpace.value === 'personal'" variant="ghost" size="sm" class="w-full justify-start gap-2 text-sm font-medium" aria-label="新建知识库" @click="kb.createMode.value = true; kb.createKbName.value = ''">
-          <BookOpen class="h-4 w-4 text-[#ff5530]" />
-          <span>新建知识库</span>
-        </Button>
-      </div>
-
-      <!-- 文件树 -->
-      <div class="flex-1 overflow-y-auto p-2" data-testid="knowledge-tree-panel">
-        <div class="space-y-0.5">
-          <SidebarTreeNode
-            v-for="node in kb.currentFileTree.value"
-            :key="node.id"
-            :node="node"
-            :depth="0"
-            :expanded-ids="kb.expandedTreeIds.value"
-            :selected-kb-id="kb.selectedKbId.value"
-            :user-role="kb.isAdmin.value ? 'admin' : 'user'"
-            :active-space="kb.activeSpace.value"
-            @toggle="kb.toggleTreeNode($event)"
-            @select="kb.toggleTreeNode($event)"
-            @preview="(n: TreeNode) => { if (n.kbId && n.docName) { kb.selectKb(n.kbId); const doc = (kb.allDocs[n.kbId] ?? []).find(d => d.name === n.docName); if (doc) kb.openPreview(doc) } }"
-            @delete="kb.deleteTreeFolder($event)"
-            @create-folder="(id: string) => { kb.createFolderParentId.value = id; kb.createFolderMode.value = true; kb.createFolderName.value = '' }"
-            @rename="kb.beginRenameFolder($event)"
-            @context-menu="(e: MouseEvent, id: string) => { kb.contextMenu.value = { type: 'tree', id, x: e.clientX, y: e.clientY } }"
-          />
-        </div>
-      </div>
-    </aside>
-
-    <!-- 主内容区 -->
-    <main
-      data-testid="knowledge-main-pane"
-      class="flex min-w-0 flex-1 flex-col overflow-hidden transition-[margin] duration-300"
-      :style="{ marginLeft: kb.sidebarVisible.value ? 'clamp(286px,21vw,400px)' : '0px' }"
-    >
-      <!-- 头部 -->
-      <div data-testid="knowledge-main-header" class="flex min-h-14 items-center border-b border-zinc-200 bg-white px-4">
-        <div class="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
-          <button v-if="!kb.sidebarVisible.value" type="button" class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600" aria-label="展开侧边栏" @click="kb.sidebarVisible.value = true">
-            <ChevronsRight class="h-4 w-4" />
-          </button>
-          <template v-for="(crumb, idx) in breadcrumbTrail" :key="idx">
-            <button v-if="crumb.onClick" type="button" class="rounded-md px-1.5 py-0.5 text-xs font-medium text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800" @click="crumb.onClick">{{ crumb.label }}</button>
-            <span v-else class="truncate font-semibold text-zinc-950">{{ crumb.label }}</span>
-            <span v-if="idx < breadcrumbTrail.length - 1" class="text-zinc-300">/</span>
-          </template>
-        </div>
-        <div class="ml-auto flex items-center gap-2">
-          <!-- 视图切换（仅文件视图） -->
-          <div v-if="kb.selectedKb.value" class="inline-flex h-9 overflow-hidden rounded-lg border border-zinc-200 bg-white">
-            <button class="px-2.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600" :class="{ 'bg-zinc-100 text-zinc-600': kb.fileView.value === 'list' }" aria-label="列表视图" @click="kb.fileView.value = 'list'"><List class="h-4 w-4" /></button>
-            <button class="px-2.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600" :class="{ 'bg-zinc-100 text-zinc-600': kb.fileView.value === 'grid' }" aria-label="宫格视图" @click="kb.fileView.value = 'grid'"><LayoutGrid class="h-4 w-4" /></button>
-          </div>
-          <Button v-if="!kb.selectedKb.value" size="sm" aria-label="新建知识库" @click="kb.createMode.value = true; kb.createKbName.value = ''">
-            <Plus class="h-4 w-4" />新建知识库
-          </Button>
-        </div>
-      </div>
-
-      <!-- 主内容 -->
-      <div class="flex-1 overflow-y-auto p-4 md:p-6">
-        <!-- === 视图：知识库列表（纯表格） === -->
-        <template v-if="!kb.selectedKb.value">
-          <div class="space-y-4">
-            <div class="overflow-hidden rounded-xl border border-zinc-200 bg-white">
-              <!-- Table header -->
-              <div class="grid grid-cols-[minmax(240px,1fr)_100px_140px_140px_80px] border-b border-zinc-100 bg-[#f7f8fa] px-4 py-3 text-xs font-medium text-zinc-500">
-                <span>名称</span><span>所有者</span><span>创建时间</span><span>最近访问</span><span class="text-right">操作</span>
-              </div>
-              <!-- Table rows -->
-              <div
-                v-for="k in kb.displayedKnowledgeBases.value"
-                :key="k.id"
-                data-testid="knowledge-kb-card"
-                class="grid grid-cols-[minmax(240px,1fr)_100px_140px_140px_80px] items-center border-b border-zinc-100 px-4 py-3.5 last:border-0 hover:bg-[#f7f8fa] cursor-pointer transition"
-                @click="kb.selectKb(k.id)"
-              >
-                <div class="flex min-w-0 items-center gap-3">
-                  <BookOpen class="h-5 w-5 shrink-0 text-[#ff5530]" />
-                  <div class="min-w-0">
-                    <div class="truncate text-sm font-semibold text-zinc-900">{{ k.name }}</div>
-                    <div class="mt-0.5 text-[11px] text-zinc-400">({{ k.docs }} 文档)</div>
-                  </div>
-                </div>
-                <span class="truncate text-xs text-zinc-500">{{ k.owner }}</span>
-                <span class="truncate text-xs text-zinc-500">{{ k.recent }}</span>
-                <span class="truncate text-xs text-zinc-500">{{ k.recent }}</span>
-                <div class="flex justify-end">
-                  <div class="relative">
-                    <button
-                      type="button"
-                      class="inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
-                      @click.stop="kbRowMenuId = kbRowMenuId === k.id ? '' : k.id"
-                    >
-                      <MoreVertical class="h-4 w-4" />
-                    </button>
-                    <div v-if="kbRowMenuId === k.id" class="fixed inset-0 z-40" @click="kbRowMenuId = ''" />
-                    <div
-                      v-if="kbRowMenuId === k.id"
-                      class="absolute right-0 top-full z-50 mt-1 w-40 overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 text-sm shadow-xl"
-                    >
-                      <div class="px-3 py-1.5 text-[11px] font-semibold text-zinc-400 truncate">{{ k.name }}</div>
-                      <button v-if="kb.isAdmin.value" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-50" @click="kbRowMenuId = ''"><Folder class="h-3.5 w-3.5" />新建文件夹</button>
-                      <button v-if="kb.isAdmin.value" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-50" @click="kbRowMenuId = ''"><Pencil class="h-3.5 w-3.5" />重命名</button>
-                      <button v-if="kb.isAdmin.value" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50" @click="kbRowMenuId = ''; kb.deleteKb(k)"><Trash2 class="h-3.5 w-3.5" />删除</button>
-                      <button v-if="kb.isAdmin.value" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-50" @click="kbRowMenuId = ''"><Settings class="h-3.5 w-3.5 text-[#1456f0]" />设置</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <!-- Footer count -->
-            <div class="text-xs text-zinc-400">
-              共 {{ kb.displayedKnowledgeBases.value.length }} 个知识库
-            </div>
-          </div>
-        </template>
-
-        <!-- === 视图：文件列表 === -->
-        <template v-else>
-          <div data-testid="knowledge-action-row" class="mb-3 flex flex-wrap items-center gap-2">
-            <button type="button" class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-600 hover:bg-zinc-50" aria-label="新建文件夹" @click="kb.openCreateFolderModal()">
-              <Folder class="h-4 w-4" /><span>新建文件夹</span>
+      <section class="knowledge-content">
+        <header class="knowledge-toolbar">
+          <div class="toolbar-leading">
+            <button
+              v-if="!sidebarOpen"
+              class="icon-action"
+              aria-label="展开侧栏"
+              @click="sidebarOpen = true"
+            >
+              <PanelLeftOpen :size="18" />
             </button>
-            <button class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-600 hover:bg-zinc-50" @click="kb.openUploadModal()">
-              <Upload class="h-4 w-4" /><span>上传文件</span>
+            <button
+              v-if="!sidebarOpen"
+              class="icon-action"
+              aria-label="搜索知识库"
+              @click="sidebarOpen = true"
+            >
+              <Search :size="18" />
             </button>
-            <button class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 text-xs font-medium text-zinc-600 hover:bg-zinc-50" @click="kb.openQaPanel()">
-              <MessageSquareText class="h-4 w-4" /><span>知识库问答</span>
+            <button
+              v-if="!sidebarOpen"
+              class="icon-action"
+              aria-label="新建知识库"
+              @click="openDialog('create')"
+            >
+              <Plus :size="19" />
             </button>
-          </div>
-
-          <!-- 批量操作栏 -->
-          <div v-if="kb.selectedFileIds.value.length > 0" class="mb-3 flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
-            <span class="text-xs font-medium text-blue-700">已选 {{ kb.selectedFileIds.value.length }} 项</span>
-            <div class="ml-auto flex items-center gap-1">
-              <button class="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-red-600 hover:bg-red-50" @click="kb.deleteSelectedDocs()"><Trash2 class="h-3 w-3" />删除</button>
-            </div>
-          </div>
-
-          <!-- 空态 -->
-          <div v-if="!kb.hasKnowledgeItems.value" class="flex flex-col items-center justify-center py-24 text-center">
-            <Database class="h-12 w-12 text-zinc-200" />
-            <p class="mt-3 text-sm text-zinc-400">此知识库暂无文档</p>
-            <button class="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-orange-500 px-4 py-2 text-xs font-medium text-white hover:bg-orange-600" @click="kb.openUploadModal()"><Upload class="h-3.5 w-3.5" />上传第一个文档</button>
-          </div>
-
-          <!-- 文件列表表模式 -->
-          <div v-if="kb.fileView.value === 'list' && kb.hasKnowledgeItems.value" class="overflow-hidden rounded-xl border border-zinc-200 bg-white">
-            <table class="w-full">
-              <thead class="border-b border-zinc-200 bg-zinc-50">
-                <tr>
-                  <th class="w-10 px-3 py-3"><button class="text-zinc-400 hover:text-zinc-600" @click="kb.selectAllFiles()"><CheckSquare v-if="kb.selectedFileIds.value.length === kb.filteredDocs.value.length && kb.filteredDocs.value.length > 0" class="h-4 w-4 text-blue-500" /><Square v-else class="h-4 w-4" /></button></th>
-                  <th class="px-0 py-3 text-left text-xs font-medium text-zinc-500">名称</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500">格式</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500">状态</th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500">更新时间</th>
-                  <th class="px-4 py-3 text-right text-xs font-medium text-zinc-500">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                <!-- Folder rows -->
-                <tr
-                  v-for="folder in (kb.selectedKbId.value ? kb.getKbTreeChildren(kb.selectedKbId.value).filter((n: TreeNode) => n.type === 'folder') : [])"
-                  :key="folder.id"
-                  data-testid="knowledge-folder-row"
-                  class="cursor-pointer border-b border-zinc-100 last:border-0 hover:bg-zinc-50"
-                  @click="kb.toggleTreeNode(folder)"
-                >
-                  <td class="px-3 py-3" />
-                  <td class="py-3">
-                    <div class="flex items-center gap-2 text-sm text-zinc-800">
-                      <Folder class="h-4 w-4 text-zinc-600" />
-                      <span class="truncate font-medium">{{ folder.label }}</span>
-                    </div>
-                  </td>
-                  <td class="px-4 py-3"><span class="rounded-md bg-zinc-100 px-1.5 py-0.5 text-[11px] font-medium text-zinc-500">文件夹</span></td>
-                  <td class="px-4 py-3"><span class="text-[11px] text-zinc-400">{{ folder.children?.length ?? 0 }} 项</span></td>
-                  <td class="px-4 py-3 text-xs text-zinc-400">刚刚</td>
-                  <td class="px-4 py-3">
-                    <div class="flex justify-end">
-                      <div class="relative">
-                        <button
-                          type="button"
-                          class="inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
-                          @click.stop="fileRowMenuId = fileRowMenuId === folder.id ? '' : folder.id"
-                        >
-                          <MoreVertical class="h-4 w-4" />
-                        </button>
-                        <div v-if="fileRowMenuId === folder.id" class="fixed inset-0 z-40" @click="fileRowMenuId = ''" />
-                        <div
-                          v-if="fileRowMenuId === folder.id"
-                          class="absolute right-0 top-full z-50 mt-1 w-36 overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 text-sm shadow-xl"
-                        >
-                          <button v-if="true" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-50" @click="fileRowMenuId = ''; kb.beginRenameFolder(folder)"><Pencil class="h-3.5 w-3.5" />重命名</button>
-                          <button v-if="true" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50" @click="fileRowMenuId = ''; kb.deleteTreeFolder(folder)"><Trash2 class="h-3.5 w-3.5" />删除</button>
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-                <!-- File rows -->
-                <tr
-                  v-for="doc in kb.filteredDocs.value"
-                  :key="doc.name"
-                  data-testid="knowledge-file-row"
-                  class="cursor-pointer border-b border-zinc-100 last:border-0 hover:bg-zinc-50"
-                  :class="{ 'bg-blue-50/50': kb.selectedFileIds.value.includes(doc.name) }"
-                  @click="kb.openPreview(doc)"
-                >
-                  <td class="px-3 py-3"><button class="text-zinc-400 hover:text-blue-500" @click.stop="kb.toggleFileSelect(doc.name)"><CheckSquare v-if="kb.selectedFileIds.value.includes(doc.name)" class="h-4 w-4 text-blue-500" /><Square v-else class="h-4 w-4" /></button></td>
-                  <td class="py-3">
-                    <div class="flex items-center gap-2 text-sm text-zinc-800">
-                      <component :is="getFileIcon(doc.format)" class="h-4 w-4" :class="getIconColor(doc.format)" />
-                      <span class="truncate">{{ doc.name }}</span>
-                    </div>
-                  </td>
-                  <td class="px-4 py-3"><span class="rounded-md bg-zinc-100 px-1.5 py-0.5 text-[11px] font-medium text-zinc-500">{{ doc.format }}</span></td>
-                  <td class="px-4 py-3"><span class="rounded-full px-2 py-0.5 text-[11px] font-medium" :class="doc.status === '已索引' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'">{{ doc.status }}</span></td>
-                  <td class="px-4 py-3 text-xs text-zinc-400">{{ doc.updatedAt }}</td>
-                  <td class="px-4 py-3">
-                    <div class="flex justify-end">
-                      <div class="relative">
-                        <button
-                          type="button"
-                          class="inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
-                          @click.stop="fileRowMenuId = fileRowMenuId === doc.name ? '' : doc.name"
-                        >
-                          <MoreVertical class="h-4 w-4" />
-                        </button>
-                        <div v-if="fileRowMenuId === doc.name" class="fixed inset-0 z-40" @click="fileRowMenuId = ''" />
-                        <div
-                          v-if="fileRowMenuId === doc.name"
-                          class="absolute right-0 top-full z-50 mt-1 w-36 overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 text-sm shadow-xl"
-                        >
-                          <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-50" @click="fileRowMenuId = ''; kb.openPreview(doc)"><Eye class="h-3.5 w-3.5 text-blue-500" />预览</button>
-                          <button v-if="kb.selectedKb.value?.canEdit || kb.isAdmin.value" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50" @click="fileRowMenuId = ''; kb.deleteDoc(doc)"><Trash2 class="h-3.5 w-3.5" />删除</button>
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- 文件列表网格模式 -->
-          <div v-if="kb.fileView.value === 'grid' && kb.hasKnowledgeItems.value" class="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-            <KbFileGridItem
-              v-for="doc in kb.filteredDocs.value"
-              :key="doc.name"
-              :item="doc"
-              type="file"
-              :selected="kb.selectedFileIds.value.includes(doc.name)"
-              :can-edit="kb.selectedKb.value?.canEdit || kb.isAdmin.value"
-              :tags="doc.tags"
-              :doc-format="doc.format"
-              data-testid="knowledge-file-card"
-              @click="kb.openPreview(doc)"
-              @open="kb.openPreview(doc)"
-              @toggle-select="kb.toggleFileSelect(doc.name)"
-              @delete="kb.deleteDoc(doc)"
-            />
-          </div>
-        </template>
-      </div>
-    </main>
-
-    <!-- 右侧预览面板 -->
-    <aside
-      v-if="kb.previewTabs.value.length"
-      class="fixed bottom-0 top-16 z-40 hidden flex-col border-l border-zinc-200 bg-white lg:flex"
-      :style="{ right: kb.qaOpen.value ? 'clamp(360px,28vw,460px)' : '0px', width: 'clamp(390px,32vw,520px)' }"
-    >
-      <div class="flex h-14 items-center justify-between gap-3 border-b border-zinc-200 px-4">
-        <div class="min-w-0">
-          <div class="text-sm font-semibold text-zinc-950">文件预览</div>
-          <div class="truncate text-xs text-zinc-400">{{ kb.activePreviewDoc.value?.name ?? '已打开文件' }}</div>
-        </div>
-        <div class="flex items-center gap-1.5">
-          <button
-            type="button"
-            class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium transition"
-            :class="kb.qaOpen.value ? 'bg-[#1456f0] text-white' : 'border border-zinc-200 text-zinc-600 hover:bg-zinc-50'"
-            @click="kb.qaOpen.value ? kb.closeQaPanel() : kb.openQaPanel()"
-          >
-            <MessageSquareText class="h-3.5 w-3.5" />
-            <span>小智问答</span>
-          </button>
-          <button type="button" class="rounded-lg p-2 text-zinc-500 hover:bg-zinc-100" aria-label="关闭预览" @click="kb.closePreviewPanel()"><X class="h-4 w-4" /></button>
-        </div>
-      </div>
-      <div v-if="kb.previewTabs.value.length > 1" class="flex min-h-11 gap-1 overflow-x-auto border-b border-zinc-100 bg-zinc-50 px-3 py-2">
-        <button v-for="tab in kb.previewTabs.value" :key="tab.name" type="button" class="inline-flex h-8 max-w-[180px] shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium" :class="kb.activeRightTab.value === tab.name ? 'bg-white text-blue-700 ring-1 ring-zinc-200' : 'text-zinc-500 hover:bg-white'" @click="kb.activeRightTab.value = tab.name">
-          <FileText class="h-3.5 w-3.5" />
-          <span class="truncate">{{ tab.name }}</span>
-          <X class="h-3.5 w-3.5 rounded hover:bg-zinc-100" @click.stop="kb.closeRightTab(tab.name)" />
-        </button>
-      </div>
-      <div v-if="kb.activePreviewDoc.value" class="grid min-h-0 flex-1 grid-cols-[132px_1fr] overflow-hidden">
-        <nav class="border-r border-zinc-100 bg-zinc-50 px-4 py-5 text-sm">
-          <div class="mb-3 truncate font-semibold text-blue-600">{{ kb.activePreviewDoc.value.name }}</div>
-          <div class="space-y-3 text-zinc-500">
-            <div class="border-l-4 pl-3 transition-colors duration-500" :class="kb.highlightedSection.value === '方案摘要' ? 'border-amber-400 bg-amber-50 text-amber-700' : 'border-zinc-400'">方案摘要</div>
-            <div class="border-l-4 pl-3 transition-colors duration-500" :class="kb.highlightedSection.value === '预算分档' ? 'border-amber-400 bg-amber-50 text-amber-700' : 'border-zinc-300'">预算分档</div>
-            <div class="border-l-4 pl-3 transition-colors duration-500" :class="kb.highlightedSection.value === '执行建议' ? 'border-amber-400 bg-amber-50 text-amber-700' : 'border-zinc-300'">执行建议</div>
-          </div>
-        </nav>
-        <article class="overflow-y-auto px-7 py-7 text-zinc-900">
-          <div class="mb-5 text-xs text-zinc-400">修改于 {{ kb.activePreviewDoc.value.updatedAt }} · {{ kb.activePreviewDoc.value.uploadedBy }}</div>
-          <h1 class="text-2xl font-bold tracking-normal">B2B线下团购方案</h1>
-          <section class="mt-8 space-y-4 text-base leading-8">
-            <h2 class="border-l-4 pl-3 text-xl font-bold transition-colors duration-500" :class="kb.highlightedSection.value === '方案摘要' ? 'border-amber-500 bg-amber-50/50 text-amber-800' : 'border-zinc-900'">方案摘要</h2>
-            <p>本文档用于沉淀运动鞋团购成功案例。</p>
-            <h2 class="border-l-4 pl-3 text-xl font-bold transition-colors duration-500" :class="kb.highlightedSection.value === '预算分档' ? 'border-amber-500 bg-amber-50/50 text-amber-800' : 'border-zinc-900'">预算分档</h2>
-            <p>保守档优先控制预算，均衡档兼顾品牌与数量。</p>
-            <h2 class="border-l-4 pl-3 text-xl font-bold transition-colors duration-500" :class="kb.highlightedSection.value === '执行建议' ? 'border-amber-500 bg-amber-50/50 text-amber-800' : 'border-zinc-900'">执行建议</h2>
-            <p>先用均衡档作为客户现场沟通初稿。</p>
-          </section>
-        </article>
-      </div>
-    </aside>
-
-    <!-- 小智问答面板 -->
-    <aside
-      v-if="kb.qaOpen.value"
-      class="fixed bottom-0 right-0 top-16 z-50 hidden flex-col border-l border-zinc-200 bg-white lg:flex"
-      :style="{ width: 'clamp(360px,28vw,460px)' }"
-    >
-      <div class="flex h-14 items-center justify-between border-b border-transparent px-4">
-        <div class="flex min-w-0 items-center gap-3">
-          <div class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-blue-600 text-white">
-            <MessageSquareText class="h-4 w-4" />
-          </div>
-          <div class="min-w-0">
-            <div class="text-sm font-semibold text-zinc-950">小智</div>
-            <div class="truncate text-xs text-zinc-400">
-              <template v-if="kb.selectedKb.value">基于「{{ kb.selectedKb.value.name }}」</template>
-              <template v-else>知识库问答助手</template>
-            </div>
-          </div>
-        </div>
-        <button type="button" class="rounded-lg p-2 text-zinc-500 hover:bg-zinc-100" aria-label="关闭小智" @click="kb.closeQaPanel()"><X class="h-4 w-4" /></button>
-      </div>
-
-      <!-- 模式选择 - 仅2个模式（PRD 第1216行） -->
-      <div class="grid grid-cols-2 gap-2 border-b border-transparent px-4 py-3">
-        <button class="rounded-lg border p-2.5 text-left text-xs font-medium" :class="kb.qaMode.value === 'answer' ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-zinc-200 text-zinc-700'" @click="kb.qaMode.value = 'answer'">智能问答<div class="mt-1 text-[11px] font-normal text-zinc-400">组织答案</div></button>
-        <button class="rounded-lg border p-2.5 text-left text-xs font-medium" :class="kb.qaMode.value === 'search' ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-zinc-200 text-zinc-700'" @click="kb.qaMode.value = 'search'">知识检索<div class="mt-1 text-[11px] font-normal text-zinc-400">定位原文</div></button>
-      </div>
-
-      <div class="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4 text-sm">
-        <div v-if="kb.qaMessages.value.length === 0" class="space-y-4">
-          <div v-if="!kb.selectedKb.value" class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700">
-            <p class="font-medium">💡 先选择一个知识库</p>
-            <p class="mt-1">在左侧文件树中点击任意知识库，即可开始提问</p>
-          </div>
-          <div class="rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 px-4 py-4">
-            <div class="text-base font-semibold text-zinc-950">你好，我是小智</div>
-            <div class="mt-2 text-sm leading-6 text-zinc-600">我可以基于当前知识库和已打开文件回答问题。</div>
-          </div>
-        </div>
-        <!-- 思考链路 -->
-        <ThinkingChain
-          v-if="kb.qaThinking.value.length > 0"
-          :steps="kb.qaThinking.value as any"
-          :is-collapsed="!kb.qaThinkingOpen.value"
-          @toggle="kb.toggleThinking()"
-        />
-        <div v-for="(msg, index) in kb.qaMessages.value" :key="msg.id || index" class="group/qa" :class="msg.role === 'user' ? 'ml-8' : 'mr-8'">
-          <div v-if="kb.qaEditId.value === msg.id" class="flex items-start gap-2">
-            <textarea v-model="kb.qaEditDraft.value" class="flex-1 resize-none rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none" rows="2" @keydown.enter.exact.prevent="kb.commitEditQaMessage(msg)" @keydown.esc.prevent="kb.qaEditId.value = null; kb.qaEditDraft.value = ''" />
-            <button class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white" @click="kb.commitEditQaMessage(msg)">保存</button>
-          </div>
-          <div class="rounded-2xl px-3 py-2.5 leading-6" :class="msg.role === 'user' ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-700'">
-            <div>
-              <template v-for="(seg, i) in kb.parseQaContent(msg.content)" :key="i">
-                <span v-if="seg.type === 'text'">{{ seg.text }}</span>
-                <sup v-else class="inline-flex h-4 w-4 cursor-pointer items-center justify-center rounded-full bg-blue-100 text-[10px] font-semibold text-blue-700 hover:bg-blue-200" @click="kb.openCitationRef(seg.index!, msg.citations)">{{ seg.index }}</sup>
+            <div v-if="selected" data-testid="knowledge-breadcrumb" class="breadcrumb">
+              <button @click="goRoot">全部知识库</button><span>›</span>
+              <button v-if="nodePath.length" @click="nodePath = []; previewNode = null">{{ selected.name }}</button>
+              <strong v-else>{{ selected.name }}</strong>
+              <template v-for="(node, index) in nodePath" :key="node.id">
+                <span>›</span>
+                <button v-if="index < nodePath.length - 1" @click="goBreadcrumb(index)">{{ node.name }}</button>
+                <strong v-else>{{ node.name }}</strong>
               </template>
             </div>
-            <div v-if="msg.citations?.length" class="mt-3 space-y-1.5 border-t border-zinc-100 pt-2 text-[11px]">
-              <div v-for="(cit, idx) in msg.citations" :key="cit" class="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 cursor-pointer hover:border-blue-200 hover:bg-blue-50/30 transition" @click="kb.openCitationRef(idx + 1, msg.citations)">
-                <div class="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-zinc-50 text-zinc-400"><FileText class="h-3 w-3" /></div>
-                <div class="min-w-0 flex-1"><span class="truncate font-medium text-zinc-700">{{ cit }}</span></div>
-                <sup class="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[9px] font-semibold text-blue-700">{{ idx + 1 }}</sup>
-              </div>
-            </div>
+            <strong v-else class="page-label">全部知识库</strong>
           </div>
-          <div v-if="kb.qaEditId.value !== msg.id" class="mt-1 flex gap-1.5 opacity-0 transition group-hover/qa:opacity-100" :class="msg.role === 'user' ? 'justify-end' : ''">
-            <button type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700" aria-label="复制" @click="kb.copyQaMessage(msg)">
-              <CheckCircle2 v-if="kb.qaCopiedId.value === msg.id" class="h-3.5 w-3.5 text-emerald-500" />
-              <Copy v-else class="h-3.5 w-3.5" />
+
+          <div class="toolbar-actions" data-testid="knowledge-action-row">
+            <button
+              class="source-button primary"
+              aria-label="上传文件"
+              @click="openUploadDialog"
+            >
+              <Upload :size="16" />上传文件
             </button>
-            <template v-if="msg.role === 'user'">
-              <button type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700" aria-label="编辑" @click="kb.beginEditQaMessage(msg)"><Pencil class="h-3.5 w-3.5" /></button>
-              <button type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700" aria-label="重试" @click="kb.retryQaMessage(msg)"><RotateCw class="h-3.5 w-3.5" /></button>
-            </template>
-            <template v-else>
-              <button type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700" aria-label="引用" @click="kb.qaQuestion.value = `引用上一条回答继续：${msg.content.slice(0, 60)}...`"><Quote class="h-3.5 w-3.5" /></button>
-            </template>
+            <button class="source-button" aria-label="新建文件夹" @click="openFolderDialog">
+              <FolderPlus :size="16" />新建文件夹
+            </button>
+            <button
+              v-if="!qaOpen"
+              class="source-button qa"
+              aria-label="小智问答"
+              @click="previewNode = null; qaOpen = true"
+            >
+              <Bot :size="17" />小智问答
+            </button>
           </div>
-        </div>
-      </div>
+        </header>
 
-      <div class="border-t border-transparent p-3">
-        <div class="flex items-start gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 shadow-sm">
-          <textarea
-            :ref="(el: any) => { qaTextarea = el }"
-            v-model="kb.qaQuestion.value"
-            class="max-h-[192px] min-h-[36px] flex-1 resize-none bg-transparent py-1 text-sm leading-6 outline-none placeholder:text-zinc-400"
-            placeholder="问小智任何问题..."
-            rows="1"
-            @input="resizeQaTextarea"
-            @keydown.enter.exact.prevent="kb.askKnowledgeBase()"
-          />
-          <button
-            type="button"
-            class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition"
-            :class="kb.qaQuestion.value.trim() ? 'bg-zinc-950 text-white hover:bg-zinc-800' : 'cursor-not-allowed bg-zinc-100 text-zinc-300'"
-            :disabled="!kb.qaQuestion.value.trim()"
-            @click="kb.askKnowledgeBase()"
-          >
-            <ArrowUp class="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-    </aside>
+        <KnowledgeTable
+          :items="visibleItems"
+          :detail="selected"
+          :nodes="currentNodes"
+          @select="selectItem"
+          @navigate-node="navigateNode"
+          @action="handleAction"
+        />
+      </section>
 
-    <!-- 任务中心（气泡+侧栏） -->
-    <TaskCenterPanel
-      :tasks="kb.uploadTasks.value"
-      @dismiss="kb.dismissUploadTask($event)"
-      @retry-all="kb.uploadTasks.value = kb.uploadTasks.value.filter(t => t.status !== 'success' && t.status !== 'done'); kb.showToast('已重试所有失败任务')"
-      @clear-completed="kb.uploadTasks.value = kb.uploadTasks.value.filter(t => t.status !== 'success' && t.status !== 'done')"
+      <KnowledgeQaPanel v-if="qaOpen" @close="qaOpen = false" />
+
+      <aside v-if="previewNode" class="knowledge-preview" data-testid="knowledge-file-preview" aria-label="文件预览">
+        <header>
+          <span class="preview-file-icon"><FileText :size="18" /></span>
+          <div><strong>{{ previewNode.name }}</strong><small>{{ previewNode.format }} · {{ previewNode.size }}</small></div>
+          <button type="button" aria-label="关闭文件预览" title="关闭" @click="previewNode = null"><X :size="18" /></button>
+        </header>
+        <div class="preview-paper">
+          <small>{{ selected?.name }}</small>
+          <h2>{{ previewNode.name.replace(/\.[^.]+$/, '') }}</h2>
+          <p>这是由本地 mock 数据生成的文件预览，用于完整演示知识库、文件夹和文件之间的导航关系。</p>
+          <section>
+            <h3>文件信息</h3>
+            <dl><dt>所有者</dt><dd>{{ previewNode.owner }}</dd><dt>更新时间</dt><dd>{{ previewNode.updatedAt }}</dd><dt>文件大小</dt><dd>{{ previewNode.size }}</dd></dl>
+          </section>
+        </div>
+      </aside>
+    </div>
+
+    <KnowledgeDialogs
+      :kind="dialog"
+      :target="dialogTarget"
+      :destinations="uploadDestinations"
+      @close="closeDialog"
+      @create="createKnowledge"
+      @folder="createFolder"
+      @upload="uploadFiles"
+      @rename="renameKnowledge"
+      @permission="savePermission"
+      @confirm-delete="deleteKnowledge"
     />
-
-    <!-- Toast -->
-    <Transition
-      enter-active-class="transition duration-200 ease-out"
-      enter-from-class="-translate-y-2 opacity-0"
-      enter-to-class="translate-y-0 opacity-100"
-      leave-active-class="transition duration-150 ease-in"
-      leave-from-class="translate-y-0 opacity-100"
-      leave-to-class="-translate-y-2 opacity-0"
-    >
-      <div
-        v-if="kb.fileActionFeedback.value"
-        data-testid="knowledge-toast"
-        class="fixed left-1/2 top-20 z-[70] flex min-w-[280px] max-w-[min(560px,calc(100vw-2rem))] -translate-x-1/2 items-center gap-3 rounded-xl border border-blue-100 bg-white px-4 py-3 text-sm font-medium text-blue-700 shadow-2xl shadow-blue-100/60"
-      >
-        <span class="min-w-0 flex-1 truncate">{{ kb.fileActionFeedback.value }}</span>
-        <button type="button" class="rounded-md p-1 text-blue-500 hover:bg-blue-50 hover:text-blue-800" aria-label="关闭操作提示" @click="kb.fileActionFeedback.value = ''"><X class="h-3.5 w-3.5" /></button>
-      </div>
-    </Transition>
-
-    <!-- ═══ 弹窗 ═══ -->
-
-    <!-- 新建知识库 -->
-    <Dialog v-model:open="kb.createMode.value">
-      <DialogContent class="max-w-md">
-        <DialogHeader>
-          <DialogTitle>新建知识库</DialogTitle>
-          <DialogDescription>选择所属空间后创建知识库</DialogDescription>
-        </DialogHeader>
-        <div class="space-y-4 py-2">
-          <div class="grid gap-2">
-            <label class="text-xs font-medium text-zinc-600">知识库名称</label>
-            <Input v-model="kb.createKbName.value" placeholder="输入知识库名称" />
-          </div>
-        </div>
-        <div class="flex justify-end gap-2 pt-2">
-          <Button variant="outline" @click="kb.createMode.value = false">取消</Button>
-          <Button @click="kb.createKnowledgeBase()">创建</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-
-    <!-- 新建文件夹 -->
-    <Dialog v-model:open="kb.createFolderMode.value">
-      <DialogContent class="max-w-md">
-        <DialogHeader>
-          <DialogTitle>新建文件夹</DialogTitle>
-          <DialogDescription>在知识库中创建新的文件夹</DialogDescription>
-        </DialogHeader>
-        <div class="space-y-4 py-2">
-          <div class="grid gap-2">
-            <label class="text-xs font-medium text-zinc-600">文件夹名称</label>
-            <Input v-model="kb.createFolderName.value" placeholder="例如：投标资料" />
-          </div>
-        </div>
-        <div class="flex justify-end gap-2 pt-2">
-          <Button variant="outline" @click="kb.createFolderMode.value = false">取消</Button>
-          <Button @click="kb.createFolder()">确认</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-
-    <!-- 上传文件 -->
-    <Dialog v-model:open="kb.uploadModalOpen.value">
-      <DialogContent class="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>上传文件{{ kb.selectedKb.value ? ` - ${kb.selectedKb.value.name}` : '' }}</DialogTitle>
-          <DialogDescription>{{ kb.selectedKb.value ? `上传到 ${kb.selectedKb.value.name}` : '请先选择知识库' }}</DialogDescription>
-        </DialogHeader>
-        <div class="space-y-4 py-2">
-          <label class="flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 px-4 py-6 text-center transition hover:border-blue-300 hover:bg-blue-50/50">
-            <Upload class="h-8 w-8 text-blue-500" />
-            <span class="mt-3 text-sm font-medium text-zinc-800">点击选择文件</span>
-            <span class="mt-1 text-xs text-zinc-400">支持 PDF、DOCX、XLSX 等格式，单个文件 100MB 内，单次最多 10 个</span>
-            <input class="hidden" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg" @change="kb.handleUploadFiles($event)" />
-          </label>
-          <div v-if="kb.uploadFileNames.value.length" class="max-h-60 space-y-1 overflow-y-auto rounded-lg border border-zinc-200 bg-white p-2">
-            <div v-for="name in kb.uploadFileNames.value" :key="name" class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-zinc-600">
-              <File class="h-3.5 w-3.5 text-zinc-400" />
-              <span class="min-w-0 flex-1 truncate">{{ name }}</span>
-            </div>
-          </div>
-        </div>
-        <div class="flex items-center justify-end gap-2 pt-2">
-          <Button variant="outline" @click="kb.uploadModalOpen.value = false">取消</Button>
-          <Button aria-label="确认上传文件" :disabled="kb.uploadFileNames.value.length === 0" @click="kb.confirmUpload()">确认上传</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-
-    <!-- 确认弹窗 -->
-    <Dialog v-model:open="kb.confirmModal.value.show">
-      <DialogContent class="max-w-sm">
-        <div class="flex items-center gap-2 mb-2">
-          <AlertTriangle v-if="kb.confirmModal.value.danger" class="h-5 w-5 text-red-500" />
-          <DialogTitle>{{ kb.confirmModal.value.title }}</DialogTitle>
-        </div>
-        <p class="text-sm leading-relaxed text-zinc-600">{{ kb.confirmModal.value.message }}</p>
-        <div class="flex justify-end gap-2 pt-4">
-          <Button variant="outline" @click="kb.confirmModal.value.show = false">取消</Button>
-          <Button :variant="kb.confirmModal.value.danger ? 'destructive' : 'default'" @click="kb.confirmModal.value.onConfirm(); kb.confirmModal.value.show = false">{{ kb.confirmModal.value.confirmText ?? '确认' }}</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-
-    <!-- 搜索弹窗 -->
-    <SearchDialog
-      :open="searchOpen"
-      :knowledge-bases="kb.knowledgeBases.filter(k => k.space === kb.activeSpace.value)"
-      :all-docs="kb.allDocs"
-      @update:open="(v: boolean) => searchOpen = v"
-      @select-kb="(id: string) => kb.selectKb(id)"
-      @select-doc="(doc: DocItem) => kb.openPreview(doc)"
-    />
-
-    <!-- 上下文菜单 -->
-    <Teleport to="body">
-      <div v-if="kb.contextMenu.value" class="fixed inset-0 z-[55]" @click="kb.contextMenu.value = null">
-        <div class="absolute w-44 overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 text-sm shadow-2xl" :style="{ left: `${kb.contextMenu.value.x}px`, top: `${kb.contextMenu.value.y}px` }" @click.stop>
-          <template v-if="kb.contextMenu.value.type === 'kb'">
-            <div class="px-3 py-2 text-xs font-semibold text-zinc-400">{{ kb.contextMenu.value.id }}</div>
-            <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="kb.selectKb(kb.contextMenu.value!.id); kb.contextMenu.value = null"><BookOpen class="h-4 w-4 text-orange-500" />打开</button>
-            <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="() => { const k = kb.knowledgeBases.find(item => item.id === kb.contextMenu.value!.id); if (k) kb.deleteKb(k); kb.contextMenu.value = null }"><Trash2 class="h-4 w-4" />删除</button>
-          </template>
-          <template v-else>
-            <div class="px-3 py-2 text-xs font-semibold text-zinc-400">文件操作</div>
-            <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-zinc-700 hover:bg-zinc-50" @click="() => { const doc = kb.docs.value.find(d => d.name === kb.contextMenu.value?.id); if (doc) kb.openPreview(doc); kb.contextMenu.value = null }"><Eye class="h-4 w-4" />预览</button>
-            <button type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" @click="() => { const doc = kb.docs.value.find(d => d.name === kb.contextMenu.value?.id); if (doc) kb.deleteDoc(doc); kb.contextMenu.value = null }"><Trash2 class="h-4 w-4" />删除</button>
-          </template>
-        </div>
-      </div>
-    </Teleport>
-  </div>
+  </main>
 </template>
+
+<style scoped>
+.knowledge-page {
+  position: relative;
+  height: calc(100vh - 56px);
+  min-height: 620px;
+  overflow: hidden;
+  background: #fff;
+  color: #111;
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    'PingFang SC',
+    'Microsoft YaHei',
+    sans-serif;
+}
+.knowledge-shell {
+  display: grid;
+  height: 100%;
+  grid-template-columns: 0 minmax(0, 1fr);
+  transition: grid-template-columns 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.knowledge-shell.sidebar-is-open {
+  grid-template-columns: 280px minmax(0, 1fr);
+}
+.knowledge-shell.qa-is-open {
+  grid-template-columns: 0 minmax(0, 1fr) auto;
+}
+.knowledge-shell.sidebar-is-open.qa-is-open {
+  grid-template-columns: 280px minmax(0, 1fr) auto;
+}
+.knowledge-content {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  padding: 16px 32px 0 24px;
+  transition: padding 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.knowledge-shell:not(.sidebar-is-open) .knowledge-content {
+  padding-left: 32px;
+}
+.knowledge-toolbar {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 20px;
+}
+.toolbar-leading,
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+}
+.toolbar-leading {
+  min-width: 0;
+  flex: 1;
+  gap: 4px;
+  overflow: hidden;
+}
+.toolbar-actions {
+  flex: 0 0 auto;
+  margin-left: auto;
+  gap: 12px;
+}
+.icon-action {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 8px;
+  color: #3f3f3f;
+  transition: background 0.15s;
+}
+.icon-action:hover {
+  background: #f7f7f9;
+}
+.page-label {
+  margin-left: 6px;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+}
+.breadcrumb {
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
+  align-items: center;
+  gap: 8px;
+  margin-left: 4px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.breadcrumb button {
+  min-width: 0;
+  overflow: hidden;
+  color: #777;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.breadcrumb strong {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.source-button {
+  display: flex;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 0 16px;
+  background: #fff;
+  font-size: 14px;
+  line-height: 22px;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.source-button:hover {
+  background: #f7f7f9;
+}
+.source-button.primary {
+  border-color: #111;
+  background: #111;
+  color: #fff;
+}
+.source-button.primary:hover {
+  background: #292929;
+}
+.source-button.qa {
+  min-width: 112px;
+}
+.knowledge-preview{width:376px;min-width:376px;border-left:1px solid #e8e8e8;background:#f6f7f8;box-shadow:-2px 0 10px rgba(0,0,0,.025);overflow:auto}.knowledge-preview>header{display:grid;height:70px;grid-template-columns:32px minmax(0,1fr) 30px;align-items:center;gap:8px;border-bottom:1px solid #eee;background:#fff;padding:0 18px}.knowledge-preview>header>div{min-width:0}.knowledge-preview strong,.knowledge-preview small{display:block}.knowledge-preview>header strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}.knowledge-preview>header small{margin-top:3px;color:#999;font-size:11px}.knowledge-preview>header button{display:grid;width:30px;height:30px;place-items:center;border:0;border-radius:7px;background:transparent;color:#777}.knowledge-preview>header button:hover{background:#f3f3f3}.preview-file-icon{display:grid;width:30px;height:30px;place-items:center;border-radius:7px;background:#edf4ff;color:#4b82d0}.preview-paper{margin:20px;border-radius:4px;background:#fff;padding:28px 24px;box-shadow:0 3px 18px rgba(0,0,0,.08);color:#303846}.preview-paper>small{color:#8090a0;font-size:10px;letter-spacing:.8px}.preview-paper h2{margin:8px 0 16px;font-size:20px}.preview-paper>p{margin:0;color:#6b7581;font-size:12px;line-height:1.8}.preview-paper section{margin-top:24px;border-top:1px solid #edf0f3;padding-top:18px}.preview-paper h3{margin:0 0 12px;font-size:13px}.preview-paper dl{display:grid;grid-template-columns:70px 1fr;gap:9px;margin:0;font-size:11px}.preview-paper dt{color:#929ba7}.preview-paper dd{margin:0;color:#4d5662}
+@media (max-width: 900px) {
+  .toolbar-actions {
+    gap: 8px;
+  }
+  .source-button {
+    padding: 0 12px;
+  }
+  .source-button.qa {
+    min-width: auto;
+  }
+  .knowledge-content {
+    padding-right: 32px;
+  }
+  .knowledge-preview{position:fixed;z-index:250;inset:56px 0 0 auto;width:min(376px,100vw);min-width:0;box-shadow:-8px 0 26px rgba(0,0,0,.12)}
+}
+@media (max-width: 640px) {
+  .knowledge-page {
+    height: calc(100vh - 56px);
+    min-height: 0;
+  }
+  .knowledge-shell,
+  .knowledge-shell.sidebar-is-open,
+  .knowledge-shell.qa-is-open,
+  .knowledge-shell.sidebar-is-open.qa-is-open {
+    display: block;
+  }
+  .knowledge-content,
+  .knowledge-shell:not(.sidebar-is-open) .knowledge-content {
+    height: 100%;
+    padding: 92px 12px 0;
+  }
+  .knowledge-toolbar {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    top: 60px;
+    z-index: 1;
+    flex-wrap: wrap;
+  }
+  .toolbar-leading {
+    width: 100%;
+  }
+  .toolbar-actions {
+    position: absolute;
+    right: 0;
+    top: 0;
+  }
+  .page-label,
+  .breadcrumb {
+    display: none;
+  }
+  .source-button {
+    width: 32px;
+    padding: 0;
+    font-size: 0;
+  }
+  .source-button svg {
+    display: block;
+  }
+  .source-button.qa {
+    min-width: 32px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .knowledge-shell,
+  .knowledge-content,
+  .source-button,
+  .icon-action {
+    transition: none;
+  }
+}
+</style>

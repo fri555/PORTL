@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { useChatController, type RunMode } from '@/composables/useWorkspaceChat'
 import {
-  AlertCircle, Check, ChevronDown, Clock, FileText, Globe,
+  AlertCircle, Check, ChevronDown, FileText, Globe,
   Plus, SendHorizontal, Square, User, X, Zap,
 } from 'lucide-vue-next'
 
@@ -14,16 +14,6 @@ const modeMenuOpen = ref(false)
 const modeOptions: { value: RunMode; label: string; desc: string; icon: any }[] = [
   { value: 'quick', label: '日常办公', desc: '问答、检索与轻量办公', icon: Zap },
   { value: 'task', label: '专家模式', desc: '选择专家完成复杂任务', icon: User },
-  { value: 'schedule', label: '定时任务', desc: '设置周期性自动任务', icon: Clock },
-]
-
-const frequencyOptions = [
-  { value: 'once', label: '不重复' },
-  { value: 'daily', label: '每天' },
-  { value: 'workday', label: '工作日' },
-  { value: 'weekly', label: '每周' },
-  { value: 'monthly', label: '每月' },
-  { value: 'cron', label: '自定义 Cron' },
 ]
 
 // 当前选中专家花名（蓝色 tag 主显示）
@@ -46,7 +36,6 @@ const recommendedPrompts = computed(() => {
 
 // 各模式专属 placeholder（对齐三张设计图）
 const placeholder = computed(() => {
-  if (chat.runMode.value === 'schedule') return '描述需要周期性执行的定时任务，小马来帮你按时完成'
   if (chat.runMode.value === 'task') {
     return chat.selectedExperts.value.length
       ? `倾听着手在线，让AI模型问您上传文件吧...`
@@ -142,27 +131,6 @@ function formatSize(bytes?: number) {
             <X class="h-3 w-3" />
           </button>
         </div>
-      </div>
-
-      <!-- Schedule panel (定时任务模式专属) -->
-      <div v-if="chat.runMode.value === 'schedule'" class="mx-3 mt-3 rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
-        <div class="grid grid-cols-1 items-center gap-2 sm:grid-cols-3">
-          <label class="flex flex-col gap-1 text-[11px] text-zinc-500">
-            频率
-            <select v-model="chat.schedule.value.frequency" class="rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-800 outline-none">
-              <option v-for="f in frequencyOptions" :key="f.value" :value="f.value">{{ f.label }}</option>
-            </select>
-          </label>
-          <label class="flex flex-col gap-1 text-[11px] text-zinc-500">
-            日期
-            <input v-model="chat.schedule.value.date" type="date" class="rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-800 outline-none" />
-          </label>
-          <label class="flex flex-col gap-1 text-[11px] text-zinc-500">
-            时间
-            <input v-model="chat.schedule.value.time" type="time" class="rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-800 outline-none" />
-          </label>
-        </div>
-        <input v-if="chat.schedule.value.frequency === 'cron'" v-model="chat.schedule.value.cron" type="text" placeholder="0 9 * * *" class="mt-2 w-full rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-800 outline-none" />
       </div>
 
       <!-- Textarea -->

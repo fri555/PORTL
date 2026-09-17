@@ -21,7 +21,7 @@ export function useKnowledgeBase() {
   const isAdmin = computed(() => store.user?.role === 'admin')
 
   // ═══════════════ 响应式状态 ═══════════════
-  const sidebarVisible = ref(true)
+  const sidebarVisible = ref(false)
   const activeSpace = ref<'public' | 'personal'>('public')
   const selectedKbId = ref<string | null>(null)
   const activeSpaceRoot = ref(true)

@@ -106,22 +106,6 @@ function setMobileMessagesEl(el: Element | ComponentPublicInstance | null) {
                 </div>
               </div>
             </div>
-            <!-- Automation -->
-            <div v-if="chat.activeSubPanel.value === 'automation'" class="mx-auto max-w-2xl space-y-4">
-              <div v-for="auto in chat.automations.value" :key="auto.name" class="rounded-xl border border-zinc-200 bg-white p-4">
-                <div class="flex items-start justify-between">
-                  <div>
-                    <div class="flex items-center gap-2"><span class="text-sm font-semibold text-zinc-900">{{ auto.name }}</span><span class="rounded-full px-1.5 py-0.5 text-[9px] font-medium" :class="auto.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-zinc-100 text-zinc-500'">{{ auto.status === 'active' ? '运行中' : '暂停' }}</span></div>
-                    <p class="mt-1 text-xs text-zinc-500">触发：{{ auto.trigger }} · 执行：{{ auto.agent }}</p>
-                  </div>
-                  <div class="flex shrink-0 items-center gap-1.5">
-                    <button class="rounded-lg border border-zinc-200 px-2 py-1 text-[10px] text-zinc-500 hover:bg-zinc-50" @click="chat.runAutomationNow(auto.name)">立即启动</button>
-                    <button v-if="auto.status === 'active'" class="rounded-lg border border-zinc-200 px-2 py-1 text-[10px] text-zinc-500 hover:bg-zinc-50" @click="chat.toggleAutomation(auto.name)">暂停</button>
-                    <button v-else class="rounded-lg border border-zinc-200 px-2 py-1 text-[10px] text-zinc-600 hover:bg-zinc-50" @click="chat.toggleAutomation(auto.name)">启动</button>
-                  </div>
-                </div>
-              </div>
-            </div>
             <!-- Expert -->
             <div v-if="chat.activeSubPanel.value === 'expert'" class="mx-auto max-w-2xl space-y-4">
               <div v-for="exp in chat.experts" :key="exp.id" class="flex gap-3 rounded-xl border border-zinc-200 bg-white p-4">

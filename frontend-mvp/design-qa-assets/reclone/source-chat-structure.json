@@ -1,0 +1,898 @@
+{
+  "bodyText": "内测版\n天马智擎\n工作台\n仪表盘\n知识中心\n设置\n我要吐槽\n内测\n朝暮\n新对话\n日常办公\n查看更多\n2026-08-11 15:19\n2026-08-11 15:19\n知识库中查下关于「鞋服配」的内容，并输出一份报告\n2026-08-11 14:54\n搜索知识库中关于鞋服配的内容\n2026-08-11 10:56\n给「朝暮」发条钉钉消息：「早上好」（拼音模糊搜索\n2026-08-11 10:48\n专家模式\n查看更多\n经营数据分析\n2026-08-10 16:34\n需求池分析\n2026-08-10 16:10\n商品池分析\n2026-08-10 15:45\n分层盘点商品池动销、库存、毛利数据，筛选爆款、平\n2026-08-10 12:14\n分析需求池数据表，制作可视化html报告，包含以\n2026-08-10 12:12\n日常办公\n联网查询\n发消息\n给「花名」发条钉钉消息：「内容」（拼音模糊搜索）\n建待办\n给我建个钉钉待办：「标题」「内容」，「时间」前完成（拼音模糊搜索）\n建日程\n跟「花名」约钉钉会议：「园区」空会议室，「时间时长」开「主题」会（拼音模糊搜索）\n查日程\n查下我今天的钉钉日程\n查知识库\n知识库中查下关于「关键词」的内容，并输出一份报告\n网络查询\n网上查下关于「关键词」的内容，并生成一份报告",
+  "interactives": [
+    {
+      "aria": "天马智擎",
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 16,
+        "w": 67,
+        "x": 28,
+        "y": 17
+      },
+      "style": {
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(17, 17, 17)",
+        "borderRadius": "0px",
+        "color": "rgb(17, 17, 17)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "0px"
+      },
+      "tag": "BUTTON",
+      "text": ""
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 30,
+        "w": 86,
+        "x": 170,
+        "y": 16
+      },
+      "style": {
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(17, 17, 17)",
+        "borderRadius": "0px",
+        "color": "rgb(17, 17, 17)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "4px normal",
+        "padding": "0px"
+      },
+      "tag": "BUTTON",
+      "text": "天马智擎"
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 30,
+        "w": 70,
+        "x": 288,
+        "y": 16
+      },
+      "style": {
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(17, 17, 17)",
+        "borderRadius": "0px",
+        "color": "rgb(17, 17, 17)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "4px normal",
+        "padding": "0px"
+      },
+      "tag": "BUTTON",
+      "text": "工作台"
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 30,
+        "w": 70,
+        "x": 390,
+        "y": 16
+      },
+      "style": {
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(17, 17, 17)",
+        "borderRadius": "0px",
+        "color": "rgb(17, 17, 17)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "4px normal",
+        "padding": "0px"
+      },
+      "tag": "BUTTON",
+      "text": "仪表盘"
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 30,
+        "w": 86,
+        "x": 492,
+        "y": 16
+      },
+      "style": {
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(17, 17, 17)",
+        "borderRadius": "0px",
+        "color": "rgb(17, 17, 17)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "4px normal",
+        "padding": "0px"
+      },
+      "tag": "BUTTON",
+      "text": "知识中心"
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 30,
+        "w": 54,
+        "x": 610,
+        "y": 16
+      },
+      "style": {
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(17, 17, 17)",
+        "borderRadius": "0px",
+        "color": "rgb(17, 17, 17)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "4px normal",
+        "padding": "0px"
+      },
+      "tag": "BUTTON",
+      "text": "设置"
+    },
+    {
+      "aria": "我要吐槽",
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 32,
+        "w": 144,
+        "x": 1065,
+        "y": 12
+      },
+      "style": {
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "1px solid rgb(211, 211, 211)",
+        "borderRadius": "8px",
+        "color": "rgb(17, 17, 17)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "0px 16px"
+      },
+      "tag": "BUTTON",
+      "text": "我要吐槽内测"
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 42,
+        "w": 150,
+        "x": 1274,
+        "y": 7
+      },
+      "style": {
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(17, 17, 17)",
+        "borderRadius": "8px",
+        "color": "rgb(17, 17, 17)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "5px 8px"
+      },
+      "tag": "BUTTON",
+      "text": "朝暮"
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 32,
+        "w": 32,
+        "x": 16,
+        "y": 72
+      },
+      "style": {
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(17, 17, 17)",
+        "borderRadius": "8px",
+        "color": "rgb(17, 17, 17)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "8px"
+      },
+      "tag": "BUTTON",
+      "text": ""
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 32,
+        "w": 32,
+        "x": 50,
+        "y": 72
+      },
+      "style": {
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(17, 17, 17)",
+        "borderRadius": "8px",
+        "color": "rgb(17, 17, 17)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "8px"
+      },
+      "tag": "BUTTON",
+      "text": ""
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 36,
+        "w": 246,
+        "x": 12,
+        "y": 116
+      },
+      "style": {
+        "background": "rgb(17, 17, 17)",
+        "border": "0px none rgb(255, 255, 255)",
+        "borderRadius": "10px",
+        "color": "rgb(255, 255, 255)",
+        "font": "500 14px / 22px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "500",
+        "gap": "8px",
+        "padding": "0px"
+      },
+      "tag": "BUTTON",
+      "text": "新对话"
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 36,
+        "w": 246,
+        "x": 12,
+        "y": 168
+      },
+      "style": {
+        "background": "rgb(255, 255, 255)",
+        "border": "0px none rgb(17, 17, 17)",
+        "borderRadius": "12px",
+        "color": "rgb(17, 17, 17)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "0px 12px"
+      },
+      "tag": "BUTTON",
+      "text": "日常办公查看更多"
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 20,
+        "w": 20,
+        "x": 230,
+        "y": 213
+      },
+      "style": {
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(102, 102, 102)",
+        "borderRadius": "6px",
+        "color": "rgb(102, 102, 102)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "0px"
+      },
+      "tag": "BUTTON",
+      "text": ""
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 20,
+        "w": 20,
+        "x": 230,
+        "y": 277
+      },
+      "style": {
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(102, 102, 102)",
+        "borderRadius": "6px",
+        "color": "rgb(102, 102, 102)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "0px"
+      },
+      "tag": "BUTTON",
+      "text": ""
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 20,
+        "w": 20,
+        "x": 230,
+        "y": 341
+      },
+      "style": {
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(102, 102, 102)",
+        "borderRadius": "6px",
+        "color": "rgb(102, 102, 102)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "0px"
+      },
+      "tag": "BUTTON",
+      "text": ""
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 20,
+        "w": 20,
+        "x": 230,
+        "y": 405
+      },
+      "style": {
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(102, 102, 102)",
+        "borderRadius": "6px",
+        "color": "rgb(102, 102, 102)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "0px"
+      },
+      "tag": "BUTTON",
+      "text": ""
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 20,
+        "w": 20,
+        "x": 230,
+        "y": 469
+      },
+      "style": {
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(102, 102, 102)",
+        "borderRadius": "6px",
+        "color": "rgb(102, 102, 102)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "0px"
+      },
+      "tag": "BUTTON",
+      "text": ""
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 36,
+        "w": 246,
+        "x": 12,
+        "y": 536
+      },
+      "style": {
+        "background": "rgb(255, 255, 255)",
+        "border": "0px none rgb(17, 17, 17)",
+        "borderRadius": "12px",
+        "color": "rgb(17, 17, 17)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "0px 12px"
+      },
+      "tag": "BUTTON",
+      "text": "专家模式查看更多"
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 20,
+        "w": 20,
+        "x": 230,
+        "y": 581
+      },
+      "style": {
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(102, 102, 102)",
+        "borderRadius": "6px",
+        "color": "rgb(102, 102, 102)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "0px"
+      },
+      "tag": "BUTTON",
+      "text": ""
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 20,
+        "w": 20,
+        "x": 230,
+        "y": 645
+      },
+      "style": {
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(102, 102, 102)",
+        "borderRadius": "6px",
+        "color": "rgb(102, 102, 102)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "0px"
+      },
+      "tag": "BUTTON",
+      "text": ""
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 20,
+        "w": 20,
+        "x": 230,
+        "y": 709
+      },
+      "style": {
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(102, 102, 102)",
+        "borderRadius": "6px",
+        "color": "rgb(102, 102, 102)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "0px"
+      },
+      "tag": "BUTTON",
+      "text": ""
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 20,
+        "w": 20,
+        "x": 230,
+        "y": 773
+      },
+      "style": {
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(102, 102, 102)",
+        "borderRadius": "6px",
+        "color": "rgb(102, 102, 102)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "0px"
+      },
+      "tag": "BUTTON",
+      "text": ""
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 20,
+        "w": 20,
+        "x": 230,
+        "y": 837
+      },
+      "style": {
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(102, 102, 102)",
+        "borderRadius": "6px",
+        "color": "rgb(102, 102, 102)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "0px"
+      },
+      "tag": "BUTTON",
+      "text": ""
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 32,
+        "w": 32,
+        "x": 16,
+        "y": 72
+      },
+      "style": {
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(17, 17, 17)",
+        "borderRadius": "8px",
+        "color": "rgb(17, 17, 17)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "8px"
+      },
+      "tag": "BUTTON",
+      "text": ""
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 32,
+        "w": 32,
+        "x": 50,
+        "y": 72
+      },
+      "style": {
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(17, 17, 17)",
+        "borderRadius": "8px",
+        "color": "rgb(17, 17, 17)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "8px"
+      },
+      "tag": "BUTTON",
+      "text": ""
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 32,
+        "w": 32,
+        "x": 84,
+        "y": 72
+      },
+      "style": {
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(17, 17, 17)",
+        "borderRadius": "8px",
+        "color": "rgb(17, 17, 17)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "8px"
+      },
+      "tag": "BUTTON",
+      "text": ""
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": "小马在线，随时向我提问或上传文件...",
+      "rect": {
+        "h": 100,
+        "w": 776,
+        "x": 332,
+        "y": 300
+      },
+      "style": {
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(17, 17, 17)",
+        "borderRadius": "0px",
+        "color": "rgb(17, 17, 17)",
+        "font": "14px / 26px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "0px 2px"
+      },
+      "tag": "TEXTAREA",
+      "text": ""
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 32,
+        "w": 32,
+        "x": 332,
+        "y": 414
+      },
+      "style": {
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(17, 17, 17)",
+        "borderRadius": "50%",
+        "color": "rgb(17, 17, 17)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "0px"
+      },
+      "tag": "BUTTON",
+      "text": ""
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 32,
+        "w": 112,
+        "x": 372,
+        "y": 414
+      },
+      "style": {
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(17, 17, 17)",
+        "borderRadius": "8px",
+        "color": "rgb(17, 17, 17)",
+        "font": "500 13px / 22px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "gap": "normal",
+        "padding": "0px 9px 0px 10px"
+      },
+      "tag": "BUTTON",
+      "text": "日常办公"
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 32,
+        "w": 96,
+        "x": 492,
+        "y": 414
+      },
+      "style": {
+        "background": "rgb(241, 247, 255)",
+        "border": "0px none rgb(0, 102, 255)",
+        "borderRadius": "8px",
+        "color": "rgb(0, 102, 255)",
+        "font": "500 13px / 22px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "gap": "5px",
+        "padding": "0px 13px 0px 10px"
+      },
+      "tag": "BUTTON",
+      "text": "联网查询"
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 36,
+        "w": 36,
+        "x": 1072,
+        "y": 412
+      },
+      "style": {
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(17, 17, 17)",
+        "borderRadius": "24px",
+        "color": "rgb(17, 17, 17)",
+        "font": "14px / 0px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "0px"
+      },
+      "tag": "BUTTON",
+      "text": ""
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 74,
+        "w": 246,
+        "x": 339,
+        "y": 492
+      },
+      "style": {
+        "background": "rgb(255, 255, 255)",
+        "border": "1px solid rgb(242, 242, 242)",
+        "borderRadius": "12px",
+        "color": "rgb(17, 17, 17)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "0px 16px"
+      },
+      "tag": "BUTTON",
+      "text": "发消息给「花名」发条钉钉消息：「内容」（拼音模糊搜索）"
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 74,
+        "w": 246,
+        "x": 597,
+        "y": 492
+      },
+      "style": {
+        "background": "rgb(255, 255, 255)",
+        "border": "1px solid rgb(242, 242, 242)",
+        "borderRadius": "12px",
+        "color": "rgb(17, 17, 17)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "0px 16px"
+      },
+      "tag": "BUTTON",
+      "text": "建待办给我建个钉钉待办：「标题」「内容」，「时间」前完成（拼音模糊搜索）"
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 74,
+        "w": 246,
+        "x": 855,
+        "y": 492
+      },
+      "style": {
+        "background": "rgb(255, 255, 255)",
+        "border": "1px solid rgb(242, 242, 242)",
+        "borderRadius": "12px",
+        "color": "rgb(17, 17, 17)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "0px 16px"
+      },
+      "tag": "BUTTON",
+      "text": "建日程跟「花名」约钉钉会议：「园区」空会议室，「时间时长」开「主题」会（拼音模糊搜索）"
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 74,
+        "w": 246,
+        "x": 339,
+        "y": 578
+      },
+      "style": {
+        "background": "rgb(255, 255, 255)",
+        "border": "1px solid rgb(242, 242, 242)",
+        "borderRadius": "12px",
+        "color": "rgb(17, 17, 17)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "0px 16px"
+      },
+      "tag": "BUTTON",
+      "text": "查日程查下我今天的钉钉日程"
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 74,
+        "w": 246,
+        "x": 597,
+        "y": 578
+      },
+      "style": {
+        "background": "rgb(255, 255, 255)",
+        "border": "1px solid rgb(242, 242, 242)",
+        "borderRadius": "12px",
+        "color": "rgb(17, 17, 17)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "0px 16px"
+      },
+      "tag": "BUTTON",
+      "text": "查知识库知识库中查下关于「关键词」的内容，并输出一份报告"
+    },
+    {
+      "aria": null,
+      "href": null,
+      "placeholder": null,
+      "rect": {
+        "h": 74,
+        "w": 246,
+        "x": 855,
+        "y": 578
+      },
+      "style": {
+        "background": "rgb(255, 255, 255)",
+        "border": "1px solid rgb(242, 242, 242)",
+        "borderRadius": "12px",
+        "color": "rgb(17, 17, 17)",
+        "font": "14px / 21px system-ui, -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "gap": "normal",
+        "padding": "0px 16px"
+      },
+      "tag": "BUTTON",
+      "text": "网络查询网上查下关于「关键词」的内容，并生成一份报告"
+    }
+  ],
+  "viewport": {
+    "dpr": 1,
+    "h": 900,
+    "w": 1440
+  }
+}
