@@ -747,7 +747,7 @@ const metrics = computed(() => [
     icon: CircleDollarSign,
   },
   {
-    label: '系统额度',
+    label: '个人额度',
     value: money(displayQuota.value),
     note: `${isAdmin.value ? '' : `来源：${personalQuotaSource.value} · `}使用率 ${displayRate.value.toFixed(1)}%`,
     icon: Gauge,
@@ -757,12 +757,6 @@ const metrics = computed(() => [
     value: money(remainingQuota.value),
     note: quotaBand(displayRate.value),
     icon: ShieldCheck,
-  },
-  {
-    label: '总 Token',
-    value: compact(totals.value.tokens),
-    note: '输入与输出合计',
-    icon: Sparkles,
   },
 ])
 
@@ -860,17 +854,14 @@ function exportUsage() {
 }
 function exportPersonalUsage() {
   downloadCsv('个人消耗明细.csv', [
-    '时间,请求,请求ID,Token消耗,金额消耗,智能体,模型,使用端',
+    '时间,请求,模块,智能体,金额消耗',
     ...personalUsageRecords.map((row) =>
       [
         row.time,
         row.request,
-        row.requestId,
-        row.tokens,
-        row.amount,
-        row.agent,
-        row.model,
         row.client,
+        row.agent,
+        row.amount,
       ].join(','),
     ),
   ])
@@ -1238,12 +1229,12 @@ function exportAudit() {
         </header>
         <section class="metric-grid personal-metrics">
           <article
-            v-for="item in metrics.slice(0, 4)"
+            v-for="item in metrics.slice(0, 3)"
             :key="item.label"
             class="metric-card"
             :class="{
-              danger: item.label === '系统额度' && displayRate >= 90,
-              warning: item.label === '系统额度' && displayRate >= 80 && displayRate < 90,
+              danger: item.label === '个人额度' && displayRate >= 90,
+              warning: item.label === '个人额度' && displayRate >= 80 && displayRate < 90,
             }"
           >
             <div>
@@ -1261,11 +1252,9 @@ function exportAudit() {
                 <tr>
                   <th>时间</th>
                   <th>请求</th>
-                  <th>Token 消耗</th>
-                  <th>金额消耗</th>
+                  <th>模块</th>
                   <th>智能体</th>
-                  <th>模型</th>
-                  <th>使用端</th>
+                  <th>金额消耗</th>
                 </tr>
               </thead>
               <tbody>
@@ -1277,11 +1266,9 @@ function exportAudit() {
                       ><small>{{ record.requestId }}</small>
                     </div>
                   </td>
-                  <td>{{ number(record.tokens) }}</td>
-                  <td>{{ money(record.amount) }}</td>
-                  <td>{{ record.agent }}</td>
-                  <td>{{ record.model }}</td>
                   <td>{{ record.client }}</td>
+                  <td>{{ record.agent }}</td>
+                  <td>{{ money(record.amount) }}</td>
                 </tr>
               </tbody>
             </table>
