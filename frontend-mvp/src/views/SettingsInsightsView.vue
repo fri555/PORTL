@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Activity,
@@ -41,23 +41,29 @@ type UsageNode = {
   sessionId?: string
   children?: UsageNode[]
 }
+type DeptNode = {
+  id: string
+  name: string
+  children?: DeptNode[]
+}
+
 type VisibleUsageRow = UsageNode & { level: number }
 type AuditRecord = {
   id: string
-  logType: 'system' | 'user' | 'login'
-  time: string
-  actor: string
-  actorId: string
-  module: string
-  action: string
-  objectType: string
-  objectId: string
-  objectName: string
-  description: string
-  source: string
+  bizType: string
+  bizId: string
+  bizName: string
+  operationType: 'CREATE' | 'UPDATE' | 'DELETE'
+  operationDesc: string
+  beforeContent: string
+  afterContent: string
+  source: '管理端' | '用户端' | '系统任务'
+  ip: string
   traceId: string
-  before: string
-  after: string
+  createUserId: string
+  createUser: string
+  createRealName: string
+  createTime: string
 }
 type PersonalUsageRecord = {
   id: string
@@ -110,28 +116,135 @@ const globalQuotaDefaults = ref<Record<'每日' | '每周' | '每月', number>>(
 })
 const personalQuotaSource = ref<'全局默认' | '个人设置'>('全局默认')
 
+const deptTree: DeptNode[] = [
+  { id: 'dept-root', name: '天马集团', children: [
+    { id: 'dept-product', name: '商品部', children: [
+      { id: 'dept-product-op', name: '商品运营组' },
+      { id: 'dept-product-plan', name: '商品企划组' },
+    ]},
+    { id: 'dept-online', name: '线上店铺', children: [
+      { id: 'dept-online-tmall', name: '天猫运营组' },
+      { id: 'dept-online-dy', name: '抖音运营组' },
+    ]},
+    { id: 'dept-marketing', name: '市场营销部', children: [
+      { id: 'dept-mkt-brand', name: '品牌组' },
+      { id: 'dept-mkt-digital', name: '数字营销组' },
+    ]},
+    { id: 'dept-supply', name: '供应链中心', children: [
+      { id: 'dept-supply-procure', name: '采购组' },
+      { id: 'dept-supply-logistics', name: '物流组' },
+    ]},
+  ]},
+]
+
+const deptOpen = ref(false)
+const selectedDeptIds = ref(new Set<string>())
+const deptSearchQuery = ref('')
+
+function allDeptIds(nodes: DeptNode[]): string[] {
+  return nodes.flatMap(n => [n.id, ...(n.children ? allDeptIds(n.children) : [])])
+}
+function isDeptSelected(node: DeptNode): 'all' | 'partial' | 'none' {
+  const ids = allDeptIds([node])
+  const selected = ids.filter(id => selectedDeptIds.value.has(id))
+  if (selected.length === 0) return 'none'
+  if (selected.length === ids.length) return 'all'
+  return 'partial'
+}
+function toggleDept(node: DeptNode) {
+  const ids = allDeptIds([node])
+  const allSelected = ids.every(id => selectedDeptIds.value.has(id))
+  const next = new Set(selectedDeptIds.value)
+  if (allSelected) ids.forEach(id => next.delete(id))
+  else ids.forEach(id => next.add(id))
+  selectedDeptIds.value = next
+}
+function toggleAllDepts() {
+  const all = allDeptIds(deptTree)
+  const allSelected = all.every(id => selectedDeptIds.value.has(id))
+  selectedDeptIds.value = allSelected ? new Set() : new Set(all)
+}
+function deptDisplayName(): string {
+  if (selectedDeptIds.value.size === 0) return '全部部门'
+  if (selectedDeptIds.value.size === allDeptIds(deptTree).length) return '全部部门'
+  const names: string[] = []
+  const walk = (nodes: DeptNode[]) => nodes.forEach(n => {
+    if (selectedDeptIds.value.has(n.id)) names.push(n.name)
+    if (n.children) walk(n.children)
+  })
+  walk(deptTree)
+  return names.length > 2 ? `${names[0]} 等 ${names.length} 个部门` : names.join('、')
+}
+
+const filteredDeptTree = computed(() => {
+  const q = deptSearchQuery.value.trim().toLowerCase()
+  if (!q) return deptTree
+  const match = (nodes: DeptNode[]): DeptNode[] =>
+    nodes.reduce<DeptNode[]>((acc, n) => {
+      const childMatch = n.children ? match(n.children) : []
+      const nameMatch = n.name.toLowerCase().includes(q)
+      if (nameMatch || childMatch.length) {
+        acc.push({ ...n, children: childMatch.length ? childMatch : n.children })
+      }
+      return acc
+    }, [])
+  return match(deptTree)
+})
+
 const startDate = ref('2026-09-01')
 const endDate = ref('2026-09-16')
-const usagePeriod = ref('本月')
 const peopleQuery = ref('')
-const usageModule = ref('全部模块')
-const usageAgent = ref('全部智能体')
-const appliedUsage = ref({ start: startDate.value, end: endDate.value, person: '', module: '全部模块', agent: '全部智能体' })
+const appliedUsage = ref({ start: startDate.value, end: endDate.value, person: '', module: '' })
+
+// 模块级联数据（两级，单选）
+const moduleCascade = [
+  { id: 'mc-agent', name: '智能体对话', children: [
+    { id: 'mc-agent-data', name: '数据分析师' },
+    { id: 'mc-agent-top', name: 'TOP款分析师' },
+    { id: 'mc-agent-assort', name: '组货专家' },
+  ]},
+  { id: 'mc-knowledge', name: '知识中心', children: [
+    { id: 'mc-knowledge-xiaozhi', name: '小智问答' },
+  ]},
+  { id: 'mc-workbench', name: '工作台', children: [
+    { id: 'mc-workbench-todo', name: '待办提取' },
+  ]},
+]
+const moduleOpen = ref(false)
+const selectedModuleId = ref('')
+function moduleDisplayName(): string {
+  if (!selectedModuleId.value) return '全部模块'
+  for (const g of moduleCascade) {
+    if (g.id === selectedModuleId.value) return g.name
+    const child = g.children?.find(c => c.id === selectedModuleId.value)
+    if (child) return `${g.name} - ${child.name}`
+  }
+  return '全部模块'
+}
+function selectModule(id: string) {
+  selectedModuleId.value = selectedModuleId.value === id ? '' : id
+  moduleOpen.value = false
+}
+
+// 人员筛选列表
+const allPersons = computed(() => flattenPersons(adminTree).map(p => ({ id: p.id, name: p.name })))
 const personalPeriod = ref<'today' | '7d' | '30d' | 'custom'>('7d')
 const quotaWarningOpen = ref(true)
 
 const auditStart = ref('2026-09-01T00:00')
 const auditEnd = ref('2026-09-16T23:59')
 const actorQuery = ref('')
-const auditModule = ref('全部模块')
-const auditAction = ref('全部操作')
+const auditModule = ref('')
+const auditObjectQuery = ref('')
+const auditAction = ref('')
 const appliedAudit = ref({
   start: auditStart.value,
   end: auditEnd.value,
   actor: '',
   actorId: '',
-  module: '全部模块',
-  action: '全部操作',
+  module: '',
+  objectQuery: '',
+  action: '',
 })
 
 const personalUsageRecords: PersonalUsageRecord[] = [
@@ -254,7 +367,7 @@ const adminTree: UsageNode[] = [
     id: 'dept-product',
     type: 'department',
     name: '商品部',
-    subtitle: '2 人',
+    subtitle: '4 人',
     tokens: 92_600_000,
     calls: 68_420,
     coins: 186_420,
@@ -316,13 +429,31 @@ const adminTree: UsageNode[] = [
           },
         ],
       },
+      {
+        id: 'user-muxin', type: 'person', name: '刘洋（沐心）', subtitle: '商品企划',
+        tokens: 45_200_000, calls: 32_100, coins: 89_400, amount: 4128.30,
+        quota: 150_000, quotaRate: 62, quotaSource: '全局默认',
+        children: [session('s-prod-0916', '秋冬企划分析', '专家模式', 'Qwen3 Max', 45_200_000, 32_100, 89_400, 4128.30, '2026-09-16 09:30')],
+      },
+      {
+        id: 'user-ranqiu', type: 'person', name: '赵婷（染秋）', subtitle: '商品运营',
+        tokens: 38_600_000, calls: 28_400, coins: 76_200, amount: 3512.80,
+        quota: 120_000, quotaRate: 58, quotaSource: '全局默认',
+        children: [session('s-prod-0915', '商品详情页优化', '日常办公', 'Qwen3 Plus', 38_600_000, 28_400, 76_200, 3512.80, '2026-09-15 14:20')],
+      },
+      {
+        id: 'user-chunyuan', type: 'person', name: '孙鹏（淳远）', subtitle: '商品数据分析',
+        tokens: 22_100_000, calls: 16_800, coins: 43_600, amount: 2016.50,
+        quota: 100_000, quotaRate: 40, quotaSource: '全局默认',
+        children: [session('s-prod-0914', '销售趋势分析', '日常办公', 'Qwen3 Plus', 22_100_000, 16_800, 43_600, 2016.50, '2026-09-14 11:00')],
+      },
     ],
   },
   {
     id: 'dept-online',
     type: 'department',
     name: '线上店铺',
-    subtitle: '2 人',
+    subtitle: '4 人',
     tokens: 81_400_000,
     calls: 76_108,
     coins: 161_280,
@@ -383,13 +514,31 @@ const adminTree: UsageNode[] = [
           },
         ],
       },
+      {
+        id: 'user-lanxin', type: 'person', name: '周琳（蓝心）', subtitle: '天猫店长',
+        tokens: 52_300_000, calls: 48_200, coins: 103_600, amount: 4786.40,
+        quota: 160_000, quotaRate: 78, quotaSource: '个人设置',
+        children: [session('s-online-0916', '天猫活动策划', '专家模式', 'DeepSeek R1', 52_300_000, 48_200, 103_600, 4786.40, '2026-09-16 13:15')],
+      },
+      {
+        id: 'user-fenglai', type: 'person', name: '吴磊（枫来）', subtitle: '抖音运营',
+        tokens: 41_800_000, calls: 39_600, coins: 82_800, amount: 3818.60,
+        quota: 140_000, quotaRate: 68, quotaSource: '全局默认',
+        children: [session('s-online-0915', '短视频脚本生成', '日常办公', 'Qwen3 Max', 41_800_000, 39_600, 82_800, 3818.60, '2026-09-15 16:40')],
+      },
+      {
+        id: 'user-yingshi', type: 'person', name: '郑欣（映时）', subtitle: '店铺数据分析',
+        tokens: 28_500_000, calls: 26_100, coins: 56_400, amount: 2604.20,
+        quota: 100_000, quotaRate: 52, quotaSource: '全局默认',
+        children: [session('s-online-0914', '店铺流量分析', '日常办公', 'Qwen3 Plus', 28_500_000, 26_100, 56_400, 2604.20, '2026-09-14 10:20')],
+      },
     ],
   },
   {
     id: 'dept-marketing',
     type: 'department',
     name: '市场营销部',
-    subtitle: '1 人',
+    subtitle: '3 人',
     tokens: 74_200_000,
     calls: 55_430,
     coins: 148_620,
@@ -449,13 +598,25 @@ const adminTree: UsageNode[] = [
           },
         ],
       },
+      {
+        id: 'user-hanyi', type: 'person', name: '黄莉（涵意）', subtitle: '品牌经理',
+        tokens: 35_400_000, calls: 26_800, coins: 70_200, amount: 3240.60,
+        quota: 120_000, quotaRate: 55, quotaSource: '全局默认',
+        children: [session('s-mkt-0916', '品牌故事撰写', '日常办公', 'Qwen3 Max', 35_400_000, 26_800, 70_200, 3240.60, '2026-09-16 11:30')],
+      },
+      {
+        id: 'user-qianyu', type: 'person', name: '林峰（千语）', subtitle: '数字营销',
+        tokens: 19_800_000, calls: 15_200, coins: 39_200, amount: 1808.40,
+        quota: 80_000, quotaRate: 45, quotaSource: '全局默认',
+        children: [session('s-mkt-0915', '投放效果分析', '日常办公', 'Qwen3 Plus', 19_800_000, 15_200, 39_200, 1808.40, '2026-09-15 09:50')],
+      },
     ],
   },
   {
     id: 'dept-supply',
     type: 'department',
     name: '供应链中心',
-    subtitle: '1 人',
+    subtitle: '3 人',
     tokens: 62_800_000,
     calls: 49_026,
     coins: 124_360,
@@ -514,6 +675,18 @@ const adminTree: UsageNode[] = [
             ],
           },
         ],
+      },
+      {
+        id: 'user-mochen', type: 'person', name: '何芳（墨尘）', subtitle: '采购专员',
+        tokens: 28_600_000, calls: 22_400, coins: 56_800, amount: 2618.90,
+        quota: 100_000, quotaRate: 52, quotaSource: '全局默认',
+        children: [session('s-supply-0916', '供应商比价分析', '专家模式', 'DeepSeek R1', 28_600_000, 22_400, 56_800, 2618.90, '2026-09-16 14:50')],
+      },
+      {
+        id: 'user-zhiqiu', type: 'person', name: '徐强（知秋）', subtitle: '物流调度',
+        tokens: 18_200_000, calls: 14_600, coins: 36_000, amount: 1660.30,
+        quota: 80_000, quotaRate: 38, quotaSource: '全局默认',
+        children: [session('s-supply-0915', '配送路线优化', '日常办公', 'Qwen3 Plus', 18_200_000, 14_600, 36_000, 1660.30, '2026-09-15 15:10')],
       },
     ],
   },
@@ -654,10 +827,66 @@ function matchesFilters(node: UsageNode) {
       (!filters.end || (node.date ?? '') <= `${filters.end} 23:59`))
   return (
     dateMatched &&
-    containsModule(node, filters.module) &&
-    (filters.agent === '全部智能体' || containsModule(node, filters.agent))
+    containsModule(node, filters.module)
   )
 }
+
+// 扁平人员列表（从 adminTree 提取所有 person 节点）
+function flattenPersons(nodes: UsageNode[]): UsageNode[] {
+  return nodes.flatMap(n =>
+    n.type === 'person' ? [n] : flattenPersons(n.children ?? []),
+  )
+}
+
+const flatPersonList = computed(() => {
+  const persons = flattenPersons(adminTree)
+  const query = peopleQuery.value.trim().toLowerCase()
+  const deptIds = selectedDeptIds.value
+  const allIds = allDeptIds(deptTree)
+  const noDeptFilter = deptIds.size === 0 || deptIds.size === allIds.length
+  return persons
+    .filter(p => !query || p.name.toLowerCase().includes(query))
+    .filter(p => {
+      if (noDeptFilter) return true
+      // 找到该人员所属的部门（通过 adminTree 反向查找）
+      const findDept = (nodes: UsageNode[], parentDept?: string): string | null => {
+        for (const n of nodes) {
+          if (n.type === 'person' && n.id === p.id) return parentDept ?? null
+          if (n.type === 'department' && n.children) {
+            const found = findDept(n.children, n.id)
+            if (found) return found
+          }
+        }
+        return null
+      }
+      const deptId = findDept(adminTree)
+      return deptId ? deptIds.has(deptId) : true
+    })
+    .sort((a, b) => b.amount - a.amount)
+})
+
+// 汇总行
+const summaryRow = computed(() => {
+  const persons = flatPersonList.value
+  const totalAmount = persons.reduce((s, p) => s + p.amount, 0)
+  const totalQuota = persons.reduce((s, p) => s + p.quota, 0)
+  const totalTokens = persons.reduce((s, p) => s + p.tokens, 0)
+  const remaining = Math.max(0, totalQuota - totalAmount)
+  const rate = totalQuota ? (totalAmount / totalQuota) * 100 : 0
+  return { amount: totalAmount, quota: totalQuota, tokens: totalTokens, remaining, rate }
+})
+
+// 用量分页
+const usagePageSize = 10
+const usagePage = ref(1)
+const paginatedPersonList = computed(() => {
+  const start = (usagePage.value - 1) * usagePageSize
+  return flatPersonList.value.slice(start, start + usagePageSize)
+})
+const usageTotalPages = computed(() =>
+  Math.max(1, Math.ceil(flatPersonList.value.length / usagePageSize)),
+)
+watch(flatPersonList, () => { usagePage.value = 1 })
 
 const filteredRoots = computed(() => {
   const roots = isAdmin.value ? adminTree : personalTree
@@ -681,7 +910,7 @@ const visibleRows = computed<VisibleUsageRow[]>(() => {
       if (!node.children?.length) return
       if (node.type === 'person' && expandedIds.value.has(node.id)) {
         sessionsWithPath(node.children)
-          .filter(({ row, path }) => matchesFilters(row) && (appliedUsage.value.module === '全部模块' || path.includes(appliedUsage.value.module)) && (appliedUsage.value.agent === '全部智能体' || path.includes(appliedUsage.value.agent)))
+          .filter(({ row, path }) => matchesFilters(row) && (!appliedUsage.value.module || path.includes(appliedUsage.value.module)))
           .forEach(({ row: request }) => rows.push({ ...request, name: `${request.name} · ${request.date ?? ''}`, subtitle: request.model, level: level + 1 }))
         return
       }
@@ -712,8 +941,7 @@ const totals = computed(() => {
     const filters = appliedUsage.value
     const rows = sessionsWithPath(filteredRoots.value).filter(({ row, path }) =>
       matchesFilters(row) &&
-      (filters.module === '全部模块' || path.includes(filters.module)) &&
-      (filters.agent === '全部智能体' || path.includes(filters.agent)))
+      (!filters.module || path.includes(filters.module)))
     return rows.reduce((sum, { row }) => ({ amount: sum.amount + row.amount, coins: 0, tokens: sum.tokens + row.tokens, calls: 0, quota: sum.quota }), {
       amount: 0, coins: 0, tokens: 0, calls: 0, quota: filteredRoots.value.reduce((sum, row) => sum + row.quota, 0),
     })
@@ -732,17 +960,17 @@ const totals = computed(() => {
 const personalRate = computed(() =>
   totals.value.quota ? (totals.value.amount / totals.value.quota) * 100 : 0,
 )
-const displayQuota = computed(() => (isAdmin.value ? monthlyQuota.value : totals.value.quota))
+const displayQuota = computed(() => (isAdmin.value ? summaryRow.value.quota : totals.value.quota))
 const displayRate = computed(() =>
   isAdmin.value
-    ? (totals.value.amount / Math.max(1, monthlyQuota.value)) * 100
+    ? summaryRow.value.rate
     : personalRate.value,
 )
 const remainingQuota = computed(() => Math.max(0, displayQuota.value - totals.value.amount))
 const metrics = computed(() => [
   {
     label: '人民币消耗',
-    value: money(totals.value.amount),
+    value: money(isAdmin.value ? summaryRow.value.amount : totals.value.amount),
     note: `${startDate.value} 至 ${endDate.value}`,
     icon: CircleDollarSign,
   },
@@ -754,7 +982,7 @@ const metrics = computed(() => [
   },
   {
     label: '剩余额度',
-    value: money(remainingQuota.value),
+    value: money(isAdmin.value ? summaryRow.value.remaining : remainingQuota.value),
     note: quotaBand(displayRate.value),
     icon: ShieldCheck,
   },
@@ -806,22 +1034,16 @@ function collapseAll() {
   expandedIds.value = new Set()
 }
 function applyUsageFilters() {
-  if (usagePeriod.value === '今日') startDate.value = endDate.value = '2026-09-17'
-  else if (usagePeriod.value === '本周') { startDate.value = '2026-09-14'; endDate.value = '2026-09-20' }
-  else if (usagePeriod.value === '本月') { startDate.value = '2026-09-01'; endDate.value = '2026-09-30' }
-  appliedUsage.value = { start: startDate.value, end: endDate.value, person: peopleQuery.value, module: usageModule.value, agent: usageAgent.value }
-  collapseAll()
-  showFeedback(`查询已生效，当前展示 ${visibleRows.value.length} 条`)
+  appliedUsage.value = { start: startDate.value, end: endDate.value, person: peopleQuery.value, module: selectedModuleId.value }
+  showFeedback(`查询已生效，当前展示 ${flatPersonList.value.length} 人`)
 }
 function resetUsageFilters() {
   startDate.value = '2026-09-01'
   endDate.value = '2026-09-30'
-  usagePeriod.value = '本月'
   peopleQuery.value = ''
-  usageModule.value = '全部模块'
-  usageAgent.value = '全部智能体'
-  appliedUsage.value = { start: startDate.value, end: endDate.value, person: '', module: '全部模块', agent: '全部智能体' }
-  collapseAll()
+  selectedDeptIds.value = new Set()
+  selectedModuleId.value = ''
+  appliedUsage.value = { start: startDate.value, end: endDate.value, person: '', module: '' }
 }
 function showFeedback(message: string) {
   feedback.value = message
@@ -969,133 +1191,291 @@ function deletePersonalQuota() {
   quotaOpen.value = false
   showFeedback(`已删除个人额度，恢复使用${quotaCycle.value}全局默认额度`)
 }
-function openRow(row: UsageNode) {
-  if (row.type !== 'department' && row.type !== 'person' && !row.children?.length) selectedUsage.value = row
-  else if (row.children?.length) toggleNode(row.id)
+function openPersonDetail(row: UsageNode) {
+  selectedPersonDetail.value = row
 }
+const selectedPersonDetail = ref<UsageNode | null>(null)
+const personRequests = computed(() => {
+  if (!selectedPersonDetail.value) return []
+  const person = selectedPersonDetail.value
+  const sessions: UsageNode[] = []
+  const collect = (nodes: UsageNode[]) => nodes.forEach(n => {
+    if (n.type === 'session') sessions.push(n)
+    if (n.children) collect(n.children)
+  })
+  collect(person.children ?? [])
+  return sessions
+})
+// 额度分解（基本信息）
+const personGlobalQuota = computed(() => {
+  if (!selectedPersonDetail.value) return 0
+  const p = selectedPersonDetail.value
+  return p.quotaSource === '全局默认' ? p.quota : 100_000
+})
+const personUserQuota = computed(() => {
+  if (!selectedPersonDetail.value) return 0
+  const p = selectedPersonDetail.value
+  return p.quotaSource === '个人设置' ? p.quota : 0
+})
+const personTempQuota = computed(() => {
+  if (!selectedPersonDetail.value) return 0
+  return Math.round(selectedPersonDetail.value.quota * 0.1)
+})
+// 消耗明细 token 分解
+const personInputTokens = computed(() => selectedPersonDetail.value ? Math.round(selectedPersonDetail.value.tokens * 0.62) : 0)
+const personOutputTokens = computed(() => selectedPersonDetail.value ? Math.round(selectedPersonDetail.value.tokens * 0.28) : 0)
+const personCacheTokens = computed(() => selectedPersonDetail.value ? Math.round(selectedPersonDetail.value.tokens * 0.10) : 0)
 
 const auditRecords: AuditRecord[] = [
   {
-    id: 'audit-001',
-    logType: 'system',
-    time: '2026-09-16 14:32:18',
-    actor: '张明（朝暮）',
-    actorId: 'user-chaomu',
-    module: '智能体管理',
-    action: '修改',
-    objectType: '智能体',
-    objectId: 'agent_top_001',
-    objectName: 'TOP款分析师',
-    description: '调整默认模型与可见范围',
+    id: '10001',
+    bizType: '智能体',
+    bizId: 'agent_top_001',
+    bizName: 'TOP款分析师',
+    operationType: 'UPDATE',
+    operationDesc: '调整默认模型与可见范围',
+    beforeContent: '{"defaultModel":"Qwen3 Max","visibility":"商品部"}',
+    afterContent: '{"defaultModel":"DeepSeek R1","visibility":"商品部、线上店铺"}',
     source: '管理端',
+    ip: '192.168.1.101',
     traceId: 'tr_9d21f8c2',
-    before: '默认模型：Qwen3 Max\n可见范围：商品部',
-    after: '默认模型：DeepSeek R1\n可见范围：商品部、线上店铺',
+    createUserId: 'user-chaomu',
+    createUser: '朝暮',
+    createRealName: '张明',
+    createTime: '2026-09-16 14:32:18',
   },
   {
-    id: 'audit-002',
-    logType: 'system',
-    time: '2026-09-16 11:08:44',
-    actor: '李清（清晖）',
-    actorId: 'user-qinghui',
-    module: '知识中心',
-    action: '新增',
-    objectType: '知识库',
-    objectId: 'kb_aw_2026',
-    objectName: '秋冬商品知识库',
-    description: '创建部门共享知识库',
+    id: '10002',
+    bizType: '知识库',
+    bizId: 'kb_aw_2026',
+    bizName: '秋冬商品知识库',
+    operationType: 'CREATE',
+    operationDesc: '创建部门共享知识库',
+    beforeContent: '',
+    afterContent: '{"name":"秋冬商品知识库","permission":"部门可见"}',
     source: '用户端',
+    ip: '192.168.1.102',
     traceId: 'tr_46a0c19e',
-    before: '—',
-    after: '名称：秋冬商品知识库\n权限：部门可见',
+    createUserId: 'user-qinghui',
+    createUser: '清晖',
+    createRealName: '李清',
+    createTime: '2026-09-16 11:08:44',
   },
   {
-    id: 'audit-003',
-    logType: 'system',
-    time: '2026-09-15 18:26:09',
-    actor: '系统任务',
-    actorId: 'system-task',
-    module: '模型管理',
-    action: '修改',
-    objectType: '模型',
-    objectId: 'model_qwen3',
-    objectName: 'Qwen3 企业主模型',
-    description: '恢复模型服务状态',
+    id: '10003',
+    bizType: '模型',
+    bizId: 'model_qwen3',
+    bizName: 'Qwen3 企业主模型',
+    operationType: 'UPDATE',
+    operationDesc: '恢复模型服务状态',
+    beforeContent: '{"status":"降级"}',
+    afterContent: '{"status":"运行中"}',
     source: '系统任务',
+    ip: '',
     traceId: 'tr_7bc8e410',
-    before: '状态：降级',
-    after: '状态：运行中',
+    createUserId: '0',
+    createUser: '',
+    createRealName: '系统任务',
+    createTime: '2026-09-15 18:26:09',
   },
   {
-    id: 'audit-004',
-    logType: 'system',
-    time: '2026-09-15 16:41:27',
-    actor: '王蕾（白露）',
-    actorId: 'user-bailu',
-    module: '工具管理',
-    action: '删除',
-    objectType: '工具',
-    objectId: 'tool_report_old',
-    objectName: '旧版报表导出工具',
-    description: '清理停用工具',
+    id: '10004',
+    bizType: '技能',
+    bizId: 'skill_report_old',
+    bizName: '旧版报表导出工具',
+    operationType: 'DELETE',
+    operationDesc: '清理停用技能',
+    beforeContent: '{"status":"已暂停"}',
+    afterContent: '',
     source: '管理端',
+    ip: '192.168.1.105',
     traceId: 'tr_1fb602a8',
-    before: '状态：已暂停',
-    after: '对象已删除',
+    createUserId: 'user-bailu',
+    createUser: '白露',
+    createRealName: '王蕾',
+    createTime: '2026-09-15 16:41:27',
   },
   {
-    id: 'audit-user-001',
-    logType: 'user',
-    time: '2026-09-16 09:12:00',
-    actor: '李清（清晖）',
-    actorId: 'user-qinghui',
-    module: '会话',
-    action: '授权',
-    objectType: '会话',
-    objectId: 'conv_review_0916',
-    objectName: '经营复盘会话',
-    description: '授权商品部成员查看',
+    id: '10005',
+    bizType: '知识文档',
+    bizId: 'doc_seasonal_001',
+    bizName: '秋冬商品上架指南',
+    operationType: 'CREATE',
+    operationDesc: '上传季节商品文档',
+    beforeContent: '',
+    afterContent: '{"name":"秋冬商品上架指南","format":"pdf"}',
     source: '用户端',
-    traceId: 'tr_user_001',
-    before: '仅本人',
-    after: '商品部可见',
+    ip: '192.168.1.108',
+    traceId: 'tr_doc_001',
+    createUserId: 'user-qinghui',
+    createUser: '清晖',
+    createRealName: '李清',
+    createTime: '2026-09-15 10:22:00',
   },
   {
-    id: 'audit-login-001',
-    logType: 'login',
-    time: '2026-09-16 08:42:10',
-    actor: '张明（朝暮）',
-    actorId: 'user-chaomu',
-    module: '身份认证',
-    action: '登录',
-    objectType: '账号',
-    objectId: 'admin-1',
-    objectName: '朝暮',
-    description: '通过钉钉 SSO 登录',
-    source: 'Web',
-    traceId: 'tr_login_001',
-    before: '未登录',
-    after: '已登录',
+    id: '10006',
+    bizType: '模型供应商',
+    bizId: 'provider_deepseek',
+    bizName: 'DeepSeek 供应商',
+    operationType: 'UPDATE',
+    operationDesc: '更新供应商 API 密钥',
+    beforeContent: '{"apiKey":"***old***"}',
+    afterContent: '{"apiKey":"***new***"}',
+    source: '管理端',
+    ip: '192.168.1.101',
+    traceId: 'tr_provider_001',
+    createUserId: 'user-chaomu',
+    createUser: '朝暮',
+    createRealName: '张明',
+    createTime: '2026-09-14 16:05:33',
+  },
+  {
+    id: '10007', bizType: '连接器', bizId: 'conn_dingtalk_01', bizName: '钉钉消息连接器',
+    operationType: 'CREATE', operationDesc: '新增钉钉消息推送连接器',
+    beforeContent: '', afterContent: '{"name":"钉钉消息连接器","type":"dingtalk"}',
+    source: '管理端', ip: '192.168.1.101', traceId: 'tr_conn_001',
+    createUserId: 'user-chaomu', createUser: '朝暮', createRealName: '张明',
+    createTime: '2026-09-14 11:20:15',
+  },
+  {
+    id: '10008', bizType: '智能体', bizId: 'agent_data_002', bizName: '数据分析师',
+    operationType: 'UPDATE', operationDesc: '更新智能体提示词',
+    beforeContent: '{"prompt":"v1.2"}', afterContent: '{"prompt":"v1.3"}',
+    source: '管理端', ip: '192.168.1.101', traceId: 'tr_agent_002',
+    createUserId: 'user-chaomu', createUser: '朝暮', createRealName: '张明',
+    createTime: '2026-09-13 17:45:02',
+  },
+  {
+    id: '10009', bizType: '知识文件夹', bizId: 'folder_fw_001', bizName: '秋冬商品资料',
+    operationType: 'CREATE', operationDesc: '创建知识文件夹',
+    beforeContent: '', afterContent: '{"name":"秋冬商品资料","parent":"根目录"}',
+    source: '用户端', ip: '192.168.1.108', traceId: 'tr_folder_001',
+    createUserId: 'user-qinghui', createUser: '清晖', createRealName: '李清',
+    createTime: '2026-09-13 14:30:00',
+  },
+  {
+    id: '10010', bizType: '模型', bizId: 'model_deepseek', bizName: 'DeepSeek R1',
+    operationType: 'UPDATE', operationDesc: '调整模型并发上限',
+    beforeContent: '{"maxConcurrency":10}', afterContent: '{"maxConcurrency":20}',
+    source: '系统任务', ip: '', traceId: 'tr_model_003',
+    createUserId: '0', createUser: '', createRealName: '系统任务',
+    createTime: '2026-09-13 09:00:00',
+  },
+  {
+    id: '10011', bizType: '技能', bizId: 'skill_review_01', bizName: '经营复盘技能',
+    operationType: 'CREATE', operationDesc: '发布经营复盘技能',
+    beforeContent: '', afterContent: '{"name":"经营复盘技能","agent":"数据分析师"}',
+    source: '管理端', ip: '192.168.1.105', traceId: 'tr_skill_002',
+    createUserId: 'user-bailu', createUser: '白露', createRealName: '王蕾',
+    createTime: '2026-09-12 16:18:40',
+  },
+  {
+    id: '10012', bizType: '知识库', bizId: 'kb_brand_2026', bizName: '品牌素材知识库',
+    operationType: 'UPDATE', operationDesc: '更新知识库权限范围',
+    beforeContent: '{"visibility":"市场营销部"}', afterContent: '{"visibility":"全公司"}',
+    source: '管理端', ip: '192.168.1.105', traceId: 'tr_kb_002',
+    createUserId: 'user-bailu', createUser: '白露', createRealName: '王蕾',
+    createTime: '2026-09-12 11:05:22',
+  },
+  {
+    id: '10013', bizType: '知识文档', bizId: 'doc_brand_v3', bizName: '品牌视觉规范 V3',
+    operationType: 'CREATE', operationDesc: '上传品牌视觉规范文档',
+    beforeContent: '', afterContent: '{"name":"品牌视觉规范 V3","format":"pdf","size":"12MB"}',
+    source: '用户端', ip: '192.168.1.105', traceId: 'tr_doc_002',
+    createUserId: 'user-bailu', createUser: '白露', createRealName: '王蕾',
+    createTime: '2026-09-11 15:42:10',
+  },
+  {
+    id: '10014', bizType: '智能体', bizId: 'agent_top_001', bizName: 'TOP款分析师',
+    operationType: 'DELETE', operationDesc: '删除旧版 TOP 款分析师',
+    beforeContent: '{"status":"已停用"}', afterContent: '',
+    source: '管理端', ip: '192.168.1.101', traceId: 'tr_agent_del_001',
+    createUserId: 'user-chaomu', createUser: '朝暮', createRealName: '张明',
+    createTime: '2026-09-11 10:30:00',
+  },
+  {
+    id: '10015', bizType: '模型供应商', bizId: 'provider_qwen', bizName: '通义千问供应商',
+    operationType: 'UPDATE', operationDesc: '更新供应商额度配置',
+    beforeContent: '{"monthlyLimit":500000}', afterContent: '{"monthlyLimit":800000}',
+    source: '管理端', ip: '192.168.1.101', traceId: 'tr_prov_002',
+    createUserId: 'user-chaomu', createUser: '朝暮', createRealName: '张明',
+    createTime: '2026-09-10 14:22:18',
+  },
+  {
+    id: '10016', bizType: '连接器', bizId: 'conn_erp_01', bizName: 'ERP库存连接器',
+    operationType: 'UPDATE', operationDesc: '修复库存同步频率配置',
+    beforeContent: '{"syncInterval":"6h"}', afterContent: '{"syncInterval":"1h"}',
+    source: '管理端', ip: '192.168.1.102', traceId: 'tr_conn_002',
+    createUserId: 'user-qinghui', createUser: '清晖', createRealName: '李清',
+    createTime: '2026-09-10 09:55:30',
+  },
+  {
+    id: '10017', bizType: '知识文档', bizId: 'doc_operation', bizName: '运营SOP手册',
+    operationType: 'DELETE', operationDesc: '删除过期运营手册',
+    beforeContent: '{"version":"v1"}', afterContent: '',
+    source: '用户端', ip: '192.168.1.108', traceId: 'tr_doc_del_001',
+    createUserId: 'user-qinghui', createUser: '清晖', createRealName: '李清',
+    createTime: '2026-09-09 17:10:45',
+  },
+  {
+    id: '10018', bizType: '模型', bizId: 'model_qwen3_plus', bizName: 'Qwen3 Plus',
+    operationType: 'UPDATE', operationDesc: '开启模型缓存优化',
+    beforeContent: '{"cacheEnabled":false}', afterContent: '{"cacheEnabled":true}',
+    source: '系统任务', ip: '', traceId: 'tr_model_004',
+    createUserId: '0', createUser: '', createRealName: '系统任务',
+    createTime: '2026-09-09 08:00:00',
+  },
+  {
+    id: '10019', bizType: '技能', bizId: 'skill_todo_ext', bizName: '待办提取技能',
+    operationType: 'UPDATE', operationDesc: '优化待办提取规则',
+    beforeContent: '{"rules":"v2"}', afterContent: '{"rules":"v3"}',
+    source: '管理端', ip: '192.168.1.110', traceId: 'tr_skill_003',
+    createUserId: 'user-ziyun', createUser: '子云', createRealName: '陈宇',
+    createTime: '2026-09-08 16:33:12',
+  },
+  {
+    id: '10020', bizType: '知识库', bizId: 'kb_supply', bizName: '供应链知识库',
+    operationType: 'CREATE', operationDesc: '创建供应链专属知识库',
+    beforeContent: '', afterContent: '{"name":"供应链知识库","permission":"供应链中心"}',
+    source: '用户端', ip: '192.168.1.110', traceId: 'tr_kb_003',
+    createUserId: 'user-ziyun', createUser: '子云', createRealName: '陈宇',
+    createTime: '2026-09-08 10:15:00',
   },
 ]
 const actorDirectory = [
   { id: 'user-chaomu', label: '张明（朝暮）', department: '商品部' },
   { id: 'user-qinghui', label: '李清（清晖）', department: '线上店铺' },
   { id: 'user-bailu', label: '王蕾（白露）', department: '市场营销部' },
-  { id: 'system-task', label: '系统任务', department: '系统' },
+  { id: 'user-ziyun', label: '陈宇（子云）', department: '供应链中心' },
+  { id: '0', label: '系统任务', department: '系统' },
 ]
+const operationTypeLabels: Record<string, string> = {
+  CREATE: '新增',
+  UPDATE: '修改',
+  DELETE: '删除',
+}
+function actorDisplayName(record: AuditRecord): string {
+  if (record.createUserId === '0') return '系统任务'
+  return record.createRealName && record.createUser
+    ? `${record.createRealName}（${record.createUser}）`
+    : record.createUser || record.createRealName || record.createUserId
+}
 const filteredAuditRecords = computed(() =>
-  auditRecords.filter((record) => {
-    const f = appliedAudit.value
-    const time = new Date(record.time.replace(' ', 'T')).getTime()
-    return (
-      (!f.start || time >= new Date(f.start).getTime()) &&
-      (!f.end || time <= new Date(f.end).getTime()) &&
-      (!f.actorId || record.actorId === f.actorId) &&
-      (f.module === '全部模块' || record.module === f.module) &&
-      (f.action === '全部操作' || record.action === f.action)
-    )
-  }),
+  auditRecords
+    .filter((record) => {
+      const f = appliedAudit.value
+      const time = new Date(record.createTime.replace(' ', 'T')).getTime()
+      const objQ = f.objectQuery.trim().toLowerCase()
+      return (
+        (!f.start || time >= new Date(f.start).getTime()) &&
+        (!f.end || time <= new Date(f.end).getTime()) &&
+        (!f.actorId || record.createUserId === f.actorId) &&
+        (!f.module || record.bizType === f.module) &&
+        (!f.action || record.operationType === f.action) &&
+        (!objQ || record.bizName.toLowerCase().includes(objQ) || record.bizId.toLowerCase().includes(objQ))
+      )
+    })
+    .sort((a, b) => b.createTime.localeCompare(a.createTime)),
 )
 function applyAuditFilters() {
   const keyword = actorQuery.value.trim().toLowerCase()
@@ -1108,6 +1488,7 @@ function applyAuditFilters() {
     actor: actorQuery.value,
     actorId: keyword ? selectedActor?.id ?? '__no_match__' : '',
     module: auditModule.value,
+    objectQuery: auditObjectQuery.value,
     action: auditAction.value,
   }
   showFeedback(`筛选已应用，共 ${filteredAuditRecords.value.length} 条记录`)
@@ -1116,29 +1497,38 @@ function resetAuditFilters() {
   auditStart.value = '2026-09-01T00:00'
   auditEnd.value = '2026-09-16T23:59'
   actorQuery.value = ''
-  auditModule.value = '全部模块'
-  auditAction.value = '全部操作'
+  auditModule.value = ''
+  auditObjectQuery.value = ''
+  auditAction.value = ''
   applyAuditFilters()
 }
 function exportAudit() {
   downloadCsv('日志管理.csv', [
-    '操作时间,人员,模块,操作类型,操作对象ID,名称,描述,修改前,修改后',
+    '操作时间,操作人员,操作模块,操作对象,描述',
     ...filteredAuditRecords.value.map((r) =>
       [
-        r.time,
-        r.actor,
-        r.module,
-        r.action,
-        r.objectId,
-        r.objectName,
-        r.description,
-        r.before,
-        r.after,
+        r.createTime,
+        actorDisplayName(r),
+        r.bizType,
+        r.bizName,
+        r.operationDesc,
       ].join(','),
     ),
   ])
   showFeedback(`已导出 ${filteredAuditRecords.value.length} 条日志记录`)
 }
+
+// 分页
+const auditPageSize = 10
+const auditPage = ref(1)
+const paginatedAuditRecords = computed(() => {
+  const start = (auditPage.value - 1) * auditPageSize
+  return filteredAuditRecords.value.slice(start, start + auditPageSize)
+})
+const auditTotalPages = computed(() =>
+  Math.max(1, Math.ceil(filteredAuditRecords.value.length / auditPageSize)),
+)
+watch(filteredAuditRecords, () => { auditPage.value = 1 })
 </script>
 
 <template>
@@ -1281,7 +1671,7 @@ function exportAudit() {
           <div>
             <span class="eyebrow">USAGE MANAGEMENT</span>
             <h1>用量管理</h1>
-            <p>从部门逐层下钻至每一次会话，统一核对额度与费用</p>
+            <p>按部门筛选人员，一目了然查看每人消耗与额度，点击行查看请求明细</p>
             <p class="freshness-note">
               数据更新：请求完成后实时初算；次日重算前一日 Token 并回写人民币金额 · 最近更新
               2026-09-17 09:10
@@ -1289,58 +1679,82 @@ function exportAudit() {
           </div>
         </header>
         <section class="filter-panel" aria-label="用量筛选">
-            <label><span>周期</span><select v-model="usagePeriod" aria-label="周期"><option>今日</option><option>本周</option><option>本月</option><option>自定义</option></select></label>
             <label
               ><span>开始日期</span
-              ><input v-model="startDate" type="date" aria-label="开始日期" @change="usagePeriod = '自定义'" /></label
+              ><input v-model="startDate" type="date" aria-label="开始日期" /></label
             ><label
               ><span>结束日期</span
-              ><input v-model="endDate" type="date" aria-label="结束日期" @change="usagePeriod = '自定义'" /></label
-            ><label class="search-field wide"
-              ><span>人员</span>
-              <div>
-                <Search :size="15" /><input
-                  v-model="peopleQuery"
-                  list="usage-person-options"
-                  aria-label="人员筛选"
-                  placeholder="输入本名或花名筛选"
-                /><datalist id="usage-person-options"><option>张明（朝暮）</option><option>李清（清晖）</option><option>王蕾（白露）</option></datalist></div></label
+              ><input v-model="endDate" type="date" aria-label="结束日期" /></label
             ><label
-              ><span>模块</span
-              ><select v-model="usageModule" aria-label="模块">
-                <option>全部模块</option>
-                <option>智能体</option>
-                <option>小智问答</option>
-                <option>办公助手</option>
-              </select></label
-            ><label
-              ><span>智能体</span
-              ><select v-model="usageAgent" aria-label="智能体">
-                <option>全部智能体</option>
-                <option>数据分析师</option>
-                <option>TOP 款分析师</option>
-                <option>小智问答</option>
-              </select></label
+              ><span>人员</span
+              ><input v-model="peopleQuery" list="usage-person-options" aria-label="人员" placeholder="输入本名或花名筛选" /><datalist id="usage-person-options"><option v-for="p in allPersons" :key="p.id" :value="p.name">{{ p.name }}</option></datalist></label
+            ><label class="dept-field"
+              ><span>部门</span>
+              <div class="dept-select-wrap">
+                <button type="button" class="dept-select-btn" @click="deptOpen = !deptOpen">
+                  <span>{{ deptDisplayName() }}</span>
+                  <ChevronDown :size="14" :class="{ 'dept-rotate': deptOpen }" />
+                </button>
+                <div v-if="deptOpen" class="dept-dropdown" @mousedown.stop>
+                  <div class="dept-dropdown-header">
+                    <input v-model="deptSearchQuery" placeholder="搜索部门" class="dept-search" />
+                    <button type="button" class="dept-toggle-all" @click="toggleAllDepts">{{ selectedDeptIds.size === allDeptIds(deptTree).length ? '取消全选' : '全选' }}</button>
+                  </div>
+                  <div class="dept-tree">
+                    <template v-for="node in filteredDeptTree" :key="node.id">
+                      <div class="dept-item">
+                        <label class="dept-check">
+                          <input type="checkbox" :checked="isDeptSelected(node) !== 'none'" :indeterminate="isDeptSelected(node) === 'partial'" @change="toggleDept(node)" />
+                          <span>{{ node.name }}</span>
+                        </label>
+                        <div v-if="node.children" class="dept-children">
+                          <div v-for="child in node.children" :key="child.id" class="dept-item dept-child">
+                            <label class="dept-check">
+                              <input type="checkbox" :checked="selectedDeptIds.has(child.id)" @change="toggleDept(child)" />
+                              <span>{{ child.name }}</span>
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div></label
+            ><label class="dept-field"
+              ><span>模块</span>
+              <div class="dept-select-wrap">
+                <button type="button" class="dept-select-btn" @click="moduleOpen = !moduleOpen">
+                  <span>{{ moduleDisplayName() }}</span>
+                  <ChevronDown :size="14" :class="{ 'dept-rotate': moduleOpen }" />
+                </button>
+                <div v-if="moduleOpen" class="dept-dropdown" @mousedown.stop>
+                  <div class="dept-tree">
+                    <template v-for="group in moduleCascade" :key="group.id">
+                      <div class="dept-item">
+                        <button type="button" class="dept-check module-group-btn" :class="{ active: selectedModuleId === group.id }" @click="selectModule(group.id)">
+                          <span>{{ group.name }}</span>
+                        </button>
+                        <div v-if="group.children" class="dept-children">
+                          <button v-for="child in group.children" :key="child.id" type="button" class="dept-item dept-child dept-check module-group-btn" :class="{ active: selectedModuleId === child.id }" @click="selectModule(child.id)">
+                            <span>{{ child.name }}</span>
+                          </button>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div></label
             ><div class="filter-actions"><button type="button" class="filter-reset" aria-label="清空用量筛选" @click="resetUsageFilters"><RotateCcw :size="14" />清空</button><button type="button" class="primary-button" aria-label="查询用量" @click="applyUsageFilters">查询</button></div>
-        </section>
-        <section class="metric-grid">
-          <article v-for="item in metrics" :key="item.label" class="metric-card" :class="{ danger: item.label === '系统额度' && displayRate >= 90, warning: item.label === '系统额度' && displayRate >= 80 && displayRate < 90 }">
-            <div><span>{{ item.label }}</span><component :is="item.icon" :size="17" /></div><strong>{{ item.value }}</strong><small>{{ item.note }}</small>
-          </article>
         </section>
           <section class="panel detail-panel">
             <header>
               <div>
                 <h2>组织用量明细</h2>
-                <p>部门 → 人员 → 请求（会话名称 · 时间）</p>
+                <p>按人员汇总，点击行查看请求明细</p>
               </div>
               <div class="table-actions">
                 <button type="button" aria-label="配置全局默认额度" @click="openGlobalQuota"><Settings2 :size="15" />全局默认额度</button>
-                <button type="button" aria-label="全部展开" @click="expandAll">
-                  <PlusSquare :size="15" />全部展开</button
-                ><button type="button" aria-label="全部收起" @click="collapseAll">
-                  <MinusSquare :size="15" />全部收起</button
-                ><button
+                <button
                   type="button"
                   class="secondary-button"
                   aria-label="导出用量明细"
@@ -1351,72 +1765,52 @@ function exportAudit() {
               </div>
             </header>
             <div class="table-scroll">
-              <table class="usage-tree">
+              <table class="usage-flat">
                 <thead>
                   <tr>
-                    <th>分类</th>
-                    <th>系统额度</th>
+                    <th>人员</th>
+                    <th>额度</th>
+                    <th>消耗</th>
                     <th>使用率</th>
-                    <th>金额消耗</th>
                     <th>操作</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr
-                    v-for="row in visibleRows"
-                    :key="row.id"
-                    :data-testid="`usage-row-${row.id}`"
-                    :class="[
-                      'tree-row',
-                      `tree-row--${row.type}`,
-                      { clickable: row.type === 'session' },
-                    ]"
-                    :tabindex="row.type === 'session' ? 0 : undefined"
-                    @click="openRow(row)"
-                    @keydown.enter="openRow(row)"
-                  >
+                  <!-- 汇总行 -->
+                  <tr class="summary-row">
+                    <td><strong>汇总</strong></td>
+                    <td><strong>{{ money(summaryRow.quota) }}</strong></td>
+                    <td><strong>{{ money(summaryRow.amount) }}</strong></td>
                     <td>
-                      <div class="tree-cell" :style="{ paddingLeft: `${row.level * 22}px` }">
-                        <button
-                          v-if="row.children?.length"
-                          type="button"
-                          class="tree-toggle"
-                          :aria-label="`${expandedIds.has(row.id) ? '收起' : '展开'}${row.name}`"
-                          @click.stop="toggleNode(row.id)"
-                        >
-                          <ChevronDown v-if="expandedIds.has(row.id)" :size="15" /><ChevronRight
-                            v-else
-                            :size="15"
-                          /></button
-                        ><span v-else class="tree-dot" /><strong>{{ row.name }}</strong
-                        ><small v-if="row.subtitle">{{ row.subtitle }}</small>
+                      <div class="quota-cell">
+                        <span class="quota-track"><i :class="{ warning: summaryRow.rate >= 80, danger: summaryRow.rate >= 90 }" :style="{ width: `${Math.min(summaryRow.rate, 100)}%` }" /></span>
+                        <b :class="['quota-rate', { 'quota-rate--warning': summaryRow.rate >= 80, 'quota-rate--danger': summaryRow.rate >= 90 }]">{{ summaryRow.rate.toFixed(0) }}%</b>
                       </div>
                     </td>
-                    <td><span>{{ row.quota ? money(row.quota) : '—' }}</span><small v-if="row.type === 'person' && row.quotaSource" class="quota-source">{{ row.quotaSource }}</small></td>
+                    <td>—</td>
+                  </tr>
+                  <!-- 人员行 -->
+                  <tr
+                    v-for="person in paginatedPersonList"
+                    :key="person.id"
+                    class="person-row"
+                  >
+                    <td><strong>{{ person.name }}</strong><small v-if="person.subtitle">{{ person.subtitle }}</small></td>
+                    <td><span>{{ person.quota ? money(person.quota) : '—' }}</span><small v-if="person.quotaSource" class="quota-source">{{ person.quotaSource }}</small></td>
+                    <td>{{ money(person.amount) }}</td>
                     <td>
-                      <div v-if="row.quota" class="quota-cell">
-                        <span class="quota-track"
-                          ><i
-                            :class="{ warning: row.quotaRate >= 80, danger: row.quotaRate >= 90 }"
-                            :style="{ width: `${Math.min(row.quotaRate, 100)}%` }" /></span
-                        ><b
-                          :data-testid="`quota-rate-${row.id}`"
-                          :class="[
-                            'quota-rate',
-                            {
-                              'quota-rate--warning': row.quotaRate >= 80,
-                              'quota-rate--danger': row.quotaRate >= 90,
-                            },
-                          ]"
-                          >{{ row.quotaRate.toFixed(0) }}%</b
-                        >
+                      <div v-if="person.quota" class="quota-cell">
+                        <span class="quota-track"><i :class="{ warning: person.quotaRate >= 80, danger: person.quotaRate >= 90 }" :style="{ width: `${Math.min(person.quotaRate, 100)}%` }" /></span>
+                        <b :class="['quota-rate', { 'quota-rate--warning': person.quotaRate >= 80, 'quota-rate--danger': person.quotaRate >= 90 }]">{{ person.quotaRate.toFixed(0) }}%</b>
                       </div>
                       <span v-else>—</span>
                     </td>
-                    <td>{{ money(row.amount) }}</td>
-                    <td class="row-actions"><button v-if="row.type === 'person'" type="button" @click.stop="openPersonQuota(row)">设置额度</button><button v-if="row.type !== 'department'" type="button" @click.stop="selectedUsage = row">详情</button><span v-if="row.type === 'department'">—</span></td>
+                    <td class="row-actions">
+                      <button type="button" @click.stop="openPersonDetail(person)">详情</button>
+                      <button type="button" @click.stop="openPersonQuota(person)">设置</button>
+                    </td>
                   </tr>
-                  <tr v-if="!visibleRows.length">
+                  <tr v-if="!paginatedPersonList.length">
                     <td colspan="5" class="empty-cell">
                       当前条件下暂无数据
                       <button type="button" @click="resetUsageFilters">清空筛选</button>
@@ -1424,6 +1818,18 @@ function exportAudit() {
                   </tr>
                 </tbody>
               </table>
+            </div>
+            <div v-if="usageTotalPages > 1" class="pagination">
+              <span class="pagination-info">共 {{ flatPersonList.length }} 人，第 {{ usagePage }} / {{ usageTotalPages }} 页</span>
+              <div class="pagination-btns">
+                <button type="button" :disabled="usagePage <= 1" @click="usagePage--">上一页</button>
+                <button
+                  v-for="p in usageTotalPages" :key="p" type="button"
+                  :class="{ active: p === usagePage }"
+                  @click="usagePage = p"
+                >{{ p }}</button>
+                <button type="button" :disabled="usagePage >= usageTotalPages" @click="usagePage++">下一页</button>
+              </div>
             </div>
           </section>
       </template>
@@ -1433,7 +1839,7 @@ function exportAudit() {
           <div>
             <span class="eyebrow">LOG MANAGEMENT</span>
             <h1>日志管理</h1>
-            <p>查看新增、修改、删除与授权操作的完整字段差异</p>
+            <p>查看新增、修改、删除操作的完整字段差异</p>
           </div>
           <button
             type="button"
@@ -1453,16 +1859,18 @@ function exportAudit() {
             ><input v-model="auditEnd" aria-label="结束时间" type="datetime-local" /></label
           ><label
             ><span>操作人员</span
-            ><input v-model="actorQuery" list="audit-actor-options" aria-label="操作人员" placeholder="输入本名或当前花名筛选" /><datalist id="audit-actor-options"><option v-for="actor in actorDirectory" :key="actor.id" :value="actor.label">{{ actor.label }}＋{{ actor.department }}</option></datalist></label
-          ><label><span>模块</span><select v-model="auditModule" aria-label="日志模块"><option>全部模块</option><option>智能体管理</option><option>知识中心</option><option>模型管理</option><option>工具管理</option><option>会话</option></select></label
+            ><input v-model="actorQuery" list="audit-actor-options" aria-label="操作人员" placeholder="输入本名或花名" /><datalist id="audit-actor-options"><option v-for="actor in actorDirectory" :key="actor.id" :value="actor.label">{{ actor.label }} · {{ actor.department }}</option></datalist></label
+          ><label><span>操作模块</span><select v-model="auditModule" aria-label="操作模块" required><option value="" disabled>请选择模块</option><option value="智能体">智能体</option><option>连接器</option><option>技能</option><option>模型</option><option>模型供应商</option><option>知识库</option><option>知识文件夹</option><option>知识文档</option></select></label
+          ><label
+            ><span>操作对象</span
+            ><input v-model="auditObjectQuery" aria-label="操作对象" placeholder="对象名称或 ID" /></label
           ><label
             ><span>操作类型</span
-            ><select v-model="auditAction" aria-label="操作类型">
-              <option>全部操作</option>
-              <option>新增</option>
-              <option>修改</option>
-              <option>删除</option>
-              <option>授权</option>
+            ><select v-model="auditAction" aria-label="操作类型" required>
+              <option value="" disabled>请选择类型</option>
+              <option value="CREATE">新增</option>
+              <option value="UPDATE">修改</option>
+              <option value="DELETE">删除</option>
             </select></label
           >
           <div class="filter-actions">
@@ -1488,20 +1896,16 @@ function exportAudit() {
             <table aria-label="日志列表">
               <thead>
                 <tr>
-                  <th>操作时间</th>
+                  <th>时间</th>
                   <th>人员</th>
                   <th>模块</th>
-                  <th>操作类型</th>
-                  <th>操作对象</th>
-                  <th>修改前</th>
-                  <th>修改后</th>
+                  <th>对象</th>
                   <th>描述</th>
-                  <th>操作</th>
                 </tr>
               </thead>
               <tbody>
                 <tr
-                  v-for="record in filteredAuditRecords"
+                  v-for="record in paginatedAuditRecords"
                   :key="record.id"
                   :data-testid="`audit-row-${record.id}`"
                   class="clickable"
@@ -1509,25 +1913,31 @@ function exportAudit() {
                   @click="selectedAudit = record"
                   @keydown.enter="selectedAudit = record"
                 >
-                  <td>{{ record.time }}</td>
-                  <td>{{ record.actor }}</td>
-                  <td>{{ record.module }}</td>
-                  <td>{{ record.action }}</td>
+                  <td>{{ record.createTime }}</td>
+                  <td>{{ actorDisplayName(record) }}</td>
+                  <td>{{ record.bizType }}</td>
                   <td>
-                    <strong>{{ record.objectName }}</strong>
+                    <strong>{{ record.bizName }}</strong>
                   </td>
-                  <td class="change-cell">{{ record.before }}</td>
-                  <td class="change-cell">{{ record.after }}</td>
-                  <td>{{ record.description }}</td>
-                  <td>
-                    <button type="button" class="detail-btn" @click.stop="selectedAudit = record">详情</button>
-                  </td>
+                  <td>{{ record.operationDesc }}</td>
                 </tr>
-                <tr v-if="!filteredAuditRecords.length">
-                  <td colspan="9" class="empty-cell">当前条件下暂无日志</td>
+                <tr v-if="!paginatedAuditRecords.length">
+                  <td colspan="5" class="empty-cell">当前条件下暂无日志</td>
                 </tr>
               </tbody>
             </table>
+          </div>
+          <div v-if="auditTotalPages > 1" class="pagination">
+            <span class="pagination-info">共 {{ filteredAuditRecords.length }} 条，第 {{ auditPage }} / {{ auditTotalPages }} 页</span>
+            <div class="pagination-btns">
+              <button type="button" :disabled="auditPage <= 1" @click="auditPage--">上一页</button>
+              <button
+                v-for="p in auditTotalPages" :key="p" type="button"
+                :class="{ active: p === auditPage }"
+                @click="auditPage = p"
+              >{{ p }}</button>
+              <button type="button" :disabled="auditPage >= auditTotalPages" @click="auditPage++">下一页</button>
+            </div>
           </div>
         </section>
       </template>
@@ -1545,16 +1955,14 @@ function exportAudit() {
           class="quota-dialog"
           role="dialog"
           aria-modal="true"
-          :aria-label="quotaDialogMode === 'create' ? '新增额度策略' : '调整月度额度'"
+          :aria-label="quotaScope === '全局' ? '全局额度设置' : '用户额度设置'"
         >
           <header>
             <div>
               <span class="dialog-icon"><CircleDollarSign :size="18" /></span>
               <div>
-                <strong>{{
-                  quotaDialogMode === 'create' ? `为 ${quotaObject || '指定人员'} 设置额度` : '调整月度额度'
-                }}</strong>
-                <p>2026 年 9 月 · 人民币额度</p>
+                <strong>{{ quotaScope === '全局' ? '全局额度设置' : '用户额度设置' }}</strong>
+                <p>{{ quotaScope === '全局' ? '调整每个用户每个月的默认额度' : `${quotaObject} · 2026 年 9 月` }}</p>
               </div>
             </div>
             <button type="button" aria-label="关闭" @click="quotaOpen = false">
@@ -1562,45 +1970,47 @@ function exportAudit() {
             </button>
           </header>
           <div class="dialog-body quota-form">
-            <label
-              ><span>额度范围</span
-              ><select v-model="quotaScope" aria-label="额度范围">
-                <option>人员</option>
-                <option>全局</option>
-              </select></label
-            >
-            <label
-              ><span>额度对象</span
-              ><input
-                v-model="quotaObject"
-                aria-label="额度对象"
-                placeholder="输入人员花名或全局名称"
-            /></label>
-            <label
-              ><span>额度类型</span
-              ><select v-model="quotaType" aria-label="额度类型">
-                <option>默认</option>
-                <option>临时</option>
-              </select></label
-            >
-            <label
-              ><span>额度周期</span
-              ><select v-model="quotaCycle" aria-label="额度周期">
-                <option>每日</option>
-                <option>每周</option>
-                <option>每月</option>
-              </select></label
-            >
-            <label class="full"
-              ><span>{{
-                quotaDialogMode === 'create' ? '额度总量（人民币）' : '调整后额度（人民币）'
-              }}</span
-              ><input v-model="quotaAmount" aria-label="调整后额度（人民币）" type="number" min="1"
-            /></label>
-            <label class="full"
-              ><span>调整原因</span
-              ><textarea v-model="quotaReason" aria-label="调整原因" rows="3" />
-            </label>
+            <!-- 全局额度模式 -->
+            <template v-if="quotaScope === '全局'">
+              <div class="quota-current">
+                <span>全局额度</span>
+                <strong>{{ money(globalQuotaDefaults['每月']) }}</strong>
+                <small>（当前额度）</small>
+              </div>
+              <label class="full"
+                ><span>变更额度（人民币）</span
+                ><input v-model="quotaAmount" aria-label="变更额度" type="number" min="1" placeholder="变更后额度"
+              /></label>
+              <label class="full"
+                ><span>调整原因</span
+                ><textarea v-model="quotaReason" aria-label="调整原因" rows="3" placeholder="请填写调整原因" />
+              </label>
+              <p class="quota-hint full">全局额度调整每个用户每个月的默认额度，单位：人民币</p>
+            </template>
+            <!-- 用户额度模式 -->
+            <template v-else>
+              <div class="quota-current">
+                <span>用户额度</span>
+                <strong>{{ money(quotaTarget?.quota || 0) }}</strong>
+                <small>（当前额度）</small>
+              </div>
+              <label
+                ><span>额度类型</span
+                ><select v-model="quotaType" aria-label="额度类型">
+                  <option>默认</option>
+                  <option>临时</option>
+                </select></label
+              >
+              <label class="full"
+                ><span>变更额度（人民币）</span
+                ><input v-model="quotaAmount" aria-label="变更额度" type="number" min="1" placeholder="变更后额度"
+              /></label>
+              <label class="full"
+                ><span>调整原因</span
+                ><textarea v-model="quotaReason" aria-label="调整原因" rows="3" placeholder="请填写调整原因" />
+              </label>
+              <p class="quota-hint full">默认额度调整当前用户每个月的默认额度，及时生效，次月充值；临时额度调整当前用户当月的临时额度，及时生效，优先级 &gt; 默认额度，单位：人民币</p>
+            </template>
             <p v-if="quotaError" class="form-error full">{{ quotaError }}</p>
           </div>
           <footer>
@@ -1612,7 +2022,7 @@ function exportAudit() {
               aria-label="确认调整额度"
               @click="confirmQuota"
             >
-              {{ quotaDialogMode === 'create' ? '创建额度' : '确认调整' }}
+              确认调整
             </button>
           </footer>
         </section>
@@ -1693,8 +2103,8 @@ function exportAudit() {
             <div>
               <span class="dialog-icon"><ShieldCheck :size="18" /></span>
               <div>
-                <strong>日志详情</strong>
-                <p>{{ selectedAudit.id }}</p>
+                <strong>日志详情（{{ selectedAudit.id }}）</strong>
+                <p>{{ actorDisplayName(selectedAudit) }} · {{ operationTypeLabels[selectedAudit.operationType] || selectedAudit.operationType }}</p>
               </div>
             </div>
             <button type="button" aria-label="关闭日志详情" @click="selectedAudit = null">
@@ -1707,19 +2117,23 @@ function exportAudit() {
               <dl>
                 <div>
                   <dt>操作时间</dt>
-                  <dd>{{ selectedAudit.time }}</dd>
+                  <dd>{{ selectedAudit.createTime }}</dd>
                 </div>
                 <div>
-                  <dt>操作人</dt>
-                  <dd>{{ selectedAudit.actor }}</dd>
+                  <dt>操作人员</dt>
+                  <dd>{{ actorDisplayName(selectedAudit) }}</dd>
                 </div>
                 <div>
-                  <dt>模块</dt>
-                  <dd>{{ selectedAudit.module }}</dd>
+                  <dt>操作模块</dt>
+                  <dd>{{ selectedAudit.bizType }}</dd>
                 </div>
                 <div>
                   <dt>来源</dt>
                   <dd>{{ selectedAudit.source }}</dd>
+                </div>
+                <div>
+                  <dt>IP 地址</dt>
+                  <dd>{{ selectedAudit.ip || '—' }}</dd>
                 </div>
                 <div>
                   <dt>Trace ID</dt>
@@ -1733,41 +2147,103 @@ function exportAudit() {
               <h2>操作对象</h2>
               <dl>
                 <div>
-                  <dt>对象类型</dt>
-                  <dd>{{ selectedAudit.objectType }}</dd>
-                </div>
-                <div>
                   <dt>对象名称</dt>
-                  <dd>{{ selectedAudit.objectName }}</dd>
+                  <dd>{{ selectedAudit.bizName }}</dd>
                 </div>
                 <div>
-                  <dt>操作对象 ID</dt>
+                  <dt>对象 ID</dt>
                   <dd>
-                    <code>{{ selectedAudit.objectId }}</code>
+                    <code>{{ selectedAudit.bizId }}</code>
                   </dd>
                 </div>
                 <div>
-                  <dt>描述</dt>
-                  <dd>{{ selectedAudit.description }}</dd>
+                  <dt>操作类型</dt>
+                  <dd>{{ operationTypeLabels[selectedAudit.operationType] || selectedAudit.operationType }}</dd>
                 </div>
                 <div>
-                  <dt>操作</dt>
-                  <dd>{{ selectedAudit.action }}</dd>
+                  <dt>描述</dt>
+                  <dd>{{ selectedAudit.operationDesc }}</dd>
                 </div>
               </dl>
             </section>
             <section>
-              <h2>字段变更</h2>
+              <h2>变更内容</h2>
               <div class="diff-grid">
                 <article>
                   <span>变更前</span>
-                  <pre>{{ selectedAudit.before }}</pre>
+                  <pre>{{ selectedAudit.beforeContent || '（无）' }}</pre>
                 </article>
                 <article class="after">
                   <span>变更后</span>
-                  <pre>{{ selectedAudit.after }}</pre>
+                  <pre>{{ selectedAudit.afterContent || '（无）' }}</pre>
                 </article>
               </div>
+            </section>
+          </div>
+        </section>
+      </div>
+      <!-- 人员用量详情弹窗 -->
+      <div v-if="selectedPersonDetail" class="modal-layer" @mousedown.self="selectedPersonDetail = null">
+        <section
+          class="person-detail-modal"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="`${selectedPersonDetail.name} 的用量详情`"
+        >
+          <header>
+            <div>
+              <span class="dialog-icon"><Users :size="18" /></span>
+              <div>
+                <strong>用量详情</strong>
+                <p>{{ selectedPersonDetail.name }}</p>
+              </div>
+            </div>
+            <button type="button" aria-label="关闭人员详情" @click="selectedPersonDetail = null">
+              <X :size="18" />
+            </button>
+          </header>
+          <div class="dialog-body audit-detail-body">
+            <section>
+              <h2>基本信息</h2>
+              <dl>
+                <div>
+                  <dt>人员</dt>
+                  <dd>{{ selectedPersonDetail.name }}</dd>
+                </div>
+                <div>
+                  <dt>全局额度</dt>
+                  <dd>{{ money(personGlobalQuota) }}</dd>
+                </div>
+                <div>
+                  <dt>用户额度</dt>
+                  <dd>{{ personUserQuota ? money(personUserQuota) : '—' }}</dd>
+                </div>
+                <div>
+                  <dt>临时额度</dt>
+                  <dd>{{ personTempQuota ? money(personTempQuota) : '—' }}</dd>
+                </div>
+              </dl>
+            </section>
+            <section>
+              <h2>消耗明细</h2>
+              <dl>
+                <div>
+                  <dt>金额消耗</dt>
+                  <dd>{{ money(selectedPersonDetail.amount) }}</dd>
+                </div>
+                <div>
+                  <dt>输入 Token</dt>
+                  <dd>{{ compact(personInputTokens) }}</dd>
+                </div>
+                <div>
+                  <dt>输出 Token</dt>
+                  <dd>{{ compact(personOutputTokens) }}</dd>
+                </div>
+                <div>
+                  <dt>缓存命中 Token</dt>
+                  <dd>{{ compact(personCacheTokens) }}</dd>
+                </div>
+              </dl>
             </section>
           </div>
         </section>
@@ -2096,6 +2572,10 @@ function exportAudit() {
 .filter-panel select:focus {
   border-color: #71717a;
   box-shadow: 0 0 0 3px rgba(24, 24, 27, 0.07);
+}
+.filter-panel select:invalid,
+.filter-panel select option[disabled] {
+  color: #a1a1aa;
 }
 .search-field > div {
   display: flex;
@@ -2486,6 +2966,29 @@ function exportAudit() {
 .quota-form .full {
   grid-column: 1 / -1;
 }
+.quota-current {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 12px 14px;
+  background: #f8f9fb;
+  border-radius: 8px;
+  border: 1px solid #eee;
+}
+.quota-current span { font-size: 12px; color: #71717a; }
+.quota-current strong { font-size: 18px; color: #18181b; }
+.quota-current small { font-size: 11px; color: #a1a1aa; }
+.quota-hint {
+  font-size: 11px;
+  color: #71717a;
+  line-height: 1.5;
+  margin: 0;
+  padding: 8px 10px;
+  background: #fafafa;
+  border-radius: 6px;
+  border: 1px solid #eee;
+}
 .form-error {
   color: #b42318;
   font-size: 12px;
@@ -2545,6 +3048,100 @@ function exportAudit() {
 .row-actions button { border:0; background:transparent; color:#176fe8; cursor:pointer; font:12px inherit; }
 .quota-source { display:block; width:max-content; margin:4px auto 0; border-radius:999px; background:#f1f6ff; padding:2px 7px; color:#3974c9; font-size:10px; }
 .quota-dialog footer .danger-text { margin-right:auto; border-color:#ffd4d4; color:#c73535; }
+/* ── 部门级联多选下拉框 ── */
+.dept-field { position: relative; }
+.dept-select-wrap { position: relative; }
+.dept-select-btn {
+  display: flex; width: 100%; height: 34px; align-items: center; justify-content: space-between;
+  gap: 6px; border: 1px solid #dedfe2; border-radius: 7px; background: #fff; padding: 0 9px;
+  color: #27272a; font: 12px inherit; cursor: pointer; outline: none;
+}
+.dept-select-btn:focus { border-color: #71717a; box-shadow: 0 0 0 3px rgba(24,24,27,.07); }
+.dept-select-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dept-rotate { transform: rotate(180deg); }
+.dept-dropdown {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 40;
+  width: 280px; border: 1px solid #e2e3e6; border-radius: 10px;
+  background: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.12);
+}
+.dept-dropdown-header {
+  display: flex; align-items: center; gap: 6px; padding: 8px 10px;
+  border-bottom: 1px solid #eee;
+}
+.dept-search {
+  flex: 1; height: 30px; border: 1px solid #dedfe2; border-radius: 6px;
+  padding: 0 8px; font: 12px inherit; outline: none;
+}
+.dept-search:focus { border-color: #71717a; }
+.dept-toggle-all {
+  height: 30px; border: 1px solid #dedfe2; border-radius: 6px;
+  background: #fff; padding: 0 10px; font: 11px inherit; cursor: pointer; white-space: nowrap;
+}
+.dept-toggle-all:hover { background: #f5f5f6; }
+.dept-tree { max-height: 260px; overflow-y: auto; padding: 6px 0; }
+.dept-item { padding: 0 10px; }
+.dept-check {
+  display: flex; align-items: center; gap: 7px; padding: 5px 4px;
+  border-radius: 5px; cursor: pointer; font-size: 12px; color: #27272a;
+}
+.dept-check:hover { background: #f5f5f6; }
+.dept-check input[type="checkbox"] { width: 15px; height: 15px; accent-color: #18181b; cursor: pointer; }
+.dept-children { padding-left: 18px; }
+.dept-child { }
+.module-group-btn {
+  background: none; border: none; width: 100%; text-align: left;
+  font: inherit; color: inherit;
+}
+.module-group-btn.active { color: #18181b; font-weight: 600; background: #f0f4ff; }
+/* ── 平铺列表 ── */
+.usage-flat { width: 100%; min-width: 900px; border-collapse: collapse; font-size: 12px; }
+.usage-flat thead th {
+  height: 42px; background: #fafafa; color: #71717a; font-weight: 500;
+  text-align: left; white-space: nowrap; padding: 0 14px;
+}
+.usage-flat tbody td {
+  height: 52px; border-top: 1px solid #ededee; color: #52525b;
+  white-space: nowrap; padding: 0 14px; vertical-align: middle;
+}
+.usage-flat tbody td strong { font-size: 13px; }
+.usage-flat tbody td small { display: block; color: #a1a1aa; font-size: 10px; margin-top: 2px; }
+.summary-row td { background: #f8f9fb; border-bottom: 2px solid #e5e5e7; }
+.person-row { cursor: pointer; transition: background .12s; }
+.person-row:hover td { background: #f5f7ff; }
+.person-row:focus { outline: none; }
+.person-row:focus td { background: #f0f4ff; }
+/* ── 人员用量详情弹窗 ── */
+.person-detail-modal {
+  width: min(560px, calc(100vw - 40px));
+  max-height: calc(100vh - 70px);
+  overflow: auto;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 22px 60px rgba(0,0,0,.22);
+}
+.audit-detail-body { padding: 0 20px 20px; }
+.audit-detail-body section { margin-top: 16px; }
+.audit-detail-body h2 { font-size: 13px; font-weight: 600; color: #3f3f46; margin: 0 0 10px; padding-bottom: 6px; border-bottom: 1px solid #eee; }
+.audit-detail-body dl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; }
+.audit-detail-body dl > div { display: flex; flex-direction: column; gap: 2px; }
+.audit-detail-body dt { font-size: 11px; color: #71717a; }
+.audit-detail-body dd { font-size: 14px; font-weight: 600; color: #18181b; margin: 0; }
+/* ── 分页 ── */
+.pagination {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 12px 16px; border-top: 1px solid #eee;
+}
+.pagination-info { color: #71717a; font-size: 12px; white-space: nowrap; }
+.pagination-btns { display: flex; gap: 4px; }
+.pagination-btns button {
+  height: 30px; min-width: 30px; border: 1px solid #dedfe2; border-radius: 6px;
+  background: #fff; padding: 0 8px; font: 12px inherit; cursor: pointer; color: #3f3f46;
+}
+.pagination-btns button:hover:not(:disabled):not(.active) { background: #f5f5f6; }
+.pagination-btns button.active {
+  border-color: #18181b; background: #18181b; color: #fff; font-weight: 600;
+}
+.pagination-btns button:disabled { opacity: .4; cursor: not-allowed; }
 .quota-warning { position:fixed; z-index:750; right:24px; bottom:24px; display:grid; width:min(390px,calc(100vw - 48px)); grid-template-columns:32px 1fr 24px; gap:10px; border:1px solid #ffc9c9; border-radius:12px; background:#fff7f7; padding:15px; box-shadow:0 14px 40px rgba(93,24,24,.16); }
 .quota-warning .warning-icon { display:grid; width:30px; height:30px; place-items:center; border-radius:50%; background:#e5484d; color:#fff; font-weight:800; }
 .quota-warning strong { color:#7f1d1d; font-size:14px; }
