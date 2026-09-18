@@ -246,8 +246,8 @@ function hoverDeptColumn(nodeId: string, colIndex: number) {
   deptExpandedPath.value = [...deptExpandedPath.value.slice(0, colIndex), nodeId]
 }
 function deptDisplayName(): string {
-  if (selectedDeptIds.value.size === 0) return '全部部门'
-  if (selectedDeptIds.value.size === allDeptIds(deptTree).length) return '全部部门'
+  if (selectedDeptIds.value.size === 0) return '选择部门'
+  if (selectedDeptIds.value.size === allDeptIds(deptTree).length) return '选择部门'
   const names: string[] = []
   const walk = (nodes: DeptNode[]) => nodes.forEach(n => {
     if (selectedDeptIds.value.has(n.id)) names.push(n.name)
@@ -295,7 +295,7 @@ const moduleOpen = ref(false)
 const selectedModuleId = ref('')
 const moduleExpandedPath = ref<string[]>([])  // 级联面板展开路径
 function moduleDisplayName(): string {
-  if (!selectedModuleId.value) return '全部模块'
+  if (!selectedModuleId.value) return '选择模块'
   const findName = (nodes: { id: string; name: string; children?: { id: string; name: string }[] }[]): string => {
     for (const g of nodes) {
       if (g.id === selectedModuleId.value) return g.name
@@ -1795,7 +1795,7 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
               ><span>部门</span>
               <div class="dept-select-wrap">
                 <button type="button" class="dept-select-btn" @click="deptOpen = !deptOpen">
-                  <span>{{ deptDisplayName() }}</span>
+                  <span :class="{ placeholder: selectedDeptIds.size === 0 }">{{ deptDisplayName() }}</span>
                   <ChevronDown :size="14" :class="{ 'dept-rotate': deptOpen }" />
                 </button>
                 <div v-if="deptOpen" class="cascader-dropdown" @mousedown.stop>
@@ -1831,7 +1831,7 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
               ><span>模块</span>
               <div class="dept-select-wrap">
                 <button type="button" class="dept-select-btn" @click="moduleOpen = !moduleOpen">
-                  <span>{{ moduleDisplayName() }}</span>
+                  <span :class="{ placeholder: !selectedModuleId }">{{ moduleDisplayName() }}</span>
                   <ChevronDown :size="14" :class="{ 'dept-rotate': moduleOpen }" />
                 </button>
                 <div v-if="moduleOpen" class="cascader-dropdown" @mousedown.stop>
@@ -3171,6 +3171,7 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
 }
 .dept-select-btn:focus { border-color: #71717a; box-shadow: 0 0 0 3px rgba(24,24,27,.07); }
 .dept-select-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dept-select-btn span.placeholder { color: #a1a1aa; }
 .dept-rotate { transform: rotate(180deg); }
 .dept-dropdown {
   position: absolute; top: calc(100% + 4px); left: 0; z-index: 40;
