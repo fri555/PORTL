@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Activity,
@@ -12,6 +12,7 @@ import {
   Download,
   Gauge,
   MinusSquare,
+  MoreHorizontal,
   PlusSquare,
   RotateCcw,
   Search,
@@ -1310,6 +1311,15 @@ function openQuotaFromDetail() {
   openPersonQuota(person)
 }
 const selectedPersonDetail = ref<UsageNode | null>(null)
+const personMenuId = ref('')
+
+function togglePersonMenu(id: string, ev: MouseEvent) {
+  ev.stopPropagation()
+  personMenuId.value = personMenuId.value === id ? '' : id
+}
+function closePersonMenu() {
+  personMenuId.value = ''
+}
 const personRequests = computed(() => {
   if (!selectedPersonDetail.value) return []
   const person = selectedPersonDetail.value
@@ -1889,7 +1899,7 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
                 </button>
               </div>
             </header>
-            <div class="table-scroll">
+            <div class="table-scroll" @click="closePersonMenu">
               <table class="usage-flat">
                 <thead>
                   <tr>
@@ -1898,6 +1908,7 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
                     <th><span class="th-label">消耗<span class="help-tip" title="根据每次任务大模型实际返回的token消耗及单价计算汇总得到"><CircleHelp :size="13" /></span></span></th>
                     <th>使用率</th>
                     <th>更新时间</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1914,6 +1925,7 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
                     </td>
                     <td>—</td>
                     <td>—</td>
+                    <td></td>
                   </tr>
                   <!-- 人员行 -->
                   <tr
@@ -1933,9 +1945,19 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
                       <span v-else>—</span>
                     </td>
                     <td class="text-zinc-500">{{ person.updatedAt || '—' }}</td>
+                    <td class="menu-cell" @click.stop>
+                      <button type="button" class="menu-trigger" aria-label="操作菜单" @click="togglePersonMenu(person.id, $event)">
+                        <MoreHorizontal :size="16" />
+                      </button>
+                      <div v-if="personMenuId === person.id" class="person-menu" role="menu">
+                        <button type="button" role="menuitem" @click="personMenuId = ''; openPersonDetail(person)">详情</button>
+                        <button type="button" role="menuitem" @click="personMenuId = ''; openPersonQuota(person)">设置</button>
+                        <button v-if="person.quotaSource === '个人设置'" type="button" role="menuitem" class="danger-item" @click="personMenuId = ''; quotaTarget = person; resetPersonalQuota()">重置</button>
+                      </div>
+                    </td>
                   </tr>
                   <tr v-if="!paginatedPersonList.length">
-                    <td colspan="5" class="empty-cell">
+                    <td colspan="6" class="empty-cell">
                       当前条件下暂无数据
                       <button type="button" @click="resetUsageFilters">清空筛选</button>
                     </td>
@@ -3198,6 +3220,15 @@ dt {
   font-size: 12px;
 }
 .quota-source { display:block; width:max-content; margin:4px auto 0; border-radius:999px; background:#f1f6ff; padding:2px 7px; color:#3974c9; font-size:10px; }
+/* ── 人员行操作菜单 ── */
+.menu-cell { position:relative; width:40px; text-align:center; }
+.menu-trigger { display:inline-grid; place-items:center; width:28px; height:28px; border:1px solid transparent; border-radius:6px; background:transparent; color:#71717a; cursor:pointer; transition:all .15s; }
+.menu-trigger:hover { border-color:#d4d4d8; color:#18181b; background:#f4f4f5; }
+.person-menu { position:absolute; right:8px; top:100%; z-index:20; min-width:90px; padding:4px; border:1px solid #e4e4e7; border-radius:8px; background:#fff; box-shadow:0 4px 12px rgba(0,0,0,.08); }
+.person-menu button { display:block; width:100%; padding:6px 10px; border:0; border-radius:5px; background:transparent; text-align:left; font-size:13px; color:#3f3f46; cursor:pointer; }
+.person-menu button:hover { background:#f4f4f5; }
+.person-menu .danger-item { color:#c73535; }
+.person-menu .danger-item:hover { background:#fef2f2; }
 /* ── 部门级联多选下拉框 ── */
 .dept-field { position: relative; }
 .dept-select-wrap { position: relative; }
