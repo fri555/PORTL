@@ -1286,14 +1286,14 @@ function confirmQuota() {
   quotaOpen.value = false
   quotaError.value = ''
 }
-function deletePersonalQuota() {
+function resetPersonalQuota() {
   if (!quotaTarget.value) return
   const inherited = globalQuotaDefaults.value[quotaCycle.value]
   quotaTarget.value.quota = inherited
   quotaTarget.value.quotaSource = '全局默认'
   quotaTarget.value.quotaRate = (quotaTarget.value.amount / inherited) * 100
   quotaOpen.value = false
-  showFeedback(`已删除个人额度，恢复使用${quotaCycle.value}全局默认额度`)
+  showFeedback(`已重置额度，清除默认额度和临时额度，恢复使用${quotaCycle.value}全局默认额度`)
 }
 function openPersonDetail(row: UsageNode) {
   selectedPersonDetail.value = row
@@ -2126,7 +2126,7 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
             <p v-if="quotaError" class="form-error full">{{ quotaError }}</p>
           </div>
           <footer>
-            <button v-if="quotaTarget?.quotaSource === '个人设置'" type="button" class="danger-text" aria-label="删除个人额度" @click="deletePersonalQuota">删除个人额度</button>
+            <button v-if="quotaTarget?.quotaSource === '个人设置'" type="button" class="danger-text" aria-label="重置额度" @click="resetPersonalQuota">重置</button>
             <button type="button" @click="quotaOpen = false">取消</button
             ><button
               type="button"
