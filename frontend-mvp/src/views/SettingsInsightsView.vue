@@ -1952,7 +1952,6 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
                       <div v-if="personMenuId === person.id" class="person-menu" role="menu">
                         <button type="button" role="menuitem" @click="personMenuId = ''; openPersonDetail(person)">详情</button>
                         <button type="button" role="menuitem" @click="personMenuId = ''; openPersonQuota(person)">设置</button>
-                        <button v-if="person.quotaSource === '个人设置'" type="button" role="menuitem" class="danger-item" @click="personMenuId = ''; quotaTarget = person; resetPersonalQuota()">重置</button>
                       </div>
                     </td>
                   </tr>
