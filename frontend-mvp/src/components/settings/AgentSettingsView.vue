@@ -234,6 +234,11 @@ function saveAgent() {
     notify('请输入智能体名称')
     return
   }
+  if (!draft.logo) {
+    activeStep.value = 1
+    notify('请上传 Logo')
+    return
+  }
   const wasEditing = formMode.value === 'edit'
   const existing = agents.find((agent) => agent.id === editingId.value)
   const payload = {
@@ -500,7 +505,7 @@ function toggleLimited(list: string[], value: string, limit: number) {
 
               <div class="mt-5 grid gap-5 sm:grid-cols-2">
                 <div>
-                  <label class="block text-sm font-medium">Logo 上传<span class="ml-1 inline-flex cursor-help items-center text-zinc-400 transition-colors hover:text-zinc-600" title="聊天界面顶部展示的品牌 Logo，建议横向比例"><CircleHelp :size="12" /></span></label>
+                  <label class="block text-sm font-medium">Logo 上传 <b class="text-red-500">*</b><span class="ml-1 inline-flex cursor-help items-center text-zinc-400 transition-colors hover:text-zinc-600" title="聊天界面顶部展示的品牌 Logo，建议横向比例"><CircleHelp :size="12" /></span></label>
                   <div class="mt-2 flex items-center gap-3">
                     <button type="button" class="flex h-[44px] w-[120px] items-center justify-center overflow-hidden rounded-lg border border-dashed border-zinc-300 bg-[#fafafa] text-zinc-400 hover:border-zinc-400" aria-label="上传Logo" @click="logoInput?.click()">
                       <img v-if="draft.logo" :src="draft.logo" alt="Logo" class="h-full w-full object-contain" />
