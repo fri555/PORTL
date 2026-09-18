@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronRight,
   CircleDollarSign,
+  CircleHelp,
   Download,
   Gauge,
   MinusSquare,
@@ -1882,8 +1883,8 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
                 <thead>
                   <tr>
                     <th>人员</th>
-                    <th>额度</th>
-                    <th>消耗</th>
+                    <th><span class="th-label">额度<span class="help-tip" title="以月为单位设置的金额消耗上限，耗尽后可联系管理员调整"><CircleHelp :size="13" /></span></span></th>
+                    <th><span class="th-label">消耗<span class="help-tip" title="根据每次任务大模型实际返回的token消耗及单价计算汇总得到"><CircleHelp :size="13" /></span></span></th>
                     <th>使用率</th>
                     <th>操作</th>
                   </tr>
@@ -2074,7 +2075,7 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
             <div>
               <span class="dialog-icon"><CircleDollarSign :size="18" /></span>
               <div>
-                <strong>{{ quotaScope === '全局' ? '全局额度设置' : '用户额度设置' }}</strong>
+                <strong>{{ quotaScope === '全局' ? '全局额度设置' : '用户额度设置' }}<span class="help-tip" :title="quotaScope === '全局' ? '全局额度调整每个用户每个月的默认额度，单位：人民币' : '默认额度调整当前用户每个月的默认额度，及时生效，次月充值；临时额度调整当前用户当月的临时额度，及时生效，优先级>默认额度，单位：人民币'"><CircleHelp :size="14" /></span></strong>
                 <p>{{ quotaScope === '全局' ? '调整每个用户每个月的默认额度' : `${quotaObject} · 2026 年 9 月` }}</p>
               </div>
             </div>
@@ -2086,7 +2087,7 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
             <!-- 全局额度模式 -->
             <template v-if="quotaScope === '全局'">
               <div class="quota-current">
-                <span>全局额度</span>
+                <span>全局额度<span class="help-tip" title="系统为每位用户每月自动分配的默认额度"><CircleHelp :size="12" /></span></span>
                 <strong>{{ money(globalQuotaDefaults['每月']) }}</strong>
                 <small>（当前额度）</small>
               </div>
@@ -2098,17 +2099,16 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
                 ><span>调整原因</span
                 ><textarea v-model="quotaReason" aria-label="调整原因" rows="3" placeholder="请填写调整原因" />
               </label>
-              <p class="quota-hint full">全局额度调整每个用户每个月的默认额度，单位：人民币</p>
             </template>
             <!-- 用户额度模式 -->
             <template v-else>
               <div class="quota-current">
-                <span>用户额度</span>
+                <span>用户额度<span class="help-tip" title="管理员为该用户单独设置的个性化额度"><CircleHelp :size="12" /></span></span>
                 <strong>{{ money(quotaTarget?.quota || 0) }}</strong>
                 <small>（当前额度）</small>
               </div>
               <label
-                ><span>额度类型</span
+                ><span>额度类型<span class="help-tip" title="默认为每月自动分配的额度；临时为当月追加的额度，次月失效"><CircleHelp :size="12" /></span></span
                 ><select v-model="quotaType" aria-label="额度类型">
                   <option>默认</option>
                   <option>临时</option>
@@ -2122,7 +2122,6 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
                 ><span>调整原因</span
                 ><textarea v-model="quotaReason" aria-label="调整原因" rows="3" placeholder="请填写调整原因" />
               </label>
-              <p class="quota-hint full">默认额度调整当前用户每个月的默认额度，及时生效，次月充值；临时额度调整当前用户当月的临时额度，及时生效，优先级 &gt; 默认额度，单位：人民币</p>
             </template>
             <p v-if="quotaError" class="form-error full">{{ quotaError }}</p>
           </div>
@@ -2185,19 +2184,19 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
               <h2>消耗明细</h2>
               <dl>
                 <div>
-                  <dt>人民币消耗</dt>
+                  <dt>人民币消耗<span class="help-tip" title="根据大模型实际消耗的 token 及单价计算的费用"><CircleHelp :size="12" /></span></dt>
                   <dd>{{ money(selectedUsage.amount) }}</dd>
                 </div>
                 <div>
-                  <dt>输入 Token</dt>
+                  <dt>输入 Token<span class="help-tip" title="发送给大模型的输入文本所消耗的 token 数量"><CircleHelp :size="12" /></span></dt>
                   <dd>{{ compact(Math.round(selectedUsage.tokens * 0.62)) }}</dd>
                 </div>
                 <div>
-                  <dt>输出 Token</dt>
+                  <dt>输出 Token<span class="help-tip" title="大模型生成的回复文本所消耗的 token 数量"><CircleHelp :size="12" /></span></dt>
                   <dd>{{ compact(Math.round(selectedUsage.tokens * 0.28)) }}</dd>
                 </div>
                 <div>
-                  <dt>缓存命中 Token</dt>
+                  <dt>缓存命中 Token<span class="help-tip" title="命中缓存的重复请求所节省的 token 数量"><CircleHelp :size="12" /></span></dt>
                   <dd>{{ compact(Math.round(selectedUsage.tokens * 0.1)) }}</dd>
                 </div>
               </dl>
@@ -2324,15 +2323,15 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
                   <dd>{{ selectedPersonDetail.name }}</dd>
                 </div>
                 <div>
-                  <dt>全局额度</dt>
+                  <dt>全局额度<span class="help-tip" title="系统为每位用户每月自动分配的默认额度"><CircleHelp :size="12" /></span></dt>
                   <dd>{{ money(personGlobalQuota) }}</dd>
                 </div>
                 <div>
-                  <dt>用户额度</dt>
+                  <dt>用户额度<span class="help-tip" title="管理员为该用户单独设置的个性化额度"><CircleHelp :size="12" /></span></dt>
                   <dd>{{ personUserQuota ? money(personUserQuota) : '—' }}</dd>
                 </div>
                 <div>
-                  <dt>临时额度</dt>
+                  <dt>临时额度<span class="help-tip" title="当月临时追加的额度，优先级高于默认额度，次月失效"><CircleHelp :size="12" /></span></dt>
                   <dd>{{ personTempQuota ? money(personTempQuota) : '—' }}</dd>
                 </div>
               </dl>
@@ -2341,19 +2340,19 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
               <h2>消耗明细</h2>
               <dl>
                 <div>
-                  <dt>金额消耗</dt>
+                  <dt>金额消耗<span class="help-tip" title="根据大模型实际消耗的 token 及单价计算的费用"><CircleHelp :size="12" /></span></dt>
                   <dd>{{ money(selectedPersonDetail.amount) }}</dd>
                 </div>
                 <div>
-                  <dt>输入 Token</dt>
+                  <dt>输入 Token<span class="help-tip" title="发送给大模型的输入文本所消耗的 token 数量"><CircleHelp :size="12" /></span></dt>
                   <dd>{{ compact(personInputTokens) }}</dd>
                 </div>
                 <div>
-                  <dt>输出 Token</dt>
+                  <dt>输出 Token<span class="help-tip" title="大模型生成的回复文本所消耗的 token 数量"><CircleHelp :size="12" /></span></dt>
                   <dd>{{ compact(personOutputTokens) }}</dd>
                 </div>
                 <div>
-                  <dt>缓存命中 Token</dt>
+                  <dt>缓存命中 Token<span class="help-tip" title="命中缓存缓存的重复请求所节省的 token 数量"><CircleHelp :size="12" /></span></dt>
                   <dd>{{ compact(personCacheTokens) }}</dd>
                 </div>
               </dl>
@@ -3101,6 +3100,18 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
   background: #fafafa;
   border-radius: 6px;
   border: 1px solid #eee;
+}
+/* ── 问号提示 ── */
+.th-label {
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.help-tip {
+  display: inline-flex; align-items: center; cursor: help;
+  color: #a1a1aa; transition: color .15s;
+}
+.help-tip:hover { color: #52525b; }
+dt {
+  display: inline-flex; align-items: center; gap: 4px;
 }
 .form-error {
   color: #b42318;
