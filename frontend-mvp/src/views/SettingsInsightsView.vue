@@ -117,29 +117,68 @@ const globalQuotaDefaults = ref<Record<'每日' | '每周' | '每月', number>>(
 const personalQuotaSource = ref<'全局默认' | '个人设置'>('全局默认')
 
 const deptTree: DeptNode[] = [
-  { id: 'dept-root', name: '天马集团', children: [
-    { id: 'dept-product', name: '商品部', children: [
-      { id: 'dept-product-op', name: '商品运营组' },
-      { id: 'dept-product-plan', name: '商品企划组' },
+  { id: 'dept-1', name: '江苏天马网络科技集团有限公司', children: [
+    { id: 'dept-1053410329', name: '耶运动事业部', children: [
+      { id: 'dept-137376821', name: '线上B2C' },
+      { id: 'dept-982359842', name: '直播部' },
+      { id: 'dept-908985193', name: '数字营销中心' },
+      { id: 'dept-908932220', name: '跑步基地' },
+      { id: 'dept-1075164350', name: '羽毛球事业部' },
+      { id: 'dept-1020138491', name: '营运部' },
     ]},
-    { id: 'dept-online', name: '线上店铺', children: [
-      { id: 'dept-online-tmall', name: '天猫运营组' },
-      { id: 'dept-online-dy', name: '抖音运营组' },
+    { id: 'dept-137375891', name: '天马运动平台部', children: [
+      { id: 'dept-986605928', name: '平台销售部' },
+      { id: 'dept-373331238', name: '货源管理部' },
+      { id: 'dept-926552193', name: '平台销售中台' },
+      { id: 'dept-1054345229', name: '天团1号' },
     ]},
-    { id: 'dept-marketing', name: '市场营销部', children: [
-      { id: 'dept-mkt-brand', name: '品牌组' },
-      { id: 'dept-mkt-digital', name: '数字营销组' },
+    { id: 'dept-1071573128', name: '线下业务部' },
+    { id: 'dept-1106809551', name: '商品专卖店', children: [
+      { id: 'dept-331005663', name: '斯凯奇事业部' },
+      { id: 'dept-436958637', name: '京东MLB专卖店' },
+      { id: 'dept-340339227', name: '京东哥伦比亚专卖店' },
+      { id: 'dept-997494168', name: '特步销售运营组' },
     ]},
-    { id: 'dept-supply', name: '供应链中心', children: [
-      { id: 'dept-supply-procure', name: '采购组' },
-      { id: 'dept-supply-logistics', name: '物流组' },
+    { id: 'dept-479037415', name: '商品运营中心', children: [
+      { id: 'dept-1013947821', name: '商品运营部' },
+      { id: 'dept-867348644', name: '品牌商务部' },
     ]},
+    { id: 'dept-137517219', name: '数字技术中心', children: [
+      { id: 'dept-970183179', name: 'B2C研发部' },
+      { id: 'dept-1043637071', name: '技术服务部' },
+      { id: 'dept-1043596048', name: '中台研发部' },
+      { id: 'dept-1079461197', name: '算法研发部' },
+      { id: 'dept-861256974', name: 'B2B研发部' },
+      { id: 'dept-1079268216', name: '零售研发部' },
+      { id: 'dept-1075739175', name: 'AI项目组' },
+    ]},
+    { id: 'dept-141074384', name: '电商产业园', children: [
+      { id: 'dept-1049798148', name: '产业园中台组' },
+      { id: 'dept-599017054', name: '淮安自营业务部' },
+      { id: 'dept-917643376', name: '代运营服务部' },
+      { id: 'dept-581162735', name: '连云港自营业务部' },
+    ]},
+    { id: 'dept-997606961', name: '品牌中心', children: [
+      { id: 'dept-1085091614', name: 'Barrel项目组' },
+      { id: 'dept-1089627316', name: 'Stance项目组' },
+      { id: 'dept-1089386382', name: 'WGWG项目组' },
+      { id: 'dept-1093297348', name: '品牌运营组' },
+      { id: 'dept-1093368335', name: '商品企划组' },
+      { id: 'dept-1085642067', name: '项目中台组' },
+      { id: 'dept-635042107', name: '蓝步事业部' },
+    ]},
+    { id: 'dept-564799263', name: '财务管理中心' },
+    { id: 'dept-137304912', name: '人力资源中心' },
+    { id: 'dept-1043298232', name: '运营办公室' },
+    { id: 'dept-734674019', name: '总裁办' },
+    { id: 'dept-565011789', name: '党委' },
   ]},
 ]
 
 const deptOpen = ref(false)
 const selectedDeptIds = ref(new Set<string>())
 const deptSearchQuery = ref('')
+const expandedDeptId = ref<string | null>(null)  // 级联面板展开的部门ID
 
 function allDeptIds(nodes: DeptNode[]): string[] {
   return nodes.flatMap(n => [n.id, ...(n.children ? allDeptIds(n.children) : [])])
@@ -164,6 +203,22 @@ function toggleAllDepts() {
   const allSelected = all.every(id => selectedDeptIds.value.has(id))
   selectedDeptIds.value = allSelected ? new Set() : new Set(all)
 }
+// 获取展开部门的子部门
+const expandedDeptChildren = computed<DeptNode[]>(() => {
+  if (!expandedDeptId.value) return []
+  const find = (nodes: DeptNode[]): DeptNode | null => {
+    for (const n of nodes) {
+      if (n.id === expandedDeptId.value) return n
+      if (n.children) {
+        const found = find(n.children)
+        if (found) return found
+      }
+    }
+    return null
+  }
+  const node = find(deptTree)
+  return node?.children ?? []
+})
 function deptDisplayName(): string {
   if (selectedDeptIds.value.size === 0) return '全部部门'
   if (selectedDeptIds.value.size === allDeptIds(deptTree).length) return '全部部门'
@@ -212,6 +267,7 @@ const moduleCascade = [
 ]
 const moduleOpen = ref(false)
 const selectedModuleId = ref('')
+const expandedModuleId = ref<string | null>(null)  // 级联面板展开的模块组ID
 function moduleDisplayName(): string {
   if (!selectedModuleId.value) return '全部模块'
   for (const g of moduleCascade) {
@@ -225,6 +281,12 @@ function selectModule(id: string) {
   selectedModuleId.value = selectedModuleId.value === id ? '' : id
   moduleOpen.value = false
 }
+// 获取展开模块组的子项
+const expandedModuleChildren = computed(() => {
+  if (!expandedModuleId.value) return []
+  const group = moduleCascade.find(g => g.id === expandedModuleId.value)
+  return group?.children ?? []
+})
 
 // 人员筛选列表
 const allPersons = computed(() => flattenPersons(adminTree).map(p => ({ id: p.id, name: p.name })))
@@ -364,9 +426,9 @@ function session(
 
 const adminTree: UsageNode[] = [
   {
-    id: 'dept-product',
+    id: 'dept-479037415',
     type: 'department',
-    name: '商品部',
+    name: '商品运营中心',
     subtitle: '4 人',
     tokens: 92_600_000,
     calls: 68_420,
@@ -450,9 +512,9 @@ const adminTree: UsageNode[] = [
     ],
   },
   {
-    id: 'dept-online',
+    id: 'dept-137375891',
     type: 'department',
-    name: '线上店铺',
+    name: '天马运动平台部',
     subtitle: '4 人',
     tokens: 81_400_000,
     calls: 76_108,
@@ -535,9 +597,9 @@ const adminTree: UsageNode[] = [
     ],
   },
   {
-    id: 'dept-marketing',
+    id: 'dept-997606961',
     type: 'department',
-    name: '市场营销部',
+    name: '品牌中心',
     subtitle: '3 人',
     tokens: 74_200_000,
     calls: 55_430,
@@ -613,9 +675,9 @@ const adminTree: UsageNode[] = [
     ],
   },
   {
-    id: 'dept-supply',
+    id: 'dept-137517219',
     type: 'department',
-    name: '供应链中心',
+    name: '数字技术中心',
     subtitle: '3 人',
     tokens: 62_800_000,
     calls: 49_026,
@@ -1695,28 +1757,46 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
                   <span>{{ deptDisplayName() }}</span>
                   <ChevronDown :size="14" :class="{ 'dept-rotate': deptOpen }" />
                 </button>
-                <div v-if="deptOpen" class="dept-dropdown" @mousedown.stop>
-                  <div class="dept-dropdown-header">
+                <div v-if="deptOpen" class="cascader-dropdown" @mousedown.stop>
+                  <div class="cascader-header">
                     <input v-model="deptSearchQuery" placeholder="搜索部门" class="dept-search" />
                     <button type="button" class="dept-toggle-all" @click="toggleAllDepts">{{ selectedDeptIds.size === allDeptIds(deptTree).length ? '取消全选' : '全选' }}</button>
                   </div>
-                  <div class="dept-tree">
-                    <template v-for="node in filteredDeptTree" :key="node.id">
-                      <div class="dept-item">
-                        <label class="dept-check">
+                  <div class="cascader-panels">
+                    <!-- 第一级：顶级部门 -->
+                    <div class="cascader-panel">
+                      <button
+                        v-for="node in filteredDeptTree[0]?.children ?? filteredDeptTree"
+                        :key="node.id"
+                        type="button"
+                        class="cascader-item"
+                        :class="{ active: expandedDeptId === node.id, selected: isDeptSelected(node) !== 'none' }"
+                        @click="expandedDeptId = expandedDeptId === node.id ? null : node.id"
+                        @mouseenter="expandedDeptId = node.children?.length ? node.id : expandedDeptId"
+                      >
+                        <label class="cascader-check" @click.stop>
                           <input type="checkbox" :checked="isDeptSelected(node) !== 'none'" :indeterminate="isDeptSelected(node) === 'partial'" @change="toggleDept(node)" />
-                          <span>{{ node.name }}</span>
                         </label>
-                        <div v-if="node.children" class="dept-children">
-                          <div v-for="child in node.children" :key="child.id" class="dept-item dept-child">
-                            <label class="dept-check">
-                              <input type="checkbox" :checked="selectedDeptIds.has(child.id)" @change="toggleDept(child)" />
-                              <span>{{ child.name }}</span>
-                            </label>
-                          </div>
-                        </div>
-                      </div>
-                    </template>
+                        <span class="cascader-name">{{ node.name }}</span>
+                        <ChevronRight v-if="node.children?.length" :size="12" class="cascader-arrow" />
+                      </button>
+                    </div>
+                    <!-- 第二级：子部门 -->
+                    <div v-if="expandedDeptChildren.length" class="cascader-panel">
+                      <button
+                        v-for="child in expandedDeptChildren"
+                        :key="child.id"
+                        type="button"
+                        class="cascader-item"
+                        :class="{ selected: selectedDeptIds.has(child.id) }"
+                        @click="toggleDept(child)"
+                      >
+                        <label class="cascader-check" @click.stop>
+                          <input type="checkbox" :checked="selectedDeptIds.has(child.id)" @change="toggleDept(child)" />
+                        </label>
+                        <span class="cascader-name">{{ child.name }}</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div></label
@@ -1727,20 +1807,36 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
                   <span>{{ moduleDisplayName() }}</span>
                   <ChevronDown :size="14" :class="{ 'dept-rotate': moduleOpen }" />
                 </button>
-                <div v-if="moduleOpen" class="dept-dropdown" @mousedown.stop>
-                  <div class="dept-tree">
-                    <template v-for="group in moduleCascade" :key="group.id">
-                      <div class="dept-item">
-                        <button type="button" class="dept-check module-group-btn" :class="{ active: selectedModuleId === group.id }" @click="selectModule(group.id)">
-                          <span>{{ group.name }}</span>
-                        </button>
-                        <div v-if="group.children" class="dept-children">
-                          <button v-for="child in group.children" :key="child.id" type="button" class="dept-item dept-child dept-check module-group-btn" :class="{ active: selectedModuleId === child.id }" @click="selectModule(child.id)">
-                            <span>{{ child.name }}</span>
-                          </button>
-                        </div>
-                      </div>
-                    </template>
+                <div v-if="moduleOpen" class="cascader-dropdown" @mousedown.stop>
+                  <div class="cascader-panels">
+                    <!-- 第一级：模块组 -->
+                    <div class="cascader-panel">
+                      <button
+                        v-for="group in moduleCascade"
+                        :key="group.id"
+                        type="button"
+                        class="cascader-item"
+                        :class="{ active: expandedModuleId === group.id, selected: selectedModuleId === group.id }"
+                        @click="expandedModuleId = expandedModuleId === group.id ? null : group.id"
+                        @mouseenter="expandedModuleId = group.id"
+                      >
+                        <span class="cascader-name">{{ group.name }}</span>
+                        <ChevronRight v-if="group.children?.length" :size="12" class="cascader-arrow" />
+                      </button>
+                    </div>
+                    <!-- 第二级：子模块 -->
+                    <div v-if="expandedModuleChildren.length" class="cascader-panel">
+                      <button
+                        v-for="child in expandedModuleChildren"
+                        :key="child.id"
+                        type="button"
+                        class="cascader-item"
+                        :class="{ selected: selectedModuleId === child.id }"
+                        @click="selectModule(child.id)"
+                      >
+                        <span class="cascader-name">{{ child.name }}</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div></label
@@ -3093,6 +3189,38 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
   font: inherit; color: inherit;
 }
 .module-group-btn.active { color: #18181b; font-weight: 600; background: #f0f4ff; }
+/* ── 级联选择器面板 ── */
+.cascader-dropdown {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 40;
+  min-width: 320px; border: 1px solid #e2e3e6; border-radius: 10px;
+  background: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.12);
+}
+.cascader-header {
+  display: flex; align-items: center; gap: 6px; padding: 8px 10px;
+  border-bottom: 1px solid #eee;
+}
+.cascader-panels {
+  display: flex; max-height: 280px;
+}
+.cascader-panel {
+  flex: 0 0 auto; min-width: 160px; max-width: 200px;
+  overflow-y: auto; padding: 4px 0;
+  border-right: 1px solid #eee;
+}
+.cascader-panel:last-child { border-right: none; }
+.cascader-item {
+  display: flex; align-items: center; gap: 6px; width: 100%;
+  padding: 7px 10px; border: none; background: none;
+  font: 12px inherit; color: #27272a; cursor: pointer;
+  text-align: left; transition: background .1s;
+}
+.cascader-item:hover { background: #f5f7ff; }
+.cascader-item.active { background: #eef2ff; color: #18181b; font-weight: 500; }
+.cascader-item.selected .cascader-name { font-weight: 600; }
+.cascader-check { display: flex; align-items: center; }
+.cascader-check input[type="checkbox"] { width: 14px; height: 14px; accent-color: #18181b; cursor: pointer; }
+.cascader-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cascader-arrow { color: #a1a1aa; flex-shrink: 0; }
 /* ── 平铺列表 ── */
 .usage-flat { width: 100%; min-width: 900px; border-collapse: collapse; font-size: 12px; }
 .usage-flat thead th {
