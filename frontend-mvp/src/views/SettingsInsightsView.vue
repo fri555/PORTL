@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Activity,
@@ -12,6 +12,7 @@ import {
   Download,
   Gauge,
   MinusSquare,
+  MoreHorizontal,
   PlusSquare,
   RotateCcw,
   Search,
@@ -1299,6 +1300,7 @@ function openPersonDetail(row: UsageNode) {
   selectedPersonDetail.value = row
 }
 const selectedPersonDetail = ref<UsageNode | null>(null)
+const personMenuId = ref('')
 const personRequests = computed(() => {
   if (!selectedPersonDetail.value) return []
   const person = selectedPersonDetail.value
@@ -1919,9 +1921,16 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
                       </div>
                       <span v-else>—</span>
                     </td>
-                    <td class="row-actions">
-                      <button type="button" @click.stop="openPersonDetail(person)">详情</button>
-                      <button type="button" @click.stop="openPersonQuota(person)">设置</button>
+                    <td class="relative px-2 text-right">
+                      <button type="button" class="grid h-8 w-8 place-items-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-zinc-800" aria-label="操作菜单" @click.stop="personMenuId = personMenuId === person.id ? '' : person.id">
+                        <MoreHorizontal :size="16" />
+                      </button>
+                      <div v-if="personMenuId === person.id" class="fixed inset-0 z-30" @click="personMenuId = ''" />
+                      <div v-if="personMenuId === person.id" class="absolute right-2 top-12 z-40 w-28 overflow-hidden rounded-lg border border-zinc-200 bg-white p-1 shadow-lg">
+                        <button type="button" class="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-50" @click.stop="personMenuId = ''; openPersonDetail(person)">详情</button>
+                        <button type="button" class="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-50" @click.stop="personMenuId = ''; openPersonQuota(person)">设置</button>
+                        <button v-if="person.quotaSource === '个人设置'" type="button" class="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50" @click.stop="personMenuId = ''; openPersonQuota(person); nextTick(() => resetPersonalQuota())">重置</button>
+                      </div>
                     </td>
                   </tr>
                   <tr v-if="!paginatedPersonList.length">
@@ -2126,7 +2135,6 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
             <p v-if="quotaError" class="form-error full">{{ quotaError }}</p>
           </div>
           <footer>
-            <button v-if="quotaTarget?.quotaSource === '个人设置'" type="button" class="danger-text" aria-label="重置额度" @click="resetPersonalQuota">重置</button>
             <button type="button" @click="quotaOpen = false">取消</button
             ><button
               type="button"
@@ -3168,10 +3176,7 @@ dt {
   color: #333;
   font-size: 12px;
 }
-.row-actions { display:flex; align-items:center; gap:8px; }
-.row-actions button { border:0; background:transparent; color:#176fe8; cursor:pointer; font:12px inherit; }
 .quota-source { display:block; width:max-content; margin:4px auto 0; border-radius:999px; background:#f1f6ff; padding:2px 7px; color:#3974c9; font-size:10px; }
-.quota-dialog footer .danger-text { margin-right:auto; border-color:#ffd4d4; color:#c73535; }
 /* ── 部门级联多选下拉框 ── */
 .dept-field { position: relative; }
 .dept-select-wrap { position: relative; }
