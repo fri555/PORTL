@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Activity,
@@ -12,7 +12,6 @@ import {
   Download,
   Gauge,
   MinusSquare,
-  MoreHorizontal,
   PlusSquare,
   RotateCcw,
   Search,
@@ -39,6 +38,7 @@ type UsageNode = {
   quota: number
   quotaRate: number
   quotaSource?: '全局默认' | '个人设置'
+  updatedAt?: string
   date?: string
   sessionId?: string
   children?: UsageNode[]
@@ -492,6 +492,7 @@ const adminTree: UsageNode[] = [
         quota: 220_000,
         quotaRate: 85,
         quotaSource: '个人设置',
+        updatedAt: '2026-09-17 10:26',
         children: [
           {
             id: 'module-agent',
@@ -537,19 +538,19 @@ const adminTree: UsageNode[] = [
       {
         id: 'user-muxin', type: 'person', name: '刘洋（沐心）', subtitle: '商品企划',
         tokens: 45_200_000, calls: 32_100, coins: 89_400, amount: 4128.30,
-        quota: 150_000, quotaRate: 62, quotaSource: '全局默认',
+        quota: 150_000, quotaRate: 62, quotaSource: '全局默认', updatedAt: '2026-09-16 09:30',
         children: [session('s-prod-0916', '秋冬企划分析', '专家模式', 'Qwen3 Max', 45_200_000, 32_100, 89_400, 4128.30, '2026-09-16 09:30')],
       },
       {
         id: 'user-ranqiu', type: 'person', name: '赵婷（染秋）', subtitle: '商品运营',
         tokens: 38_600_000, calls: 28_400, coins: 76_200, amount: 3512.80,
-        quota: 120_000, quotaRate: 58, quotaSource: '全局默认',
+        quota: 120_000, quotaRate: 58, quotaSource: '全局默认', updatedAt: '2026-09-15 14:20',
         children: [session('s-prod-0915', '商品详情页优化', '日常办公', 'Qwen3 Plus', 38_600_000, 28_400, 76_200, 3512.80, '2026-09-15 14:20')],
       },
       {
         id: 'user-chunyuan', type: 'person', name: '孙鹏（淳远）', subtitle: '商品数据分析',
         tokens: 22_100_000, calls: 16_800, coins: 43_600, amount: 2016.50,
-        quota: 100_000, quotaRate: 40, quotaSource: '全局默认',
+        quota: 100_000, quotaRate: 40, quotaSource: '全局默认', updatedAt: '2026-09-14 11:00',
         children: [session('s-prod-0914', '销售趋势分析', '日常办公', 'Qwen3 Plus', 22_100_000, 16_800, 43_600, 2016.50, '2026-09-14 11:00')],
       },
     ],
@@ -578,6 +579,7 @@ const adminTree: UsageNode[] = [
         quota: 171_574,
         quotaRate: 94,
         quotaSource: '全局默认',
+        updatedAt: '2026-09-16 18:40',
         children: [
           {
             id: 'module-xiaozhi',
@@ -622,19 +624,19 @@ const adminTree: UsageNode[] = [
       {
         id: 'user-lanxin', type: 'person', name: '周琳（蓝心）', subtitle: '天猫店长',
         tokens: 52_300_000, calls: 48_200, coins: 103_600, amount: 4786.40,
-        quota: 160_000, quotaRate: 78, quotaSource: '个人设置',
+        quota: 160_000, quotaRate: 78, quotaSource: '个人设置', updatedAt: '2026-09-16 13:15',
         children: [session('s-online-0916', '天猫活动策划', '专家模式', 'DeepSeek R1', 52_300_000, 48_200, 103_600, 4786.40, '2026-09-16 13:15')],
       },
       {
         id: 'user-fenglai', type: 'person', name: '吴磊（枫来）', subtitle: '抖音运营',
         tokens: 41_800_000, calls: 39_600, coins: 82_800, amount: 3818.60,
-        quota: 140_000, quotaRate: 68, quotaSource: '全局默认',
+        quota: 140_000, quotaRate: 68, quotaSource: '全局默认', updatedAt: '2026-09-15 16:40',
         children: [session('s-online-0915', '短视频脚本生成', '日常办公', 'Qwen3 Max', 41_800_000, 39_600, 82_800, 3818.60, '2026-09-15 16:40')],
       },
       {
         id: 'user-yingshi', type: 'person', name: '郑欣（映时）', subtitle: '店铺数据分析',
         tokens: 28_500_000, calls: 26_100, coins: 56_400, amount: 2604.20,
-        quota: 100_000, quotaRate: 52, quotaSource: '全局默认',
+        quota: 100_000, quotaRate: 52, quotaSource: '全局默认', updatedAt: '2026-09-14 10:20',
         children: [session('s-online-0914', '店铺流量分析', '日常办公', 'Qwen3 Plus', 28_500_000, 26_100, 56_400, 2604.20, '2026-09-14 10:20')],
       },
     ],
@@ -663,6 +665,7 @@ const adminTree: UsageNode[] = [
         quota: 200_000,
         quotaRate: 74,
         quotaSource: '全局默认',
+        updatedAt: '2026-09-16 11:30',
         children: [
           {
             id: 'module-agent-marketing',
@@ -706,13 +709,13 @@ const adminTree: UsageNode[] = [
       {
         id: 'user-hanyi', type: 'person', name: '黄莉（涵意）', subtitle: '品牌经理',
         tokens: 35_400_000, calls: 26_800, coins: 70_200, amount: 3240.60,
-        quota: 120_000, quotaRate: 55, quotaSource: '全局默认',
+        quota: 120_000, quotaRate: 55, quotaSource: '全局默认', updatedAt: '2026-09-16 11:30',
         children: [session('s-mkt-0916', '品牌故事撰写', '日常办公', 'Qwen3 Max', 35_400_000, 26_800, 70_200, 3240.60, '2026-09-16 11:30')],
       },
       {
         id: 'user-qianyu', type: 'person', name: '林峰（千语）', subtitle: '数字营销',
         tokens: 19_800_000, calls: 15_200, coins: 39_200, amount: 1808.40,
-        quota: 80_000, quotaRate: 45, quotaSource: '全局默认',
+        quota: 80_000, quotaRate: 45, quotaSource: '全局默认', updatedAt: '2026-09-15 09:50',
         children: [session('s-mkt-0915', '投放效果分析', '日常办公', 'Qwen3 Plus', 19_800_000, 15_200, 39_200, 1808.40, '2026-09-15 09:50')],
       },
     ],
@@ -741,6 +744,7 @@ const adminTree: UsageNode[] = [
         quota: 180_000,
         quotaRate: 69,
         quotaSource: '全局默认',
+        updatedAt: '2026-09-15 09:50',
         children: [
           {
             id: 'module-todo',
@@ -784,13 +788,13 @@ const adminTree: UsageNode[] = [
       {
         id: 'user-mochen', type: 'person', name: '何芳（墨尘）', subtitle: '采购专员',
         tokens: 28_600_000, calls: 22_400, coins: 56_800, amount: 2618.90,
-        quota: 100_000, quotaRate: 52, quotaSource: '全局默认',
+        quota: 100_000, quotaRate: 52, quotaSource: '全局默认', updatedAt: '2026-09-16 14:50',
         children: [session('s-supply-0916', '供应商比价分析', '专家模式', 'DeepSeek R1', 28_600_000, 22_400, 56_800, 2618.90, '2026-09-16 14:50')],
       },
       {
         id: 'user-zhiqiu', type: 'person', name: '徐强（知秋）', subtitle: '物流调度',
         tokens: 18_200_000, calls: 14_600, coins: 36_000, amount: 1660.30,
-        quota: 80_000, quotaRate: 38, quotaSource: '全局默认',
+        quota: 80_000, quotaRate: 38, quotaSource: '全局默认', updatedAt: '2026-09-15 15:10',
         children: [session('s-supply-0915', '配送路线优化', '日常办公', 'Qwen3 Plus', 18_200_000, 14_600, 36_000, 1660.30, '2026-09-15 15:10')],
       },
     ],
@@ -1299,8 +1303,13 @@ function resetPersonalQuota() {
 function openPersonDetail(row: UsageNode) {
   selectedPersonDetail.value = row
 }
+function openQuotaFromDetail() {
+  const person = selectedPersonDetail.value
+  if (!person) return
+  selectedPersonDetail.value = null
+  openPersonQuota(person)
+}
 const selectedPersonDetail = ref<UsageNode | null>(null)
-const personMenuId = ref('')
 const personRequests = computed(() => {
   if (!selectedPersonDetail.value) return []
   const person = selectedPersonDetail.value
@@ -1888,7 +1897,7 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
                     <th><span class="th-label">额度<span class="help-tip" title="以月为单位设置的金额消耗上限，耗尽后可联系管理员调整"><CircleHelp :size="13" /></span></span></th>
                     <th><span class="th-label">消耗<span class="help-tip" title="根据每次任务大模型实际返回的token消耗及单价计算汇总得到"><CircleHelp :size="13" /></span></span></th>
                     <th>使用率</th>
-                    <th>操作</th>
+                    <th>更新时间</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1904,12 +1913,14 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
                       </div>
                     </td>
                     <td>—</td>
+                    <td>—</td>
                   </tr>
                   <!-- 人员行 -->
                   <tr
                     v-for="person in paginatedPersonList"
                     :key="person.id"
-                    class="person-row"
+                    class="person-row clickable"
+                    @click="openPersonDetail(person)"
                   >
                     <td><strong>{{ person.name }}</strong><small v-if="person.subtitle">{{ person.subtitle }}</small></td>
                     <td><span>{{ person.quota ? money(person.quota) : '—' }}</span><small v-if="person.quotaSource" class="quota-source">{{ person.quotaSource }}</small></td>
@@ -1921,17 +1932,7 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
                       </div>
                       <span v-else>—</span>
                     </td>
-                    <td class="relative px-2 text-right">
-                      <button type="button" class="grid h-8 w-8 place-items-center rounded-md text-zinc-400 hover:bg-zinc-100 hover:text-zinc-800" aria-label="操作菜单" @click.stop="personMenuId = personMenuId === person.id ? '' : person.id">
-                        <MoreHorizontal :size="16" />
-                      </button>
-                      <div v-if="personMenuId === person.id" class="fixed inset-0 z-30" @click="personMenuId = ''" />
-                      <div v-if="personMenuId === person.id" class="absolute right-2 top-12 z-40 w-28 overflow-hidden rounded-lg border border-zinc-200 bg-white p-1 shadow-lg">
-                        <button type="button" class="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-50" @click.stop="personMenuId = ''; openPersonDetail(person)">详情</button>
-                        <button type="button" class="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-50" @click.stop="personMenuId = ''; openPersonQuota(person)">设置</button>
-                        <button v-if="person.quotaSource === '个人设置'" type="button" class="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50" @click.stop="personMenuId = ''; openPersonQuota(person); nextTick(() => resetPersonalQuota())">重置</button>
-                      </div>
-                    </td>
+                    <td class="text-zinc-500">{{ person.updatedAt || '—' }}</td>
                   </tr>
                   <tr v-if="!paginatedPersonList.length">
                     <td colspan="5" class="empty-cell">
@@ -2135,7 +2136,8 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
             <p v-if="quotaError" class="form-error full">{{ quotaError }}</p>
           </div>
           <footer>
-            <button type="button" @click="quotaOpen = false">取消</button
+            <button v-if="quotaTarget?.quotaSource === '个人设置'" type="button" class="danger-text" aria-label="重置额度" @click="resetPersonalQuota">重置</button>
+            <button type="button" @click="quotaOpen = false">取消</button>
             ><button
               type="button"
               class="primary-button"
@@ -2318,9 +2320,14 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
                 <p>{{ selectedPersonDetail.name }}</p>
               </div>
             </div>
-            <button type="button" aria-label="关闭人员详情" @click="selectedPersonDetail = null">
-              <X :size="18" />
-            </button>
+            <div class="flex items-center gap-2">
+              <button type="button" class="settings-btn" aria-label="设置额度" @click="openQuotaFromDetail">
+                <Settings2 :size="14" />设置
+              </button>
+              <button type="button" aria-label="关闭人员详情" @click="selectedPersonDetail = null">
+                <X :size="18" />
+              </button>
+            </div>
           </header>
           <div class="dialog-body audit-detail-body">
             <section>
@@ -3139,6 +3146,20 @@ dt {
   background: #fff;
   padding: 0 14px;
 }
+.quota-dialog footer .danger-text {
+  margin-right: auto;
+  border-color: #ffd4d4;
+  color: #c73535;
+}
+.settings-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 30px; padding: 0 10px;
+  border: 1px solid #ddd; border-radius: 7px;
+  background: #fff; color: #52525b;
+  font-size: 12px; cursor: pointer;
+  transition: all .15s;
+}
+.settings-btn:hover { border-color: #a1a1aa; color: #18181b; }
 .audit-detail-modal,
 .usage-detail-modal {
   width: min(720px, calc(100vw - 40px));
