@@ -115,7 +115,7 @@ describe('production-aligned prototype smoke flows', () => {
   it('renders the production agent table on settings', async () => {
     const { wrapper } = await mountAuthed('/settings/agents')
     expect(wrapper.text()).toContain('智能体管理')
-    expect(wrapper.text()).toContain('天马智擎助手')
+    expect(wrapper.text()).toContain('耶虎')
     expect(wrapper.text()).toContain('创建智能体')
   })
 })

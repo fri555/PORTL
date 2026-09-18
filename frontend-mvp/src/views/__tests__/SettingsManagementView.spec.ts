@@ -27,7 +27,7 @@ describe('SettingsManagementView', () => {
     expect(wrapper.get('[data-testid="settings-production-card"]').classes()).toContain('rounded-lg')
     expect(wrapper.text()).toContain('智能体管理')
     expect(wrapper.text()).toContain('创建智能体')
-    expect(wrapper.text()).toContain('天马智擎助手')
+    expect(wrapper.text()).toContain('耶虎')
     expect(wrapper.text()).toContain('组货专家')
   })
 

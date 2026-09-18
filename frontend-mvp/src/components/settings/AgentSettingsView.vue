@@ -5,10 +5,12 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  CircleHelp,
   CirclePlus,
   Copy,
   Download,
   FileText,
+  ImageIcon,
   MoreHorizontal,
   Plus,
   Search,
@@ -37,8 +39,8 @@ type FormMode = 'create' | 'edit' | null
 const assetBase = `${import.meta.env.BASE_URL}assets/agents-online`
 
 const agents = reactive<AgentRow[]>([
-  { id: 'assistant', name: '天马智擎助手', category: '通用助手', description: '默认智能体', status: 'active', updatedAt: '2026-08-06 14:27', avatar: `${assetBase}/tianma-assistant.png` },
-  { id: 'data', name: '数据分析', category: '数据与洞察', description: '输出经营报表、诊断异常指标、提供数据洞察', status: 'active', updatedAt: '2026-08-09 23:48', avatar: `${assetBase}/data-analysis.png` },
+  { id: 'assistant', name: '耶虎', category: '日常办公', description: '耶虎智能助手，日常办公模式默认智能体，支持发消息、建待办、查日程、知识库查询等', status: 'active', updatedAt: '2026-09-17 10:00', avatar: `${assetBase}/tianma-assistant.png` },
+  { id: 'data', name: '大表姐', category: '数据与洞察', description: '输出经营报表、诊断异常指标、提供数据洞察', status: 'active', updatedAt: '2026-08-09 23:48', avatar: `${assetBase}/data-analysis.png` },
   { id: 'assortment', name: '组货专家', category: '供应链与商品', description: '根据预算、人数、性别比例和品类需求，匹配知识库方案与商品信息，生成可执行的组货方案', status: 'active', updatedAt: '2026-08-07 20:54', avatar: `${assetBase}/assortment-expert.png` },
   { id: 'review', name: '评价分析师', category: '数据与洞察', description: '专注于淘天京东平台店铺评价数据的智能分析与报告生成', status: 'active', updatedAt: '2026-08-09 23:28', avatar: `${assetBase}/review-analyst.png` },
   { id: 'inspiration', name: '灵感大王', category: '营销与增长', description: '根据商品货号和平台，生成社媒种草营销文案和配图', status: 'active', updatedAt: '2026-08-07 20:55', avatar: `${assetBase}/inspiration-king.png` },
@@ -56,11 +58,16 @@ const permissionTarget = ref<AgentRow | null>(null)
 const permissionMembers = ref<Record<string, PermissionMember[]>>({})
 const toast = ref('')
 const avatarInput = ref<HTMLInputElement | null>(null)
+const logoInput = ref<HTMLInputElement | null>(null)
+const iconInput = ref<HTMLInputElement | null>(null)
 const importInput = ref<HTMLInputElement | null>(null)
 let toastTimer: ReturnType<typeof setTimeout> | undefined
 
+type QuickPromptDraft = { id: string; title: string; content: string }
+let qpIdSeq = 1
+
 const steps = ['基础设定', '角色设定', '能力扩展', '用户剧本']
-const categories = ['通用助手', '数据与洞察', '供应链与商品', '营销与增长']
+const categories = ['日常办公', '通用助手', '数据与洞察', '供应链与商品', '营销与增长']
 const models = ['deepseek-v4-flash（deepseek-v4-flash）', 'Qwen3 企业主模型', 'DeepSeek 推理模型']
 const departmentOptions = ['通用', '商品部', '平台部', 'B2C线上', 'B2C线下']
 const systemOptions = ['DWS', '知识库', '联网', '文档', '数据平台']
@@ -73,6 +80,8 @@ const draft = reactive({
   connectedSystems: ['知识库'] as string[],
   description: '',
   avatar: '',
+  logo: '',
+  icon: '',
   publishTemplate: false,
   model: '',
   react: true,
@@ -86,6 +95,12 @@ const draft = reactive({
   monitoring: true,
   selectedDocs: [] as string[],
   selectedTools: [] as string[],
+  dailyQuickPrompts: [
+    { id: 'qp-1', title: '发消息', content: '给「花名」发条钉钉消息：「内容」' },
+    { id: 'qp-2', title: '建待办', content: '给我建个钉钉待办：「标题」「内容」，「时间」前完成' },
+    { id: 'qp-3', title: '建日程', content: '跟「花名」约钉钉会议：「时间」开「主题」会' },
+    { id: 'qp-4', title: '查知识库', content: '知识库中查下关于「关键词」的内容，并输出一份报告' },
+  ] as QuickPromptDraft[],
 })
 
 const knowledgeDocs = [
@@ -135,11 +150,18 @@ function notify(message: string) {
 
 function resetDraft() {
   Object.assign(draft, {
-    name: '', version: 1, category: '通用助手', description: '', avatar: '', publishTemplate: false,
+    name: '', version: 1, category: '通用助手', description: '', avatar: '', logo: '', icon: '',
+    publishTemplate: false,
     applicableDepartments: ['通用'], connectedSystems: ['知识库'],
     model: '', react: true, chainOfThought: false, historyTurns: 20, compressionThreshold: 3000,
     longTermMemory: false, markdown: true, rolePrompt: defaultPrompt, strictKnowledge: false,
     monitoring: true, selectedDocs: [], selectedTools: [],
+    dailyQuickPrompts: [
+      { id: `qp-${++qpIdSeq}`, title: '发消息', content: '给「花名」发条钉钉消息：「内容」' },
+      { id: `qp-${++qpIdSeq}`, title: '建待办', content: '给我建个钉钉待办：「标题」「内容」，「时间」前完成' },
+      { id: `qp-${++qpIdSeq}`, title: '建日程', content: '跟「花名」约钉钉会议：「时间」开「主题」会' },
+      { id: `qp-${++qpIdSeq}`, title: '查知识库', content: '知识库中查下关于「关键词」的内容，并输出一份报告' },
+    ],
   })
 }
 
@@ -250,6 +272,39 @@ function handleAvatar(event: Event) {
   const reader = new FileReader()
   reader.onload = () => { draft.avatar = String(reader.result || '') }
   reader.readAsDataURL(file)
+}
+
+function handleLogo(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  if (!['image/jpeg', 'image/png', 'image/svg+xml', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) {
+    notify('请上传不超过 2MB 的 JPG、PNG 或 SVG 格式')
+    return
+  }
+  const reader = new FileReader()
+  reader.onload = () => { draft.logo = String(reader.result || '') }
+  reader.readAsDataURL(file)
+}
+
+function handleIcon(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  if (!['image/jpeg', 'image/png', 'image/svg+xml', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) {
+    notify('请上传不超过 2MB 的 JPG、PNG 或 SVG 格式')
+    return
+  }
+  const reader = new FileReader()
+  reader.onload = () => { draft.icon = String(reader.result || '') }
+  reader.readAsDataURL(file)
+}
+
+function addQuickPrompt() {
+  draft.dailyQuickPrompts.push({ id: `qp-${++qpIdSeq}`, title: '', content: '' })
+}
+
+function removeQuickPrompt(id: string) {
+  const idx = draft.dailyQuickPrompts.findIndex(qp => qp.id === id)
+  if (idx >= 0) draft.dailyQuickPrompts.splice(idx, 1)
 }
 
 function exportConfig() {
@@ -443,6 +498,31 @@ function toggleLimited(list: string[], value: string, limit: number) {
                 <input ref="avatarInput" class="hidden" type="file" accept=".jpg,.jpeg,.png,.svg,.webp" @change="handleAvatar" />
               </div>
 
+              <div class="mt-5 grid gap-5 sm:grid-cols-2">
+                <div>
+                  <label class="block text-sm font-medium">Logo 上传<span class="ml-1 inline-flex cursor-help items-center text-zinc-400 transition-colors hover:text-zinc-600" title="聊天界面顶部展示的品牌 Logo，建议横向比例"><CircleHelp :size="12" /></span></label>
+                  <div class="mt-2 flex items-center gap-3">
+                    <button type="button" class="flex h-[44px] w-[120px] items-center justify-center overflow-hidden rounded-lg border border-dashed border-zinc-300 bg-[#fafafa] text-zinc-400 hover:border-zinc-400" aria-label="上传Logo" @click="logoInput?.click()">
+                      <img v-if="draft.logo" :src="draft.logo" alt="Logo" class="h-full w-full object-contain" />
+                      <span v-else class="flex items-center gap-1.5 text-xs"><ImageIcon :size="14" />上传 Logo</span>
+                    </button>
+                    <input ref="logoInput" class="hidden" type="file" accept=".jpg,.jpeg,.png,.svg,.webp" @change="handleLogo" />
+                  </div>
+                  <p class="mt-1 text-[11px] text-zinc-400">建议尺寸 240×64px，不超过 2MB</p>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium">图标上传<span class="ml-1 inline-flex cursor-help items-center text-zinc-400 transition-colors hover:text-zinc-600" title="用于侧边栏、收藏等场景的小尺寸图标"><CircleHelp :size="12" /></span></label>
+                  <div class="mt-2 flex items-center gap-3">
+                    <button type="button" class="grid h-[44px] w-[44px] place-items-center overflow-hidden rounded-lg border border-dashed border-zinc-300 bg-[#fafafa] text-zinc-400 hover:border-zinc-400" aria-label="上传图标" @click="iconInput?.click()">
+                      <img v-if="draft.icon" :src="draft.icon" alt="图标" class="h-full w-full object-cover" />
+                      <span v-else class="flex items-center gap-1 text-xs"><ImageIcon :size="14" />图标</span>
+                    </button>
+                    <input ref="iconInput" class="hidden" type="file" accept=".jpg,.jpeg,.png,.svg,.webp" @change="handleIcon" />
+                  </div>
+                  <p class="mt-1 text-[11px] text-zinc-400">建议 1:1 正方形，64×64px 以上</p>
+                </div>
+              </div>
+
               <div class="mt-5 grid gap-4 sm:grid-cols-[1fr_80px]">
                 <label class="block text-sm font-medium">名称 <b class="text-red-500">*</b>
                   <span class="relative mt-2 block"><input v-model="draft.name" maxlength="50" class="h-10 w-full rounded-lg border border-zinc-200 px-3 pr-14 text-sm outline-none focus:border-zinc-400" placeholder="请输入智能体名称" /><small class="absolute right-3 top-3 text-zinc-300">{{ draft.name.length }}/50</small></span>
@@ -482,6 +562,26 @@ function toggleLimited(list: string[], value: string, limit: number) {
               <div class="mt-4 flex items-center justify-between gap-4">
                 <div><div class="text-sm font-medium">发布为模版</div><p class="mt-1 text-xs text-zinc-400">发布后，该智能体会显示在“发现模版”中，供他人复制使用（保存后生效）。</p></div>
                 <button type="button" role="switch" :aria-checked="draft.publishTemplate" class="relative h-5 w-9 rounded-full transition" :class="draft.publishTemplate ? 'bg-[#171717]' : 'bg-zinc-200'" @click="draft.publishTemplate = !draft.publishTemplate"><i class="absolute top-0.5 h-4 w-4 rounded-full bg-white transition" :class="draft.publishTemplate ? 'left-[18px]' : 'left-0.5'" /></button>
+              </div>
+            </section>
+
+            <section class="border-t border-zinc-100 pt-5">
+              <h2 class="text-lg font-semibold">日常办公模式 · 快捷提示词<span class="ml-1.5 inline-flex cursor-help items-center text-zinc-400 transition-colors hover:text-zinc-600" title="配置用户在「日常办公」模式下看到的快捷提示语卡片，点击即可快速填入输入框"><CircleHelp :size="14" /></span></h2>
+              <p class="mt-1 text-xs text-zinc-400">管理员配置的快捷提示词会展示在聊天首页，用户点击即可快速开始对话</p>
+              <div class="mt-4 space-y-3">
+                <div v-for="(qp, idx) in draft.dailyQuickPrompts" :key="qp.id" class="flex items-start gap-3 rounded-lg border border-zinc-200 bg-[#fafafa] p-3">
+                  <span class="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-zinc-200 text-xs font-medium text-zinc-500">{{ idx + 1 }}</span>
+                  <div class="min-w-0 flex-1 space-y-2">
+                    <input v-model="qp.title" class="h-8 w-full rounded-md border border-zinc-200 bg-white px-2.5 text-sm outline-none focus:border-zinc-400" placeholder="提示词标题（如：发消息）" maxlength="20" />
+                    <textarea v-model="qp.content" rows="2" class="w-full resize-none rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-zinc-400" placeholder="提示词内容，用户点击后填入输入框的文本..." maxlength="200" />
+                  </div>
+                  <button type="button" class="mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-md text-zinc-400 hover:bg-red-50 hover:text-red-500" aria-label="删除提示词" @click="removeQuickPrompt(qp.id)">
+                    <Trash2 class="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <button type="button" class="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-zinc-300 py-2.5 text-sm text-zinc-500 hover:border-zinc-400 hover:text-zinc-700" @click="addQuickPrompt">
+                  <Plus class="h-4 w-4" />添加快捷提示词
+                </button>
               </div>
             </section>
 
