@@ -119,7 +119,27 @@ const personalQuotaSource = ref<'全局默认' | '个人设置'>('全局默认')
 const deptTree: DeptNode[] = [
   { id: 'dept-1', name: '江苏天马网络科技集团有限公司', children: [
     { id: 'dept-1053410329', name: '耶运动事业部', children: [
-      { id: 'dept-137376821', name: '线上B2C' },
+      { id: 'dept-137376821', name: '线上B2C', children: [
+        { id: 'dept-978318956', name: '淘天平台', children: [
+          { id: 'dept-140013601', name: '幸运叶子官方旗舰店', children: [
+            { id: 'dept-339214594', name: '售后组' },
+            { id: 'dept-339874464', name: '运动顾问组' },
+            { id: 'dept-339586550', name: '运营师组' },
+            { id: 'dept-339707458', name: '运营助理组' },
+            { id: 'dept-500962847', name: '直播间组' },
+          ]},
+          { id: 'dept-140042408', name: 'Intersport旗舰店' },
+          { id: 'dept-992941473', name: '淘宝店群' },
+          { id: 'dept-992978471', name: '天猫店群' },
+        ]},
+        { id: 'dept-552181249', name: '京东平台' },
+        { id: 'dept-987551908', name: '供货平台' },
+        { id: 'dept-150482645', name: '拼多多平台' },
+        { id: 'dept-394506571', name: '新平台事业部' },
+        { id: 'dept-813466728', name: '育泰事业部' },
+        { id: 'dept-852492792', name: '销售服务中台' },
+        { id: 'dept-1030042091', name: '南京线上B2C' },
+      ]},
       { id: 'dept-982359842', name: '直播部' },
       { id: 'dept-908985193', name: '数字营销中心' },
       { id: 'dept-908932220', name: '跑步基地' },
@@ -178,7 +198,7 @@ const deptTree: DeptNode[] = [
 const deptOpen = ref(false)
 const selectedDeptIds = ref(new Set<string>())
 const deptSearchQuery = ref('')
-const expandedDeptId = ref<string | null>(null)  // 级联面板展开的部门ID
+const deptExpandedPath = ref<string[]>([])  // 级联面板展开路径（支持多层）
 
 function allDeptIds(nodes: DeptNode[]): string[] {
   return nodes.flatMap(n => [n.id, ...(n.children ? allDeptIds(n.children) : [])])
@@ -203,22 +223,28 @@ function toggleAllDepts() {
   const allSelected = all.every(id => selectedDeptIds.value.has(id))
   selectedDeptIds.value = allSelected ? new Set() : new Set(all)
 }
-// 获取展开部门的子部门
-const expandedDeptChildren = computed<DeptNode[]>(() => {
-  if (!expandedDeptId.value) return []
-  const find = (nodes: DeptNode[]): DeptNode | null => {
-    for (const n of nodes) {
-      if (n.id === expandedDeptId.value) return n
-      if (n.children) {
-        const found = find(n.children)
-        if (found) return found
-      }
-    }
-    return null
+// 级联面板列数据（支持任意深度）
+const deptCascadeColumns = computed<DeptNode[][]>(() => {
+  const columns: DeptNode[][] = []
+  // 第一列始终是根节点
+  const root = deptTree[0]
+  if (!root) return []
+  columns.push(root.children ?? [])
+  // 根据展开路径逐层生成后续列
+  let currentChildren = root.children ?? []
+  for (const pathId of deptExpandedPath.value) {
+    const found = currentChildren.find(n => n.id === pathId)
+    if (!found?.children?.length) break
+    columns.push(found.children)
+    currentChildren = found.children
   }
-  const node = find(deptTree)
-  return node?.children ?? []
+  return columns
 })
+// 悬停展开某节点（在指定列索引）
+function hoverDeptColumn(nodeId: string, colIndex: number) {
+  // 截断路径到当前列，然后追加当前节点
+  deptExpandedPath.value = [...deptExpandedPath.value.slice(0, colIndex), nodeId]
+}
 function deptDisplayName(): string {
   if (selectedDeptIds.value.size === 0) return '全部部门'
   if (selectedDeptIds.value.size === allDeptIds(deptTree).length) return '全部部门'
@@ -267,26 +293,41 @@ const moduleCascade = [
 ]
 const moduleOpen = ref(false)
 const selectedModuleId = ref('')
-const expandedModuleId = ref<string | null>(null)  // 级联面板展开的模块组ID
+const moduleExpandedPath = ref<string[]>([])  // 级联面板展开路径
 function moduleDisplayName(): string {
   if (!selectedModuleId.value) return '全部模块'
-  for (const g of moduleCascade) {
-    if (g.id === selectedModuleId.value) return g.name
-    const child = g.children?.find(c => c.id === selectedModuleId.value)
-    if (child) return `${g.name} - ${child.name}`
+  const findName = (nodes: { id: string; name: string; children?: { id: string; name: string }[] }[]): string => {
+    for (const g of nodes) {
+      if (g.id === selectedModuleId.value) return g.name
+      if ('children' in g && g.children) {
+        const child = g.children.find(c => c.id === selectedModuleId.value)
+        if (child) return `${g.name} - ${child.name}`
+      }
+    }
+    return '全部模块'
   }
-  return '全部模块'
+  return findName(moduleCascade as any)
 }
 function selectModule(id: string) {
   selectedModuleId.value = selectedModuleId.value === id ? '' : id
   moduleOpen.value = false
 }
-// 获取展开模块组的子项
-const expandedModuleChildren = computed(() => {
-  if (!expandedModuleId.value) return []
-  const group = moduleCascade.find(g => g.id === expandedModuleId.value)
-  return group?.children ?? []
+// 模块级联面板列数据
+const moduleCascadeColumns = computed(() => {
+  const columns: { id: string; name: string; children?: { id: string; name: string }[] }[][] = []
+  columns.push(moduleCascade)
+  let current = moduleCascade
+  for (const pathId of moduleExpandedPath.value) {
+    const found = current.find(g => g.id === pathId)
+    if (!found?.children?.length) break
+    columns.push(found.children as any)
+    current = found.children as any
+  }
+  return columns
 })
+function hoverModuleColumn(nodeId: string, colIndex: number) {
+  moduleExpandedPath.value = [...moduleExpandedPath.value.slice(0, colIndex), nodeId]
+}
 
 // 人员筛选列表
 const allPersons = computed(() => flattenPersons(adminTree).map(p => ({ id: p.id, name: p.name })))
@@ -1763,38 +1804,24 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
                     <button type="button" class="dept-toggle-all" @click="toggleAllDepts">{{ selectedDeptIds.size === allDeptIds(deptTree).length ? '取消全选' : '全选' }}</button>
                   </div>
                   <div class="cascader-panels">
-                    <!-- 第一级：顶级部门 -->
-                    <div class="cascader-panel">
+                    <div
+                      v-for="(column, colIdx) in deptCascadeColumns"
+                      :key="colIdx"
+                      class="cascader-panel"
+                    >
                       <button
-                        v-for="node in filteredDeptTree[0]?.children ?? filteredDeptTree"
+                        v-for="node in column"
                         :key="node.id"
                         type="button"
                         class="cascader-item"
-                        :class="{ active: expandedDeptId === node.id, selected: isDeptSelected(node) !== 'none' }"
-                        @click="expandedDeptId = expandedDeptId === node.id ? null : node.id"
-                        @mouseenter="expandedDeptId = node.children?.length ? node.id : expandedDeptId"
+                        :class="{ active: deptExpandedPath[colIdx] === node.id, selected: isDeptSelected(node) !== 'none' }"
+                        @mouseenter="node.children?.length ? hoverDeptColumn(node.id, colIdx) : undefined"
                       >
                         <label class="cascader-check" @click.stop>
                           <input type="checkbox" :checked="isDeptSelected(node) !== 'none'" :indeterminate="isDeptSelected(node) === 'partial'" @change="toggleDept(node)" />
                         </label>
                         <span class="cascader-name">{{ node.name }}</span>
                         <ChevronRight v-if="node.children?.length" :size="12" class="cascader-arrow" />
-                      </button>
-                    </div>
-                    <!-- 第二级：子部门 -->
-                    <div v-if="expandedDeptChildren.length" class="cascader-panel">
-                      <button
-                        v-for="child in expandedDeptChildren"
-                        :key="child.id"
-                        type="button"
-                        class="cascader-item"
-                        :class="{ selected: selectedDeptIds.has(child.id) }"
-                        @click="toggleDept(child)"
-                      >
-                        <label class="cascader-check" @click.stop>
-                          <input type="checkbox" :checked="selectedDeptIds.has(child.id)" @change="toggleDept(child)" />
-                        </label>
-                        <span class="cascader-name">{{ child.name }}</span>
                       </button>
                     </div>
                   </div>
@@ -1809,32 +1836,22 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
                 </button>
                 <div v-if="moduleOpen" class="cascader-dropdown" @mousedown.stop>
                   <div class="cascader-panels">
-                    <!-- 第一级：模块组 -->
-                    <div class="cascader-panel">
+                    <div
+                      v-for="(column, colIdx) in moduleCascadeColumns"
+                      :key="colIdx"
+                      class="cascader-panel"
+                    >
                       <button
-                        v-for="group in moduleCascade"
-                        :key="group.id"
+                        v-for="item in (column as any[])"
+                        :key="item.id"
                         type="button"
                         class="cascader-item"
-                        :class="{ active: expandedModuleId === group.id, selected: selectedModuleId === group.id }"
-                        @click="expandedModuleId = expandedModuleId === group.id ? null : group.id"
-                        @mouseenter="expandedModuleId = group.id"
+                        :class="{ active: moduleExpandedPath[colIdx] === item.id, selected: selectedModuleId === item.id }"
+                        @mouseenter="item.children?.length ? hoverModuleColumn(item.id, colIdx) : undefined"
+                        @click="!item.children?.length ? selectModule(item.id) : undefined"
                       >
-                        <span class="cascader-name">{{ group.name }}</span>
-                        <ChevronRight v-if="group.children?.length" :size="12" class="cascader-arrow" />
-                      </button>
-                    </div>
-                    <!-- 第二级：子模块 -->
-                    <div v-if="expandedModuleChildren.length" class="cascader-panel">
-                      <button
-                        v-for="child in expandedModuleChildren"
-                        :key="child.id"
-                        type="button"
-                        class="cascader-item"
-                        :class="{ selected: selectedModuleId === child.id }"
-                        @click="selectModule(child.id)"
-                      >
-                        <span class="cascader-name">{{ child.name }}</span>
+                        <span class="cascader-name">{{ item.name }}</span>
+                        <ChevronRight v-if="item.children?.length" :size="12" class="cascader-arrow" />
                       </button>
                     </div>
                   </div>
@@ -3192,7 +3209,7 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
 /* ── 级联选择器面板 ── */
 .cascader-dropdown {
   position: absolute; top: calc(100% + 4px); left: 0; z-index: 40;
-  min-width: 320px; border: 1px solid #e2e3e6; border-radius: 10px;
+  border: 1px solid #e2e3e6; border-radius: 10px;
   background: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.12);
 }
 .cascader-header {
@@ -3200,7 +3217,7 @@ watch(filteredAuditRecords, () => { auditPage.value = 1 })
   border-bottom: 1px solid #eee;
 }
 .cascader-panels {
-  display: flex; max-height: 280px;
+  display: flex; max-height: 300px; overflow-x: auto;
 }
 .cascader-panel {
   flex: 0 0 auto; min-width: 160px; max-width: 200px;
