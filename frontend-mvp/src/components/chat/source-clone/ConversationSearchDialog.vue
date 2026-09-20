@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { MessageSquareText, Search, X } from 'lucide-vue-next'
+import { ChevronDown, MessageSquareText, Search, X } from 'lucide-vue-next'
 
 type SearchItem = {
   id: string
@@ -16,9 +16,42 @@ type SearchItem = {
 
 const emit = defineEmits<{ close: []; open: [sessionId: string, messageId?: string] }>()
 const query = ref('')
-const mode = ref('all')
 const visibleCount = ref(20)
 const historyExpanded = ref(false)
+
+// 级联筛选
+const filterCategory = ref('')
+const filterAgent = ref('')
+const agentCascadeOpen = ref(false)
+
+const agentTree = [
+  { label: '日常办公', agents: [{ value: '耶虎', label: '耶虎' }] },
+  { label: '业务专家', agents: [
+    { value: '大表姐', label: '大表姐' },
+    { value: '组货专家', label: '组货专家' },
+    { value: '评价分析师', label: '评价分析师' },
+    { value: '灵感大王', label: '灵感大王' },
+  ]},
+]
+const currentCategory = computed(() => agentTree.find(c => c.label === filterCategory.value))
+function selectCategory(label: string) {
+  filterCategory.value = filterCategory.value === label ? '' : label
+  filterAgent.value = ''
+}
+function selectAgent(value: string) {
+  filterAgent.value = filterAgent.value === value ? '' : value
+  agentCascadeOpen.value = false
+}
+function clearFilter() {
+  filterCategory.value = ''
+  filterAgent.value = ''
+  agentCascadeOpen.value = false
+}
+const filterLabel = computed(() => {
+  if (filterAgent.value) return filterAgent.value
+  if (filterCategory.value) return filterCategory.value
+  return '全部会话'
+})
 
 const baseResults: SearchItem[] = [
   {
@@ -81,11 +114,22 @@ const results = computed(() => historyExpanded.value ? [...recentResults, ...old
 
 const filtered = computed(() => {
   const keyword = query.value.trim().toLowerCase()
-  return results.value.filter(
-    (item) =>
-      (!keyword || `${item.title}${item.excerpt}`.toLowerCase().includes(keyword)) &&
-      (mode.value === 'all' || item.mode === mode.value),
-  )
+  return results.value.filter((item) => {
+    if (keyword && !`${item.title}${item.excerpt}`.toLowerCase().includes(keyword)) return false
+    if (filterCategory.value) {
+      const cat = agentTree.find(c => c.label === filterCategory.value)
+      if (cat) {
+        const agentValues = cat.agents.map(a => a.value)
+        if (!agentValues.includes(item.sender) && !agentValues.includes(item.title)) {
+          // fallback: match by mode for daily/expert
+          if (filterCategory.value === '日常办公' && item.mode !== 'daily') return false
+          if (filterCategory.value === '业务专家' && item.mode !== 'expert') return false
+        }
+      }
+    }
+    if (filterAgent.value && item.sender !== filterAgent.value && item.title !== filterAgent.value) return false
+    return true
+  })
 })
 const visibleResults = computed(() => filtered.value.slice(0, visibleCount.value))
 const canLoadPage = computed(() => visibleCount.value < filtered.value.length)
@@ -97,7 +141,7 @@ function loadOlder() {
   historyExpanded.value = true
   visibleCount.value += 20
 }
-watch([query, mode], () => { visibleCount.value = 20; historyExpanded.value = false })
+watch([query, filterCategory, filterAgent], () => { visibleCount.value = 20; historyExpanded.value = false })
 
 function excerptData(text: string) {
   const keyword = query.value.trim()
@@ -128,7 +172,7 @@ function excerptData(text: string) {
 </script>
 
 <template>
-  <div class="search-mask" @mousedown.self="emit('close')">
+  <div class="search-mask" @mousedown.self="emit('close'); agentCascadeOpen = false">
     <section class="search-panel" role="dialog" aria-modal="true" aria-label="搜索会话">
       <header class="search-head">
         <div class="search-box">
@@ -155,12 +199,32 @@ function excerptData(text: string) {
         </button>
       </header>
 
-      <div class="filters">
-        <select v-model="mode" aria-label="对话模式筛选">
-          <option value="all">全部模式</option>
-          <option value="daily">日常办公</option>
-          <option value="expert">专家模式</option>
-        </select>
+      <div class="filters" @click.self="agentCascadeOpen = false">
+        <div class="cascade-select" :class="{ open: agentCascadeOpen }">
+          <button type="button" class="cascade-trigger" @click="agentCascadeOpen = !agentCascadeOpen">
+            <span>{{ filterLabel }}</span>
+            <ChevronDown :size="14" />
+          </button>
+          <div v-if="agentCascadeOpen" class="cascade-panel" @click.stop>
+            <div class="cascade-col">
+              <button type="button" :class="{ active: !filterCategory }" @click="clearFilter">全部</button>
+              <button
+                v-for="cat in agentTree" :key="cat.label"
+                type="button"
+                :class="{ active: filterCategory === cat.label }"
+                @click="selectCategory(cat.label)"
+              >{{ cat.label }}</button>
+            </div>
+            <div v-if="currentCategory" class="cascade-col">
+              <button
+                v-for="agent in currentCategory.agents" :key="agent.value"
+                type="button"
+                :class="{ active: filterAgent === agent.value }"
+                @click="selectAgent(agent.value)"
+              >{{ agent.label }}</button>
+            </div>
+          </div>
+        </div>
         <span>{{ filtered.length }} 条结果</span>
       </div>
 
@@ -262,14 +326,38 @@ function excerptData(text: string) {
   gap: 9px;
   padding: 0 24px 12px;
 }
-.filters select {
-  height: 32px;
-  border: 1px solid #e3e5e9;
-  border-radius: 16px;
-  padding: 0 30px 0 12px;
-  background: #f6f7f8;
-  color: #333;
+.filters select,
+.cascade-select {
+  position: relative;
 }
+.cascade-trigger {
+  display: flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 12px;
+  border: 1px solid #e3e5e9; border-radius: 16px;
+  background: #f6f7f8; color: #333; font-size: 13px;
+  cursor: pointer;
+}
+.cascade-trigger:hover { border-color: #c8cad0; }
+.cascade-select.open .cascade-trigger { border-color: #7ba7ea; box-shadow: 0 0 0 3px rgba(48,119,226,.08); }
+.cascade-panel {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 30;
+  display: flex; gap: 0;
+  border: 1px solid #e3e5e9; border-radius: 12px;
+  background: #fff; box-shadow: 0 8px 24px rgba(20,24,32,.12);
+  overflow: hidden; min-width: 260px;
+}
+.cascade-col {
+  display: flex; flex-direction: column; padding: 6px;
+  min-width: 120px;
+}
+.cascade-col + .cascade-col { border-left: 1px solid #eee; }
+.cascade-col button {
+  padding: 7px 12px; border: 0; border-radius: 6px;
+  background: transparent; text-align: left;
+  font-size: 13px; color: #3f3f46; cursor: pointer;
+}
+.cascade-col button:hover { background: #f4f4f5; }
+.cascade-col button.active { background: #eef4ff; color: #176fe8; font-weight: 500; }
 .filters > span {
   margin-left: auto;
   color: #a0a4ab;
