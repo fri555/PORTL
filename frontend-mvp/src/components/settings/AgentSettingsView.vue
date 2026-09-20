@@ -19,6 +19,7 @@ import {
   Trash2,
   Upload,
   WandSparkles,
+  X,
 } from 'lucide-vue-next'
 import ResourcePermissionDialog, { type PermissionMember } from '@/components/common/ResourcePermissionDialog.vue'
 
@@ -303,8 +304,46 @@ function handleIcon(event: Event) {
   reader.readAsDataURL(file)
 }
 
-function addQuickPrompt() {
-  draft.dailyQuickPrompts.push({ id: `qp-${++qpIdSeq}`, title: '', content: '' })
+// ── 快捷提示词弹窗 ─
+const promptModalOpen = ref(false)
+const promptModalMode = ref<'add' | 'edit'>('add')
+const promptEditId = ref('')
+const promptFormTitle = ref('')
+const promptFormContent = ref('')
+
+function openAddPrompt() {
+  promptModalMode.value = 'add'
+  promptEditId.value = ''
+  promptFormTitle.value = ''
+  promptFormContent.value = ''
+  promptModalOpen.value = true
+}
+function openEditPrompt(id: string) {
+  const qp = draft.dailyQuickPrompts.find(p => p.id === id)
+  if (!qp) return
+  promptModalMode.value = 'edit'
+  promptEditId.value = id
+  promptFormTitle.value = qp.title
+  promptFormContent.value = qp.content
+  promptModalOpen.value = true
+}
+function closePromptModal() {
+  promptModalOpen.value = false
+}
+function confirmPrompt() {
+  const title = promptFormTitle.value.trim()
+  const content = promptFormContent.value.trim()
+  if (!title) { notify('请输入提示词卡片'); return }
+  if (!content) { notify('请输入提示词内容'); return }
+  if (title.length > 20) { notify('提示词卡片不超过20字'); return }
+  if (content.length > 500) { notify('提示词内容不超过500字'); return }
+  if (promptModalMode.value === 'edit') {
+    const qp = draft.dailyQuickPrompts.find(p => p.id === promptEditId.value)
+    if (qp) { qp.title = title; qp.content = content }
+  } else {
+    draft.dailyQuickPrompts.push({ id: `qp-${++qpIdSeq}`, title, content })
+  }
+  promptModalOpen.value = false
 }
 
 function removeQuickPrompt(id: string) {
@@ -571,22 +610,27 @@ function toggleLimited(list: string[], value: string, limit: number) {
             </section>
 
             <section class="border-t border-zinc-100 pt-5">
-              <h2 class="text-lg font-semibold">日常办公模式 · 快捷提示词<span class="ml-1.5 inline-flex cursor-help items-center text-zinc-400 transition-colors hover:text-zinc-600" title="配置用户在「日常办公」模式下看到的快捷提示语卡片，点击即可快速填入输入框"><CircleHelp :size="14" /></span></h2>
-              <p class="mt-1 text-xs text-zinc-400">管理员配置的快捷提示词会展示在聊天首页，用户点击即可快速开始对话</p>
-              <div class="mt-4 space-y-3">
-                <div v-for="(qp, idx) in draft.dailyQuickPrompts" :key="qp.id" class="flex items-start gap-3 rounded-lg border border-zinc-200 bg-[#fafafa] p-3">
-                  <span class="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-zinc-200 text-xs font-medium text-zinc-500">{{ idx + 1 }}</span>
-                  <div class="min-w-0 flex-1 space-y-2">
-                    <input v-model="qp.title" class="h-8 w-full rounded-md border border-zinc-200 bg-white px-2.5 text-sm outline-none focus:border-zinc-400" placeholder="提示词标题（如：发消息）" maxlength="20" />
-                    <textarea v-model="qp.content" rows="2" class="w-full resize-none rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-zinc-400" placeholder="提示词内容，用户点击后填入输入框的文本..." maxlength="200" />
-                  </div>
-                  <button type="button" class="mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-md text-zinc-400 hover:bg-red-50 hover:text-red-500" aria-label="删除提示词" @click="removeQuickPrompt(qp.id)">
-                    <Trash2 class="h-3.5 w-3.5" />
-                  </button>
+              <div class="flex items-center justify-between">
+                <div>
+                  <h2 class="text-lg font-semibold">快捷提示词<span class="ml-1.5 inline-flex cursor-help items-center text-zinc-400 transition-colors hover:text-zinc-600" title="配置用户在「日常办公」模式下看到的快捷提示语卡片，点击即可快速填入输入框"><CircleHelp :size="14" /></span></h2>
+                  <p class="mt-1 text-xs text-zinc-400">配置常用提示词，方便快捷调用</p>
                 </div>
-                <button type="button" class="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-zinc-300 py-2.5 text-sm text-zinc-500 hover:border-zinc-400 hover:text-zinc-700" @click="addQuickPrompt">
-                  <Plus class="h-4 w-4" />添加快捷提示词
+                <button type="button" class="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#171717] px-3 text-xs font-medium text-white hover:bg-black" @click="openAddPrompt">
+                  <Plus class="h-3.5 w-3.5" />添加提示词
                 </button>
+              </div>
+              <div class="mt-4 space-y-2">
+                <div v-for="qp in draft.dailyQuickPrompts" :key="qp.id" class="flex items-center justify-between rounded-lg border border-zinc-200 px-4 py-3 hover:bg-zinc-50">
+                  <div class="min-w-0 flex-1">
+                    <div class="text-sm font-medium text-zinc-900">{{ qp.title || '未命名' }}</div>
+                    <div class="mt-0.5 truncate text-xs text-zinc-400">{{ qp.content || '暂无内容' }}</div>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <button type="button" class="grid h-7 w-7 place-items-center rounded text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600" aria-label="编辑提示词" @click="openEditPrompt(qp.id)"><Copy class="h-3.5 w-3.5" /></button>
+                    <button type="button" class="grid h-7 w-7 place-items-center rounded text-zinc-400 hover:bg-red-50 hover:text-red-500" aria-label="删除提示词" @click="removeQuickPrompt(qp.id)"><Trash2 class="h-3.5 w-3.5" /></button>
+                  </div>
+                </div>
+                <p v-if="!draft.dailyQuickPrompts.length" class="py-8 text-center text-sm text-zinc-400">暂无快捷提示词，点击上方按钮添加</p>
               </div>
             </section>
 
@@ -655,5 +699,37 @@ function toggleLimited(list: string[], value: string, limit: number) {
       @close="permissionTarget = null"
       @save="savePermissions"
     />
+
+    <!-- 快捷提示词弹窗 -->
+    <Transition enter-active-class="transition duration-200" enter-from-class="opacity-0" leave-active-class="transition duration-150" leave-to-class="opacity-0">
+      <div v-if="promptModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30" @mousedown.self="closePromptModal">
+        <div class="w-full max-w-[480px] rounded-xl border border-zinc-200 bg-white shadow-2xl">
+          <div class="flex items-center justify-between border-b border-zinc-100 px-6 py-4">
+            <h3 class="text-base font-semibold">{{ promptModalMode === 'add' ? '添加' : '编辑' }}快捷提示词</h3>
+            <button type="button" class="grid h-8 w-8 place-items-center rounded-lg text-zinc-400 hover:bg-zinc-100" @click="closePromptModal"><X class="h-4 w-4" /></button>
+          </div>
+          <div class="px-6 py-5 space-y-5">
+            <label class="block">
+              <span class="text-sm font-medium">提示词卡片 <b class="text-red-500">*</b></span>
+              <span class="relative mt-2 block">
+                <input v-model="promptFormTitle" maxlength="20" class="h-10 w-full rounded-lg border border-zinc-200 px-3 pr-14 text-sm outline-none focus:border-zinc-400" placeholder="用于在列表中快速识别该提示词" />
+                <small class="absolute right-3 top-3 text-zinc-300">{{ promptFormTitle.length }}/20</small>
+              </span>
+            </label>
+            <label class="block">
+              <span class="text-sm font-medium">提示词内容 <b class="text-red-500">*</b></span>
+              <span class="relative mt-2 block">
+                <textarea v-model="promptFormContent" maxlength="500" rows="6" class="w-full resize-none rounded-lg border border-zinc-200 p-3 pb-8 text-sm outline-none focus:border-zinc-400" placeholder="详细的提示词内容..." />
+                <small class="absolute bottom-3 right-3 text-zinc-300">{{ promptFormContent.length }}/500</small>
+              </span>
+            </label>
+          </div>
+          <div class="flex items-center justify-end gap-3 border-t border-zinc-100 px-6 py-4">
+            <button type="button" class="h-9 rounded-lg border border-zinc-200 px-5 text-sm font-medium hover:bg-zinc-50" @click="closePromptModal">取消</button>
+            <button type="button" class="h-9 rounded-lg bg-[#171717] px-5 text-sm font-medium text-white hover:bg-black" @click="confirmPrompt">确定</button>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
