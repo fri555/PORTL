@@ -65,7 +65,7 @@ const importInput = ref<HTMLInputElement | null>(null)
 let toastTimer: ReturnType<typeof setTimeout> | undefined
 
 // ── 标识下拉选项 ─
-const logoOptions = ref(['耶虎', '天马智擎', 'Tianma AI'])
+const logoOptions = ref(['NEW', 'HOT'])
 const logoCustomInput = ref('')
 const logoDropdownOpen = ref(false)
 
@@ -831,22 +831,8 @@ function toggleLimited(list: string[], value: string, limit: number) {
             <button type="button" class="grid h-8 w-8 place-items-center rounded-lg text-zinc-400 hover:bg-zinc-100" @click="closeScriptModal"><X class="h-4 w-4" /></button>
           </div>
           <div class="px-6 py-5 space-y-5">
-            <label class="block">
-              <span class="text-sm font-medium">提示词卡片 <b class="text-red-500">*</b></span>
-              <span class="relative mt-2 block">
-                <input v-model="scriptFormName" maxlength="20" class="h-10 w-full rounded-lg border border-zinc-200 px-3 pr-14 text-sm outline-none focus:border-zinc-400" placeholder="用于在列表中快速识别该提示词" />
-                <small class="absolute right-3 top-3 text-zinc-300">{{ scriptFormName.length }}/20</small>
-              </span>
-            </label>
-            <label class="block">
-              <span class="text-sm font-medium">提示词内容 <b class="text-red-500">*</b></span>
-              <span class="relative mt-2 block">
-                <textarea v-model="scriptFormContent" maxlength="500" rows="6" class="w-full resize-none rounded-lg border border-zinc-200 p-3 pb-8 text-sm outline-none focus:border-zinc-400" placeholder="详细的提示词内容..." />
-                <small class="absolute bottom-3 right-3 text-zinc-300">{{ scriptFormContent.length }}/500</small>
-              </span>
-            </label>
             <!-- 耶虎专属：图标和标识 -->
-            <div v-if="draft.name === '耶虎'" class="grid gap-4 sm:grid-cols-2 border-t border-zinc-100 pt-5">
+            <template v-if="draft.name === '耶虎'">
               <div>
                 <label class="block text-sm font-medium">图标 <b class="text-red-500">*</b><span class="ml-1 inline-flex cursor-help items-center text-zinc-400 transition-colors hover:text-zinc-600" title="用于侧边栏、收藏等场景的小尺寸图标"><CircleHelp :size="12" /></span></label>
                 <div class="mt-2 flex items-center gap-3">
@@ -867,7 +853,21 @@ function toggleLimited(list: string[], value: string, limit: number) {
                 </div>
                 <p class="mt-1 text-[11px] text-zinc-400">单选，可自定义选项</p>
               </div>
-            </div>
+            </template>
+            <label class="block">
+              <span class="text-sm font-medium">提示词卡片 <b class="text-red-500">*</b></span>
+              <span class="relative mt-2 block">
+                <input v-model="scriptFormName" maxlength="20" class="h-10 w-full rounded-lg border border-zinc-200 px-3 pr-14 text-sm outline-none focus:border-zinc-400" placeholder="用于在列表中快速识别该提示词" />
+                <small class="absolute right-3 top-3 text-zinc-300">{{ scriptFormName.length }}/20</small>
+              </span>
+            </label>
+            <label class="block">
+              <span class="text-sm font-medium">提示词内容 <b class="text-red-500">*</b></span>
+              <span class="relative mt-2 block">
+                <textarea v-model="scriptFormContent" maxlength="500" rows="6" class="w-full resize-none rounded-lg border border-zinc-200 p-3 pb-8 text-sm outline-none focus:border-zinc-400" placeholder="详细的提示词内容..." />
+                <small class="absolute bottom-3 right-3 text-zinc-300">{{ scriptFormContent.length }}/500</small>
+              </span>
+            </label>
           </div>
           <div class="flex items-center justify-end gap-3 border-t border-zinc-100 px-6 py-4">
             <button type="button" class="h-9 rounded-lg border border-zinc-200 px-5 text-sm font-medium hover:bg-zinc-50" @click="closeScriptModal">取消</button>
