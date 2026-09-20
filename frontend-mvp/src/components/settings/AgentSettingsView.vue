@@ -366,7 +366,6 @@ function openAddScript() {
   scriptModalMode.value = 'add'
   scriptEditId.value = ''
   scriptFormName.value = ''
-  scriptFormDesc.value = ''
   scriptFormContent.value = ''
   scriptModalOpen.value = true
 }
@@ -376,7 +375,6 @@ function openEditScript(id: string) {
   scriptModalMode.value = 'edit'
   scriptEditId.value = id
   scriptFormName.value = s.name
-  scriptFormDesc.value = s.description
   scriptFormContent.value = s.content
   scriptModalOpen.value = true
 }
@@ -385,15 +383,16 @@ function closeScriptModal() {
 }
 function confirmScript() {
   const name = scriptFormName.value.trim()
-  const desc = scriptFormDesc.value.trim()
   const content = scriptFormContent.value.trim()
-  if (!name) { notify('请输入剧本名称'); return }
+  if (!name) { notify('请输入剧本卡片'); return }
   if (!content) { notify('请输入剧本内容'); return }
+  if (name.length > 20) { notify('剧本卡片不超过20字'); return }
+  if (content.length > 500) { notify('剧本内容不超过500字'); return }
   if (scriptModalMode.value === 'edit') {
     const s = draft.userScripts.find(s => s.id === scriptEditId.value)
-    if (s) { s.name = name; s.description = desc; s.content = content }
+    if (s) { s.name = name; s.content = content }
   } else {
-    draft.userScripts.push({ id: `us-${++usIdSeq}`, name, description: desc, content })
+    draft.userScripts.push({ id: `us-${++usIdSeq}`, name, description: '', content })
   }
   scriptModalOpen.value = false
 }
@@ -730,7 +729,7 @@ function toggleLimited(list: string[], value: string, limit: number) {
               <div v-for="s in draft.userScripts" :key="s.id" class="flex items-center justify-between rounded-lg border border-zinc-200 px-4 py-3 hover:bg-zinc-50">
                 <div class="min-w-0 flex-1">
                   <div class="text-sm font-medium text-zinc-900">{{ s.name }}</div>
-                  <div class="mt-0.5 truncate text-xs text-zinc-400">{{ s.description || '暂无描述' }}</div>
+                  <div class="mt-0.5 truncate text-xs text-zinc-400">{{ s.content || '暂无内容' }}</div>
                 </div>
                 <div class="flex items-center gap-1">
                   <button type="button" class="grid h-7 w-7 place-items-center rounded text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600" aria-label="编辑剧本" @click="openEditScript(s.id)"><Copy class="h-3.5 w-3.5" /></button>
@@ -818,24 +817,17 @@ function toggleLimited(list: string[], value: string, limit: number) {
           </div>
           <div class="px-6 py-5 space-y-5">
             <label class="block">
-              <span class="text-sm font-medium">剧本名称 <b class="text-red-500">*</b></span>
+              <span class="text-sm font-medium">剧本卡片 <b class="text-red-500">*</b></span>
               <span class="relative mt-2 block">
-                <input v-model="scriptFormName" maxlength="30" class="h-10 w-full rounded-lg border border-zinc-200 px-3 pr-14 text-sm outline-none focus:border-zinc-400" placeholder="用于在列表中快速识别该剧本" />
-                <small class="absolute right-3 top-3 text-zinc-300">{{ scriptFormName.length }}/30</small>
-              </span>
-            </label>
-            <label class="block">
-              <span class="text-sm font-medium">剧本描述</span>
-              <span class="relative mt-2 block">
-                <input v-model="scriptFormDesc" maxlength="100" class="h-10 w-full rounded-lg border border-zinc-200 px-3 pr-14 text-sm outline-none focus:border-zinc-400" placeholder="简要描述剧本用途" />
-                <small class="absolute right-3 top-3 text-zinc-300">{{ scriptFormDesc.length }}/100</small>
+                <input v-model="scriptFormName" maxlength="20" class="h-10 w-full rounded-lg border border-zinc-200 px-3 pr-14 text-sm outline-none focus:border-zinc-400" placeholder="用于在列表中快速识别该剧本" />
+                <small class="absolute right-3 top-3 text-zinc-300">{{ scriptFormName.length }}/20</small>
               </span>
             </label>
             <label class="block">
               <span class="text-sm font-medium">剧本内容 <b class="text-red-500">*</b></span>
               <span class="relative mt-2 block">
-                <textarea v-model="scriptFormContent" maxlength="2000" rows="8" class="w-full resize-none rounded-lg border border-zinc-200 p-3 pb-8 text-sm outline-none focus:border-zinc-400" placeholder="详细的剧本流程内容..." />
-                <small class="absolute bottom-3 right-3 text-zinc-300">{{ scriptFormContent.length }}/2000</small>
+                <textarea v-model="scriptFormContent" maxlength="500" rows="6" class="w-full resize-none rounded-lg border border-zinc-200 p-3 pb-8 text-sm outline-none focus:border-zinc-400" placeholder="详细的剧本内容..." />
+                <small class="absolute bottom-3 right-3 text-zinc-300">{{ scriptFormContent.length }}/500</small>
               </span>
             </label>
           </div>
