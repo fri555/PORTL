@@ -16,7 +16,6 @@ type SearchItem = {
 
 const emit = defineEmits<{ close: []; open: [sessionId: string, messageId?: string] }>()
 const query = ref('')
-const role = ref('all')
 const mode = ref('all')
 const visibleCount = ref(20)
 const historyExpanded = ref(false)
@@ -85,7 +84,6 @@ const filtered = computed(() => {
   return results.value.filter(
     (item) =>
       (!keyword || `${item.title}${item.excerpt}`.toLowerCase().includes(keyword)) &&
-      (role.value === 'all' || item.role === role.value) &&
       (mode.value === 'all' || item.mode === mode.value),
   )
 })
@@ -99,7 +97,7 @@ function loadOlder() {
   historyExpanded.value = true
   visibleCount.value += 20
 }
-watch([query, role, mode], () => { visibleCount.value = 20; historyExpanded.value = false })
+watch([query, mode], () => { visibleCount.value = 20; historyExpanded.value = false })
 
 function excerptData(text: string) {
   const keyword = query.value.trim()
@@ -158,22 +156,6 @@ function excerptData(text: string) {
       </header>
 
       <div class="filters">
-        <div role="tablist" aria-label="消息角色筛选" class="role-tabs">
-          <button type="button" role="tab" :aria-selected="role === 'all'" @click="role = 'all'">
-            全部
-          </button>
-          <button type="button" role="tab" :aria-selected="role === 'user'" @click="role = 'user'">
-            我发送的
-          </button>
-          <button
-            type="button"
-            role="tab"
-            :aria-selected="role === 'assistant'"
-            @click="role = 'assistant'"
-          >
-            AI 回复
-          </button>
-        </div>
         <select v-model="mode" aria-label="对话模式筛选">
           <option value="all">全部模式</option>
           <option value="daily">日常办公</option>
@@ -195,13 +177,6 @@ function excerptData(text: string) {
             <span class="result-title"
               ><b>{{ item.title }}</b
               ><time>{{ item.date }}</time></span
-            >
-            <small
-              ><span>{{ item.sender }}：{{ excerptData(item.excerpt).leading ? '…' : '' }}</span
-              ><template v-for="(segment, index) in excerptData(item.excerpt).segments" :key="index"
-                ><mark v-if="segment.matched">{{ segment.text }}</mark
-                ><span v-else>{{ segment.text }}</span></template
-              ><span>{{ excerptData(item.excerpt).trailing ? '…' : '' }}</span></small
             >
           </span>
         </button>
@@ -295,26 +270,6 @@ function excerptData(text: string) {
   background: #f6f7f8;
   color: #333;
 }
-.role-tabs {
-  display: flex;
-  align-items: center;
-  border-radius: 16px;
-  background: #f3f4f6;
-  padding: 2px;
-}
-.role-tabs button {
-  height: 28px;
-  border: 0;
-  border-radius: 14px;
-  background: transparent;
-  padding: 0 12px;
-  color: #6f747c;
-}
-.role-tabs button[aria-selected='true'] {
-  background: #fff;
-  color: #176fe8;
-  box-shadow: 0 1px 4px rgba(20, 30, 50, 0.1);
-}
 .filters > span {
   margin-left: auto;
   color: #a0a4ab;
@@ -371,20 +326,6 @@ function excerptData(text: string) {
   flex: none;
   color: #aaadb2;
   font-size: 12px;
-}
-.result-copy small {
-  display: block;
-  overflow: hidden;
-  margin-top: 4px;
-  color: #8a8e95;
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.result-copy mark {
-  border-radius: 2px;
-  background: #eaf2ff;
-  color: #1470e8;
 }
 .empty {
   padding: 70px;

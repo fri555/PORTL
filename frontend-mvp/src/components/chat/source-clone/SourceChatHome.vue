@@ -239,6 +239,13 @@ function insertQuickPrompt(text: string) {
 function createQuickPrompt(item: UserQuickPrompt) {
   userQuickPrompts.value.unshift(item)
 }
+function updateQuickPrompt(item: UserQuickPrompt) {
+  const idx = userQuickPrompts.value.findIndex(p => p.id === item.id)
+  if (idx !== -1) userQuickPrompts.value[idx] = { ...item }
+}
+function deleteQuickPrompt(id: string) {
+  userQuickPrompts.value = userQuickPrompts.value.filter(p => p.id !== id)
+}
 </script>
 
 <template>
@@ -315,7 +322,7 @@ function createQuickPrompt(item: UserQuickPrompt) {
       <div v-if="mode === 'daily' || selectedExpert" class="source-chat-home__quick-entry" data-testid="quick-prompt-entry">
         <span>快捷提示语</span>
         <small>{{ quickPromptScopeLabel }}专属</small>
-        <QuickPromptPanel :scope="quickPromptScope" :scope-label="quickPromptScopeLabel" @created="createQuickPrompt" />
+        <QuickPromptPanel :scope="quickPromptScope" :scope-label="quickPromptScopeLabel" :prompts="scopedUserQuickPrompts" @created="createQuickPrompt" @updated="updateQuickPrompt" @deleted="deleteQuickPrompt" />
       </div>
 
       <div v-if="mode === 'daily'" class="source-chat-home__daily-grid" data-testid="daily-prompt-grid">

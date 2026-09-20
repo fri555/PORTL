@@ -131,6 +131,7 @@ function useSuggestion(text: string) {
       <QuickPromptPanel
         :scope="sessionId.includes('expert') ? 'data-analysis' : 'daily'"
         :scope-label="sessionId.includes('expert') ? '数据分析师' : '日常办公'"
+        :prompts="[]"
         @created="insertQuickPrompt($event.content)"
       />
       <button type="button" aria-label="添加参考文件" title="添加参考文件"><Paperclip :size="18" /></button>
