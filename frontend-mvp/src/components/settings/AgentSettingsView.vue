@@ -64,6 +64,11 @@ const iconInput = ref<HTMLInputElement | null>(null)
 const importInput = ref<HTMLInputElement | null>(null)
 let toastTimer: ReturnType<typeof setTimeout> | undefined
 
+// ── 标识下拉选项 ─
+const logoOptions = ref(['耶虎', '天马智擎', 'Tianma AI'])
+const logoCustomInput = ref('')
+const logoDropdownOpen = ref(false)
+
 type QuickPromptDraft = { id: string; title: string; content: string }
 type UserScriptDraft = { id: string; name: string; description: string; content: string }
 let qpIdSeq = 1
@@ -238,11 +243,6 @@ function saveAgent() {
     notify('请输入智能体名称')
     return
   }
-  if (!draft.logo) {
-    activeStep.value = 1
-    notify('请上传 Logo')
-    return
-  }
   const wasEditing = formMode.value === 'edit'
   const existing = agents.find((agent) => agent.id === editingId.value)
   const payload = {
@@ -274,12 +274,30 @@ function toggleAgentStatus(agent: AgentRow) {
 function handleAvatar(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]
   if (!file) return
-  if (!['image/jpeg', 'image/png', 'image/svg+xml', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) {
-    notify('请上传不超过 2MB 的 JPG、PNG 或 SVG 图标')
+  if (!['image/jpeg', 'image/png', 'image/svg+xml', 'image/webp'].includes(file.type)) {
+    notify('请上传 JPG、PNG 或 SVG 格式的图标')
+    return
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    notify('文件大小不超过 2MB')
     return
   }
   const reader = new FileReader()
-  reader.onload = () => { draft.avatar = String(reader.result || '') }
+  reader.onload = () => {
+    const img = new Image()
+    img.onload = () => {
+      if (img.width !== img.height) {
+        notify('图标需为 1:1 正方形比例')
+        return
+      }
+      if (img.width < 128 || img.height < 128) {
+        notify('分辨率不低于 128×128px')
+        return
+      }
+      draft.avatar = String(reader.result || '')
+    }
+    img.src = String(reader.result || '')
+  }
   reader.readAsDataURL(file)
 }
 
@@ -293,6 +311,23 @@ function handleLogo(event: Event) {
   const reader = new FileReader()
   reader.onload = () => { draft.logo = String(reader.result || '') }
   reader.readAsDataURL(file)
+}
+
+function selectLogoOption(value: string) {
+  draft.logo = value
+  logoDropdownOpen.value = false
+}
+function addLogoOption() {
+  const val = logoCustomInput.value.trim()
+  if (!val) return
+  if (logoOptions.value.includes(val)) {
+    notify('该选项已存在')
+    return
+  }
+  logoOptions.value.push(val)
+  draft.logo = val
+  logoCustomInput.value = ''
+  logoDropdownOpen.value = false
 }
 
 function handleIcon(event: Event) {
@@ -594,18 +629,26 @@ function toggleLimited(list: string[], value: string, limit: number) {
 
               <div class="mt-5 grid gap-5 sm:grid-cols-2">
                 <div>
-                  <label class="block text-sm font-medium">Logo 上传 <b class="text-red-500">*</b><span class="ml-1 inline-flex cursor-help items-center text-zinc-400 transition-colors hover:text-zinc-600" title="聊天界面顶部展示的品牌 Logo，建议横向比例"><CircleHelp :size="12" /></span></label>
-                  <div class="mt-2 flex items-center gap-3">
-                    <button type="button" class="flex h-[44px] w-[120px] items-center justify-center overflow-hidden rounded-lg border border-dashed border-zinc-300 bg-[#fafafa] text-zinc-400 hover:border-zinc-400" aria-label="上传Logo" @click="logoInput?.click()">
-                      <img v-if="draft.logo" :src="draft.logo" alt="Logo" class="h-full w-full object-contain" />
-                      <span v-else class="flex items-center gap-1.5 text-xs"><ImageIcon :size="14" />上传 Logo</span>
+                  <label class="block text-sm font-medium">标识<span class="ml-1 inline-flex cursor-help items-center text-zinc-400 transition-colors hover:text-zinc-600" title="聊天界面顶部展示的品牌标识"><CircleHelp :size="12" /></span></label>
+                  <div class="relative mt-2">
+                    <button type="button" class="flex h-10 w-full items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 text-sm outline-none focus:border-zinc-400" @click="logoDropdownOpen = !logoDropdownOpen">
+                      <span class="text-zinc-900">{{ draft.logo || '请选择标识' }}</span>
+                      <ChevronDown :size="16" class="text-zinc-400" />
                     </button>
-                    <input ref="logoInput" class="hidden" type="file" accept=".jpg,.jpeg,.png,.svg,.webp" @change="handleLogo" />
+                    <div v-if="logoDropdownOpen" class="absolute z-10 mt-1 w-full rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                      <div v-for="opt in logoOptions" :key="opt" class="px-3 py-2 text-sm hover:bg-zinc-50 cursor-pointer" :class="{ 'bg-zinc-100 font-medium': draft.logo === opt }" @click="selectLogoOption(opt)">{{ opt }}</div>
+                      <div class="border-t border-zinc-100 px-3 py-2">
+                        <div class="flex items-center gap-2">
+                          <input v-model="logoCustomInput" maxlength="20" class="flex-1 rounded border border-zinc-200 px-2 py-1 text-sm outline-none focus:border-zinc-400" placeholder="自定义标识" @keydown.enter.prevent="addLogoOption" />
+                          <button type="button" class="h-7 rounded bg-[#171717] px-2 text-xs text-white hover:bg-black" @click="addLogoOption">添加</button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <p class="mt-1 text-[11px] text-zinc-400">建议尺寸 240×64px，不超过 2MB</p>
+                  <p class="mt-1 text-[11px] text-zinc-400">单选，可自定义选项</p>
                 </div>
                 <div>
-                  <label class="block text-sm font-medium">图标上传<span class="ml-1 inline-flex cursor-help items-center text-zinc-400 transition-colors hover:text-zinc-600" title="用于侧边栏、收藏等场景的小尺寸图标"><CircleHelp :size="12" /></span></label>
+                  <label class="block text-sm font-medium">图标 <b class="text-red-500">*</b><span class="ml-1 inline-flex cursor-help items-center text-zinc-400 transition-colors hover:text-zinc-600" title="用于侧边栏、收藏等场景的小尺寸图标"><CircleHelp :size="12" /></span></label>
                   <div class="mt-2 flex items-center gap-3">
                     <button type="button" class="grid h-[44px] w-[44px] place-items-center overflow-hidden rounded-lg border border-dashed border-zinc-300 bg-[#fafafa] text-zinc-400 hover:border-zinc-400" aria-label="上传图标" @click="iconInput?.click()">
                       <img v-if="draft.icon" :src="draft.icon" alt="图标" class="h-full w-full object-cover" />
