@@ -1,0 +1,179 @@
+{
+  "version": "1.0",
+  "title": "Harness 实践分析报告",
+  "subtitle": "天马智擎 (Tianma AI Portal)",
+  "generatedAt": "2026-08-24T09:03:00+08:00",
+  "layout": {
+    "type": "dashboard",
+    "sections": [
+      {
+        "id": "hero",
+        "type": "hero",
+        "title": "Harness 实践分析",
+        "subtitle": "天马智擎 · d:\\工作\\portal",
+        "meta": "2026-08-24 09:03",
+        "score": {
+          "value": 68,
+          "max": 100,
+          "grade": "B-",
+          "label": "整体成熟度"
+        }
+      },
+      {
+        "id": "verdict",
+        "type": "callout",
+        "variant": "info",
+        "content": "项目拥有丰富的产品上下文和设计文档，前端工程化成熟，但 AI Agent 指令体系碎片化、后端缺乏 Agent 引导、安全与规范层存在明显短板。"
+      },
+      {
+        "id": "category-scores",
+        "type": "chart",
+        "chartType": "radar",
+        "title": "分类评分",
+        "data": [
+          { "category": "Agent 指令与规范", "score": 45, "max": 100 },
+          { "category": "上下文与文档体系", "score": 85, "max": 100 },
+          { "category": "工程化与 CI/CD", "score": 70, "max": 100 },
+          { "category": "安全与配置", "score": 40, "max": 100 },
+          { "category": "工具集成与技能", "score": 65, "max": 100 },
+          { "category": "项目结构与可维护性", "score": 75, "max": 100 }
+        ]
+      },
+      {
+        "id": "critical-findings",
+        "type": "list",
+        "title": "关键发现",
+        "items": [
+          {
+            "id": "D1",
+            "severity": "critical",
+            "title": ".env.example 包含疑似真实 API Key",
+            "category": "安全与配置",
+            "description": "backend/.env.example 中 AI_API_KEY 看起来是真实密钥而非占位符，存在密钥泄露风险。"
+          },
+          {
+            "id": "A1",
+            "severity": "high",
+            "title": "缺少根级 AGENTS.md 统一跨工具约定",
+            "category": "Agent 指令与规范",
+            "description": "项目无 AGENTS.md 或 .cursorrules，AI Agent 跨工具工作时缺少统一的编码约定和架构约束。"
+          },
+          {
+            "id": "A2",
+            "severity": "high",
+            "title": "后端无 Agent 指令文件",
+            "category": "Agent 指令与规范",
+            "description": "backend/ 目录完全没有 Agent 引导文件，AI 处理后端代码时只能依赖代码推断。"
+          },
+          {
+            "id": "C3",
+            "severity": "high",
+            "title": "后端缺少测试配置",
+            "category": "工程化与 CI/CD",
+            "description": "backend/tests/ 目录存在但无可见的测试文件或测试依赖，后端代码修改无法通过自动化测试验证。"
+          }
+        ]
+      },
+      {
+        "id": "strengths",
+        "type": "list",
+        "title": "亮点",
+        "items": [
+          {
+            "id": "B1",
+            "severity": "positive",
+            "title": "CONTEXT.md 产品术语词汇表极为详尽",
+            "description": "272 行完整产品术语定义，每个概念都有明确的业务含义和 Avoid 清单。"
+          },
+          {
+            "id": "B2",
+            "severity": "positive",
+            "title": "前端 DESIGN.md + PRODUCT.md 形成完整设计意图",
+            "description": "视觉系统和产品定位文档齐全，为 AI 提供设计决策的完整上下文。"
+          },
+          {
+            "id": "C1",
+            "severity": "positive",
+            "title": "前端测试体系完善",
+            "description": "Vitest + jsdom 环境，138 个测试全部通过，包含功能测试→回归测试→残留检查→构建检查完整流程。"
+          },
+          {
+            "id": "E3",
+            "severity": "positive",
+            "title": "Session 预算管理",
+            "description": "claude-headroom.json 实现 session 和 weekly 两级预算监控，包含三级告警。"
+          }
+        ]
+      },
+      {
+        "id": "improvement-areas",
+        "type": "list",
+        "title": "待改进项",
+        "items": [
+          {
+            "id": "A3",
+            "severity": "medium",
+            "title": ".claude/settings.json 权限列表为硬编码调试残留",
+            "category": "Agent 指令与规范"
+          },
+          {
+            "id": "B5",
+            "severity": "medium",
+            "title": "缺少架构决策记录 (ADR)",
+            "category": "上下文与文档体系"
+          },
+          {
+            "id": "C4",
+            "severity": "medium",
+            "title": "缺少 ESLint / Prettier 统一配置",
+            "category": "工程化与 CI/CD"
+          },
+          {
+            "id": "D3",
+            "severity": "medium",
+            "title": "CORS 配置过于宽松",
+            "category": "安全与配置"
+          },
+          {
+            "id": "E4",
+            "severity": "medium",
+            "title": "MCP 集成范围有限",
+            "category": "工具集成与技能"
+          },
+          {
+            "id": "F3",
+            "severity": "medium",
+            "title": "单 store 架构",
+            "category": "项目结构与可维护性"
+          }
+        ]
+      },
+      {
+        "id": "top-actions",
+        "type": "table",
+        "title": "优先行动项",
+        "headers": ["优先级", "发现项", "建议动作"],
+        "rows": [
+          ["P0", "D1 - API Key 泄露", "立即轮换密钥，替换为占位符"],
+          ["P1", "A1 - 缺少 AGENTS.md", "创建根级 AGENTS.md，统一跨工具约定"],
+          ["P1", "A2 - 后端无指令", "为 backend/ 添加 Agent 指令文件"],
+          ["P2", "C3 - 后端无测试", "建立后端测试体系 (pytest + CI)"],
+          ["P2", "C4 - 缺少 ESLint", "添加 ESLint 配置统一代码规范"]
+        ]
+      },
+      {
+        "id": "project-info",
+        "type": "info-grid",
+        "title": "项目概况",
+        "items": [
+          { "label": "项目名称", "value": "天马智擎 (Tianma AI Portal)" },
+          { "label": "前端技术栈", "value": "Vue 3 + Vite + TailwindCSS + shadcn-vue" },
+          { "label": "后端技术栈", "value": "FastAPI + SQLAlchemy + SQLite" },
+          { "label": "包管理器", "value": "pnpm (前端) / pip (后端)" },
+          { "label": "AI 工具配置", "value": ".claude/ + .mcp.json + skills/" },
+          { "label": "部署方式", "value": "GitHub Actions → GitHub Pages" }
+        ]
+      }
+    ]
+  }
+}

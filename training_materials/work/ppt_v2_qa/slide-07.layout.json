@@ -1,0 +1,742 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/yas13c",
+    "id": "yas13c",
+    "slide": 7,
+    "layoutId": "728a8764-e657-4dd0-b400-5aa60ac1420c",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "4d6d830b-6380-418a-b324-a1118145b57c",
+    "masterLayoutName": "Master",
+    "backgroundColor": "#071A2F",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "PingFang SC"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "728a8764-e657-4dd0-b400-5aa60ac1420c",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "4d6d830b-6380-418a-b324-a1118145b57c",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "4d6d830b-6380-418a-b324-a1118145b57c",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/61gnqp8r",
+      "id": "1",
+      "bbox": [
+        64,
+        40,
+        500,
+        24
+      ],
+      "geometry": "rect",
+      "text": "02 · WORKBENCH",
+      "textPreview": "02 · WORKBENCH",
+      "resolvedFontSize": 12,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 14,
+        "typeface": "PingFang SC",
+        "color": "#55D6FF",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 0.86,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "02 · WORKBENCH"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "02 · WORKBENCH",
+          "resolvedTextStyle": {
+            "fontSize": 14,
+            "typeface": "PingFang SC",
+            "color": "#55D6FF",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "02 · WORKBENCH",
+              "fontSize": 14,
+              "typeface": "PingFang SC",
+              "color": "#55D6FF",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/tor6lkr2",
+      "id": "2",
+      "bbox": [
+        64,
+        78,
+        1080,
+        72
+      ],
+      "geometry": "rect",
+      "text": "工作台：你看到的入口，由权限决定",
+      "textPreview": "工作台：你看到的入口，由权限决定",
+      "resolvedFontSize": 40,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 40,
+        "typeface": "PingFang SC",
+        "color": "#FFFFFF",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "工作台：你看到的入口，由权限决定"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "工作台：你看到的入口，由权限决定",
+          "resolvedTextStyle": {
+            "fontSize": 40,
+            "typeface": "PingFang SC",
+            "color": "#FFFFFF",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "工作台：你看到的入口，由权限决定",
+              "fontSize": 40,
+              "typeface": "PingFang SC",
+              "color": "#FFFFFF",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/s3i5sfqx",
+      "id": "3",
+      "bbox": [
+        1180,
+        48,
+        40,
+        22
+      ],
+      "geometry": "rect",
+      "text": "07",
+      "textPreview": "07",
+      "resolvedFontSize": 10.33,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 13,
+        "typeface": "PingFang SC",
+        "color": "#8FA4BD",
+        "bold": true,
+        "alignment": "right",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 0.79,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "07"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "07",
+          "resolvedTextStyle": {
+            "fontSize": 13,
+            "typeface": "PingFang SC",
+            "color": "#8FA4BD",
+            "bold": true,
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "07",
+              "fontSize": 13,
+              "typeface": "PingFang SC",
+              "color": "#8FA4BD",
+              "bold": true,
+              "alignment": "right"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/fq9onup8",
+      "id": "4",
+      "bbox": [
+        64,
+        170,
+        700,
+        430
+      ],
+      "geometry": "roundRect",
+      "fillColor": "#0E263F",
+      "lineColor": "#29425E",
+      "lineWidth": 1
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ep0nup8n",
+      "id": "5",
+      "bbox": [
+        82,
+        185,
+        8,
+        8
+      ],
+      "geometry": "ellipse",
+      "fillColor": "#FF6B6B",
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/1sr6p47e",
+      "id": "6",
+      "bbox": [
+        98,
+        185,
+        8,
+        8
+      ],
+      "geometry": "ellipse",
+      "fillColor": "#FFC857",
+      "lineWidth": 0
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/gripwzqt",
+      "id": "7",
+      "bbox": [
+        114,
+        185,
+        8,
+        8
+      ],
+      "geometry": "ellipse",
+      "fillColor": "#43D17A",
+      "lineWidth": 0
+    },
+    {
+      "order": 8,
+      "kind": "image",
+      "scope": "slide",
+      "aid": "im/u1wbmpk7",
+      "id": "8",
+      "bbox": [
+        74,
+        204,
+        680,
+        386
+      ],
+      "alt": "天马智擎工作台界面",
+      "contentType": "image/jpeg",
+      "imageFit": "contain",
+      "asset": {
+        "assetId": "46897d23-bc10-4ccb-a316-430907ffa2b2",
+        "contentType": "image/jpeg",
+        "byteLength": 16487
+      }
+    },
+    {
+      "order": 9,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/utwni58j",
+      "id": "9",
+      "bbox": [
+        824,
+        184,
+        360,
+        72
+      ],
+      "geometry": "rect",
+      "text": "看不到系统，不等于没有系统",
+      "textPreview": "看不到系统，不等于没有系统",
+      "resolvedFontSize": 26,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 31,
+        "typeface": "PingFang SC",
+        "color": "#FFFFFF",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 0.84,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "看不到系统，不等于没有系"
+          },
+          {
+            "index": 2,
+            "text": "统"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "看不到系统，不等于没有系统",
+          "resolvedTextStyle": {
+            "fontSize": 31,
+            "typeface": "PingFang SC",
+            "color": "#FFFFFF",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "看不到系统，不等于没有系统",
+              "fontSize": 31,
+              "typeface": "PingFang SC",
+              "color": "#FFFFFF",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 10,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/0f6pwv6d",
+      "id": "10",
+      "bbox": [
+        824,
+        288,
+        350,
+        118
+      ],
+      "geometry": "rect",
+      "text": "先刷新页面，再确认账号与授权范围。仍异常时，提交账号、时间、预期系统和截图。",
+      "textPreview": "先刷新页面，再确认账号与授权范围。仍异常时，提交账号、时间、预期系统和截图。",
+      "resolvedFontSize": 19,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 19,
+        "typeface": "PingFang SC",
+        "color": "#AFC0D2",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 3,
+        "lines": [
+          {
+            "index": 1,
+            "text": "先刷新页面，再确认账号与授权范围。"
+          },
+          {
+            "index": 2,
+            "text": "仍异常时，提交账号、时间、预期系统"
+          },
+          {
+            "index": 3,
+            "text": "和截图。"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "先刷新页面，再确认账号与授权范围。仍异常时，提交账号、时间、预期系统和截图。",
+          "resolvedTextStyle": {
+            "fontSize": 19,
+            "typeface": "PingFang SC",
+            "color": "#AFC0D2",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "先刷新页面，再确认账号与授权范围。仍异常时，提交账号、时间、预期系统和截图。",
+              "fontSize": 19,
+              "typeface": "PingFang SC",
+              "color": "#AFC0D2",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 11,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/10fq507y",
+      "id": "11",
+      "bbox": [
+        824,
+        438,
+        300,
+        0
+      ],
+      "geometry": "straightConnector1",
+      "lineColor": "#29425E",
+      "lineWidth": 2
+    },
+    {
+      "order": 12,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/edo7u5o7",
+      "id": "12",
+      "bbox": [
+        824,
+        470,
+        350,
+        70
+      ],
+      "geometry": "rect",
+      "text": "测试账号当前为空；正式环境以实际授权为准。",
+      "textPreview": "测试账号当前为空；正式环境以实际授权为准。",
+      "resolvedFontSize": 18,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 18,
+        "typeface": "PingFang SC",
+        "color": "#FFB020",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 1,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "测试账号当前为空；正式环境以实际授权"
+          },
+          {
+            "index": 2,
+            "text": "为准。"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "测试账号当前为空；正式环境以实际授权为准。",
+          "resolvedTextStyle": {
+            "fontSize": 18,
+            "typeface": "PingFang SC",
+            "color": "#FFB020",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "测试账号当前为空；正式环境以实际授权为准。",
+              "fontSize": 18,
+              "typeface": "PingFang SC",
+              "color": "#FFB020",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 13,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/fex83aps",
+      "id": "13",
+      "bbox": [
+        64,
+        676,
+        1152,
+        0
+      ],
+      "geometry": "straightConnector1",
+      "lineColor": "#29425E",
+      "lineWidth": 1
+    },
+    {
+      "order": 14,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/o36p0f6p",
+      "id": "14",
+      "bbox": [
+        64,
+        686,
+        300,
+        18
+      ],
+      "geometry": "rect",
+      "text": "天马智擎 · 内部培训 V1.0",
+      "textPreview": "天马智擎 · 内部培训 V1.0",
+      "resolvedFontSize": 7,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 12,
+        "typeface": "PingFang SC",
+        "color": "#8FA4BD",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 0.58,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "天马智擎 · 内部培训 V1.0"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "天马智擎 · 内部培训 V1.0",
+          "resolvedTextStyle": {
+            "fontSize": 12,
+            "typeface": "PingFang SC",
+            "color": "#8FA4BD",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "天马智擎 · 内部培训 V1.0",
+              "fontSize": 12,
+              "typeface": "PingFang SC",
+              "color": "#8FA4BD",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 15,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/p4zq9k7u",
+      "id": "15",
+      "bbox": [
+        1170,
+        686,
+        46,
+        18
+      ],
+      "geometry": "rect",
+      "text": "07",
+      "textPreview": "07",
+      "resolvedFontSize": 7,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 12,
+        "typeface": "PingFang SC",
+        "color": "#8FA4BD",
+        "alignment": "right",
+        "verticalAlignment": "top",
+        "autoFit": "shrinkText",
+        "autoFitScale": 0.58,
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "07"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "07",
+          "resolvedTextStyle": {
+            "fontSize": 12,
+            "typeface": "PingFang SC",
+            "color": "#8FA4BD",
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "07",
+              "fontSize": 12,
+              "typeface": "PingFang SC",
+              "color": "#8FA4BD",
+              "alignment": "right"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

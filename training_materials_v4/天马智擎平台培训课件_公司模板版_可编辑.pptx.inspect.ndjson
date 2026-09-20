@@ -1,0 +1,530 @@
+{"kind":"deck","id":"pr/bj7hy8","name":"Deck"}
+{"kind":"layout","layoutId":"44110436-2366-4d1e-9b16-d2e36a443141","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"878b0f2f-3c22-4f9f-90a7-ea66b170e274","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/e9fxph","slide":1,"title":"TIANMA · INTERNAL TRAINING","textShapes":5}
+{"kind":"textbox","id":"sh/s72lgvet","slide":1,"text":"TIANMA · INTERNAL TRAINING","textPreview":"TIANMA · INTERNAL TRAINING","textChars":26,"textLines":1,"bbox":[110,300,850,36]}
+{"kind":"textbox","id":"sh/ji94j6xw","slide":1,"name":"title","text":"天马智擎平台培训","textPreview":"天马智擎平台培训","textChars":8,"textLines":1,"bbox":[110,390,1280,105]}
+{"kind":"textbox","id":"sh/ih03alwb","slide":1,"text":"认清定位 · 掌握操作 · 用进业务 · 反馈共建","textPreview":"认清定位 · 掌握操作 · 用进业务 · 反馈共建","textChars":25,"textLines":1,"bbox":[110,520,1200,54]}
+{"kind":"shape","id":"sh/5krmlgf2","slide":1,"bbox":[110,625,710,0]}
+{"kind":"textbox","id":"sh/kjilcbeh","slide":1,"text":"V1 内部培训版  |  2026","textPreview":"V1 内部培训版  |  2026","textChars":17,"textLines":1,"bbox":[110,665,700,40]}
+{"kind":"textbox","id":"sh/3ed4vadg","slide":1,"name":"page","text":"01 / 28","textPreview":"01 / 28","textChars":7,"textLines":1,"bbox":[1660,1008,170,28]}
+{"kind":"image","id":"im/n65creho","slide":1,"name":"","alt":"天马集团模板橙色封面","bbox":[0,0,1920,1080]}
+{"kind":"image","id":"im/o7ytkjit","slide":1,"name":"","geometry":"rect","alt":"Tianma white logo","bbox":[110,80,300,72]}
+{"kind":"notes","id":"nt/e9fxph","slide":1,"text":"大家好，今天我们不讲复杂技术原理，而是把天马智擎当成一位刚入职的数智员工：先认识它能做什么，再学会给它派活，最后把它放进真实业务。培训结束后，希望大家能独立完成首页对话、文件与知识引用、知识中心问答、任务查看和工作台访问，并知道遇到异常应该怎么处理。\n\n[Sources]\n- 内部资料：天马智擎平台系统使用说明与正式环境实测\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}
+{"kind":"slide","id":"sl/coieev","slide":2,"title":"学习地图","textShapes":14}
+{"kind":"shape","id":"sh/fulkfep0","slide":2,"name":"accent","bbox":[80,60,12,76]}
+{"kind":"textbox","id":"sh/gvul8j6l","slide":2,"name":"kicker","text":"学习地图","textPreview":"学习地图","textChars":4,"textLines":1,"bbox":[116,58,740,28]}
+{"kind":"textbox","id":"sh/1w32ho7q","slide":2,"name":"title","text":"今天学完，要带走 5 件事","textPreview":"今天学完，要带走 5 件事","textChars":13,"textLines":1,"bbox":[116,88,1390,64]}
+{"kind":"shape","id":"sh/3ylkjypw","slide":2,"name":"footer-line","bbox":[80,995,1760,0]}
+{"kind":"textbox","id":"sh/ozelc36h","slide":2,"name":"footer","text":"天马智擎 · 内部培训","textPreview":"天马智擎 · 内部培训","textChars":11,"textLines":1,"bbox":[80,1010,460,28]}
+{"kind":"textbox","id":"sh/pkn2l872","slide":2,"name":"page","text":"02 / 28","textPreview":"02 / 28","textChars":7,"textLines":1,"bbox":[1690,1010,150,28]}
+{"kind":"textbox","id":"sh/i1sjyp87","slide":2,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[116,210,70,60]}
+{"kind":"shape","id":"sh/j21k7ups","slide":2,"bbox":[205,241,1540,0]}
+{"kind":"textbox","id":"sh/j61876hw","slide":2,"text":"知道为什么自研，以及 V1 的能力边界","textPreview":"知道为什么自研，以及 V1 的能力边界","textChars":19,"textLines":1,"bbox":[240,208,1420,66]}
+{"kind":"textbox","id":"sh/i587e10b","slide":2,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[116,352,70,60]}
+{"kind":"shape","id":"sh/58jq9wzm","slide":2,"bbox":[205,383,1540,0]}
+{"kind":"textbox","id":"sh/47apgrih","slide":2,"text":"会用首页：会话、模式、智能体、附件与重新编辑","textPreview":"会用首页：会话、模式、智能体、附件与重新编辑","textChars":22,"textLines":1,"bbox":[240,350,1420,66]}
+{"kind":"textbox","id":"sh/viho3mhk","slide":2,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[116,494,70,60]}
+{"kind":"shape","id":"sh/uh87ah0z","slide":2,"bbox":[205,525,1540,0]}
+{"kind":"textbox","id":"sh/h4zq5wzq","slide":2,"text":"会用知识中心：上传、处理、小智问答与任务中心","textPreview":"会用知识中心：上传、处理、小智问答与任务中心","textChars":22,"textLines":1,"bbox":[240,492,1420,66]}
+{"kind":"textbox","id":"sh/wjqpcri5","slide":2,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[116,636,70,60]}
+{"kind":"shape","id":"sh/7exozmho","slide":2,"bbox":[205,667,1540,0]}
+{"kind":"textbox","id":"sh/mdo76h03","slide":2,"text":"会从工作台进入已授权的内部系统","textPreview":"会从工作台进入已授权的内部系统","textChars":15,"textLines":1,"bbox":[240,634,1420,66]}
+{"kind":"textbox","id":"sh/a9o7ixkv","slide":2,"text":"05","textPreview":"05","textChars":2,"textLines":1,"bbox":[116,778,70,60]}
+{"kind":"shape","id":"sh/bax8r2lg","slide":2,"bbox":[205,809,1540,0]}
+{"kind":"textbox","id":"sh/cb69k721","slide":2,"text":"会把真实问题通过“我要吐槽”反馈给团队","textPreview":"会把真实问题通过“我要吐槽”反馈给团队","textChars":19,"textLines":1,"bbox":[240,776,1420,66]}
+{"kind":"image","id":"im/jipcrep8","slide":2,"name":"","geometry":"rect","alt":"Tianma logo","bbox":[1590,52,240,57]}
+{"kind":"notes","id":"nt/coieev","slide":2,"text":"今天的内容按真实使用路径展开。首页是主入口，也是培训重点；知识中心解决资料沉淀和复用；工作台是内部系统入口。后半段用组货、评价和数据分析说明如何与业务结合。最后统一讲异常处理和反馈，不在每个功能页重复。\n\n[Sources]\n- 内部资料：天马智擎平台系统使用说明与正式环境实测\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}
+{"kind":"slide","id":"sl/ubqqj1","slide":3,"title":"01 · 平台定位","textShapes":10}
+{"kind":"shape","id":"sh/elovuhor","slide":3,"name":"accent","bbox":[80,60,12,76]}
+{"kind":"textbox","id":"sh/1ofe5w72","slide":3,"name":"kicker","text":"01 · 平台定位","textPreview":"01 · 平台定位","textChars":9,"textLines":1,"bbox":[116,58,740,28]}
+{"kind":"textbox","id":"sh/0n6dwr6h","slide":3,"name":"title","text":"平台定位：不是“又一个聊天工具”","textPreview":"平台定位：不是“又一个聊天工具”","textChars":16,"textLines":1,"bbox":[116,88,1390,64]}
+{"kind":"shape","id":"sh/mp8vy1on","slide":3,"name":"footer-line","bbox":[80,995,1760,0]}
+{"kind":"textbox","id":"sh/9cze9w7e","slide":3,"name":"footer","text":"天马智擎 · 内部培训","textPreview":"天马智擎 · 内部培训","textChars":11,"textLines":1,"bbox":[80,1010,460,28]}
+{"kind":"textbox","id":"sh/orqd0r6t","slide":3,"name":"page","text":"03 / 28","textPreview":"03 / 28","textChars":7,"textLines":1,"bbox":[1690,1010,150,28]}
+{"kind":"shape","id":"sh/3udcv2po","slide":3,"name":"card-1","bbox":[130,300,520,420]}
+{"kind":"shape","id":"sh/2t4vmx8j","slide":3,"bbox":[130,300,520,12]}
+{"kind":"textbox","id":"sh/0f2lk36h","slide":3,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[164,338,80,38]}
+{"kind":"textbox","id":"sh/1gb2t8nm","slide":3,"text":"可治理\n让数据、权限和使用规范处于企业可管理范围","textPreview":"可治理 | 让数据、权限和使用规范处于企业可管理范围","textChars":24,"textLines":2,"bbox":[164,405,452,230]}
+{"kind":"shape","id":"sh/edk3idob","slide":3,"name":"card-2","bbox":[700,300,520,420]}
+{"kind":"shape","id":"sh/fetkripw","slide":3,"bbox":[700,300,520,12]}
+{"kind":"textbox","id":"sh/oj2lon6d","slide":3,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[734,338,80,38]}
+{"kind":"textbox","id":"sh/pkv2xsny","slide":3,"text":"可连接\n为内部知识与业务系统逐步打通预留统一入口","textPreview":"可连接 | 为内部知识与业务系统逐步打通预留统一入口","textChars":24,"textLines":2,"bbox":[734,405,452,230]}
+{"kind":"shape","id":"sh/2hk3mdo7","slide":3,"name":"card-3","bbox":[1270,300,520,420]}
+{"kind":"shape","id":"sh/nitkvi5s","slide":3,"bbox":[1270,300,520,12]}
+{"kind":"textbox","id":"sh/4ni1cj69","slide":3,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1304,338,80,38]}
+{"kind":"textbox","id":"sh/5or2lo7u","slide":3,"text":"可沉淀\n把个人经验转为可复用的知识、提示与智能体","textPreview":"可沉淀 | 把个人经验转为可复用的知识、提示与智能体","textChars":24,"textLines":2,"bbox":[1304,405,452,230]}
+{"kind":"image","id":"im/2p8j6lc7","slide":3,"name":"","geometry":"rect","alt":"Tianma logo","bbox":[1590,52,240,57]}
+{"kind":"notes","id":"nt/ubqqj1","slide":3,"text":"天马智擎选择自研，核心不是为了重复做一个聊天工具，而是解决三类长期问题。第一，内部材料和权限需要在企业可治理的框架里使用；第二，要逐步连接公司的知识和业务系统；第三，要把个人经验沉淀成团队可以复用的方法。这里强调的是降低风险和逐步连接，不代表绝对不会泄漏，也不代表所有内部系统已经自动打通。\n\n[Sources]\n- 内部资料：天马智擎平台系统使用说明与正式环境实测\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}
+{"kind":"slide","id":"sl/bp13yj","slide":4,"title":"01 · 平台定位","textShapes":13}
+{"kind":"shape","id":"sh/l8v6d4n6","slide":4,"name":"accent","bbox":[80,60,12,76]}
+{"kind":"textbox","id":"sh/y5k72pov","slide":4,"name":"kicker","text":"01 · 平台定位","textPreview":"01 · 平台定位","textChars":9,"textLines":1,"bbox":[116,58,740,28]}
+{"kind":"textbox","id":"sh/j6dobu50","slide":4,"name":"title","text":"V1 使用共识：闭环已具备，稳定性仍在成长","textPreview":"V1 使用共识：闭环已具备，稳定性仍在成长","textChars":21,"textLines":1,"bbox":[116,88,1390,64]}
+{"kind":"shape","id":"sh/twvqh4ni","slide":4,"name":"footer-line","bbox":[80,995,1760,0]}
+{"kind":"textbox","id":"sh/694769or","slide":4,"name":"footer","text":"天马智擎 · 内部培训","textPreview":"天马智擎 · 内部培训","textChars":11,"textLines":1,"bbox":[80,1010,460,28]}
+{"kind":"textbox","id":"sh/7udofu5c","slide":4,"name":"page","text":"04 / 28","textPreview":"04 / 28","textChars":7,"textLines":1,"bbox":[1690,1010,150,28]}
+{"kind":"shape","id":"sh/oz2pwf6d","slide":4,"name":"card-1","bbox":[100,300,400,420]}
+{"kind":"shape","id":"sh/p0b65kny","slide":4,"bbox":[100,300,400,12]}
+{"kind":"textbox","id":"sh/t0bm10ny","slide":4,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[134,338,80,38]}
+{"kind":"textbox","id":"sh/sz25sv6d","slide":4,"text":"系统可能出现回答偏差、执行异常或页面问题","textPreview":"系统可能出现回答偏差、执行异常或页面问题","textChars":20,"textLines":1,"bbox":[134,405,332,230]}
+{"kind":"shape","id":"sh/ryt4zq5s","slide":4,"name":"card-2","bbox":[530,300,400,420]}
+{"kind":"shape","id":"sh/6xknqlo7","slide":4,"bbox":[530,300,400,12]}
+{"kind":"textbox","id":"sh/1obm50nu","slide":4,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[564,338,80,38]}
+{"kind":"textbox","id":"sh/gn25wv69","slide":4,"text":"遇到异常：先刷新或缩小任务重试；仍不行再反馈","textPreview":"遇到异常：先刷新或缩小任务重试；仍不行再反馈","textChars":22,"textLines":1,"bbox":[564,405,332,230]}
+{"kind":"shape","id":"sh/f2t43a54","slide":4,"name":"card-3","bbox":[960,300,400,420]}
+{"kind":"shape","id":"sh/e1knu5oj","slide":4,"bbox":[960,300,400,12]}
+{"kind":"textbox","id":"sh/psv69kn6","slide":4,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[994,338,80,38]}
+{"kind":"textbox","id":"sh/orm50f6l","slide":4,"text":"不同人员看到的知识库、智能体和工作台入口可能不同","textPreview":"不同人员看到的知识库、智能体和工作台入口可能不同","textChars":24,"textLines":1,"bbox":[994,405,332,230]}
+{"kind":"shape","id":"sh/87exsnit","slide":4,"name":"card-4","bbox":[1390,300,400,420]}
+{"kind":"shape","id":"sh/98nylsze","slide":4,"bbox":[1390,300,400,12]}
+{"kind":"textbox","id":"sh/m5cfqd03","slide":4,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[1424,338,80,38]}
+{"kind":"textbox","id":"sh/765gjih8","slide":4,"text":"登录或权限有问题，第一时间联系朝暮","textPreview":"登录或权限有问题，第一时间联系朝暮","textChars":17,"textLines":1,"bbox":[1424,405,332,230]}
+{"kind":"textbox","id":"sh/wbehwny5","slide":4,"name":"notice","text":"先刷新 / 重试 → 仍失败再反馈","textPreview":"先刷新 / 重试 → 仍失败再反馈","textChars":17,"textLines":1,"bbox":[570,790,780,60]}
+{"kind":"image","id":"im/lwbix07y","slide":4,"name":"","geometry":"rect","alt":"Tianma logo","bbox":[1590,52,240,57]}
+{"kind":"notes","id":"nt/bp13yj","slide":4,"text":"当前是第一版 MVP，已经满足从输入任务、引用材料、调用能力到反馈问题的基本闭环，但仍可能出错。遇到问题先刷新页面或缩小任务范围再试一次；仍失败时在群里说明，或通过“我要吐槽”填写表格。不同账号权限不同，说明文档里的某个智能体或知识库看不到并不一定是故障。登录和权限问题请第一时间联系朝暮。\n\n[Sources]\n- 内部资料：天马智擎平台系统使用说明与正式环境实测\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}
+{"kind":"slide","id":"sl/omyphn","slide":5,"title":"PART.01","textShapes":4}
+{"kind":"textbox","id":"sh/szmtk7yx","slide":5,"text":"PART.01","textPreview":"PART.01","textChars":7,"textLines":1,"bbox":[120,270,520,60]}
+{"kind":"textbox","id":"sh/t0vatczi","slide":5,"name":"title","text":"天马智擎首页","textPreview":"天马智擎首页","textChars":6,"textLines":1,"bbox":[120,365,1080,105]}
+{"kind":"textbox","id":"sh/e1obmhg3","slide":5,"text":"从找到入口，到把任务说清楚","textPreview":"从找到入口，到把任务说清楚","textChars":13,"textLines":1,"bbox":[125,505,1000,50]}
+{"kind":"shape","id":"sh/f2xsvmho","slide":5,"bbox":[120,600,240,10]}
+{"kind":"textbox","id":"sh/g36toryt","slide":5,"name":"page","text":"05 / 28","textPreview":"05 / 28","textChars":7,"textLines":1,"bbox":[1660,1008,170,28]}
+{"kind":"image","id":"im/yt8batob","slide":5,"name":"","alt":"天马集团模板章节背景","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/omyphn","slide":5,"text":"下面进入首页操作。首页是大家每天最常用的入口，这一部分按真实操作顺序讲：先认识页面区域，再管理会话、选择日常办公或专家模式，接着上传本地文件或引用知识文件，最后把任务写清楚并发送。\n\n[Sources]\n- 内部资料：天马智擎平台系统使用说明与正式环境实测\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}
+{"kind":"slide","id":"sl/njkmb8","slide":6,"title":"02 · 天马智擎首页","textShapes":10}
+{"kind":"shape","id":"sh/0nqt0n2x","slide":6,"name":"accent","bbox":[80,60,12,76]}
+{"kind":"textbox","id":"sh/zmhsrilc","slide":6,"name":"kicker","text":"02 · 天马智擎首页","textPreview":"02 · 天马智擎首页","textChars":11,"textLines":1,"bbox":[116,58,740,28]}
+{"kind":"textbox","id":"sh/yl8bydkr","slide":6,"name":"title","text":"首页导览：先看清区域，再开始操作","textPreview":"首页导览：先看清区域，再开始操作","textChars":16,"textLines":1,"bbox":[116,88,1390,64]}
+{"kind":"shape","id":"sh/8rqt4n2t","slide":6,"name":"footer-line","bbox":[80,995,1760,0]}
+{"kind":"textbox","id":"sh/nqhcvi18","slide":6,"name":"footer","text":"天马智擎 · 内部培训","textPreview":"天马智擎 · 内部培训","textChars":11,"textLines":1,"bbox":[80,1010,460,28]}
+{"kind":"textbox","id":"sh/mp8b2xkn","slide":6,"name":"page","text":"06 / 28","textPreview":"06 / 28","textChars":7,"textLines":1,"bbox":[1690,1010,150,28]}
+{"kind":"shape","id":"sh/xgju1cja","slide":6,"name":"screenshot-frame","bbox":[78,182,1370,772]}
+{"kind":"shape","id":"sh/e1svahgz","slide":6,"name":"callout-1","bbox":[1490,220,350,168]}
+{"kind":"textbox","id":"sh/f21w3mhk","slide":6,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[1516,238,58,28]}
+{"kind":"textbox","id":"sh/0nadcry5","slide":6,"text":"顶部 Tab\n切换首页、知识中心与工作台","textPreview":"顶部 Tab | 切换首页、知识中心与工作台","textChars":20,"textLines":2,"bbox":[1516,275,296,88]}
+{"kind":"shape","id":"sh/1o3e5wzq","slide":6,"name":"callout-2","bbox":[1490,410,350,168]}
+{"kind":"textbox","id":"sh/2pcve1gb","slide":6,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1516,428,58,28]}
+{"kind":"textbox","id":"sh/nqlw7mhw","slide":6,"text":"左侧会话历史区\n新建、搜索并继续旧会话","textPreview":"左侧会话历史区 | 新建、搜索并继续旧会话","textChars":19,"textLines":2,"bbox":[1516,465,296,88]}
+{"kind":"shape","id":"sh/orudgryh","slide":6,"name":"callout-3","bbox":[1490,600,350,168]}
+{"kind":"textbox","id":"sh/ps3e9wzm","slide":6,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1516,618,58,28]}
+{"kind":"textbox","id":"sh/it8v2x07","slide":6,"text":"中央任务区\n切换模式、选择材料并发送","textPreview":"中央任务区 | 切换模式、选择材料并发送","textChars":18,"textLines":2,"bbox":[1516,655,296,88]}
+{"kind":"image","id":"im/ojytwz65","slide":6,"name":"","geometry":"rect","alt":"Tianma logo","bbox":[1590,52,240,57]}
+{"kind":"image","id":"im/5onatknm","slide":6,"name":"","geometry":"rect","alt":"首页导览：先看清区域，再开始操作","bbox":[92,196,1342,744]}
+{"kind":"notes","id":"nt/njkmb8","slide":6,"text":"登录后首先看到首页。顶部标签页用于在首页、知识中心和工作台之间切换；左侧是会话历史区，可以新建、搜索和继续过去的会话；中央是任务输入区，在这里选择日常办公或专家模式、挂载材料、写任务并发送。请大家先确认自己在哪个页面、哪个模式，再开始输入。\n\n[Sources]\n- 正式环境截图：14_home_tabs.png\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}
+{"kind":"slide","id":"sl/669ajm","slide":7,"title":"02 · 天马智擎首页","textShapes":10}
+{"kind":"shape","id":"sh/napwbq5s","slide":7,"name":"accent","bbox":[80,60,12,76]}
+{"kind":"textbox","id":"sh/8bydkv6d","slide":7,"name":"kicker","text":"02 · 天马智擎首页","textPreview":"02 · 天马智擎首页","textChars":11,"textLines":1,"bbox":[116,58,740,28]}
+{"kind":"textbox","id":"sh/9c7edgny","slide":7,"name":"title","text":"会话管理：同一任务继续，不同主题新建","textPreview":"会话管理：同一任务继续，不同主题新建","textChars":18,"textLines":1,"bbox":[116,88,1390,64]}
+{"kind":"shape","id":"sh/ve9wfq54","slide":7,"name":"footer-line","bbox":[80,995,1760,0]}
+{"kind":"textbox","id":"sh/wfid8v6p","slide":7,"name":"footer","text":"天马智擎 · 内部培训","textPreview":"天马智擎 · 内部培训","textChars":11,"textLines":1,"bbox":[80,1010,460,28]}
+{"kind":"textbox","id":"sh/xgreh0na","slide":7,"name":"page","text":"07 / 28","textPreview":"07 / 28","textChars":7,"textLines":1,"bbox":[1690,1010,150,28]}
+{"kind":"shape","id":"sh/ih0va54f","slide":7,"name":"screenshot-frame","bbox":[78,182,1370,772]}
+{"kind":"shape","id":"sh/vmdkjqho","slide":7,"name":"callout-1","bbox":[1490,220,350,168]}
+{"kind":"textbox","id":"sh/ul4jq5g3","slide":7,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[1516,238,58,28]}
+{"kind":"textbox","id":"sh/hov2l0ze","slide":7,"text":"搜索历史会话\n用任务名、文件名或业务对象定位","textPreview":"搜索历史会话 | 用任务名、文件名或业务对象定位","textChars":22,"textLines":2,"bbox":[1516,275,296,88]}
+{"kind":"shape","id":"sh/wnm1svy9","slide":7,"name":"callout-2","bbox":[1490,410,350,168]}
+{"kind":"textbox","id":"sh/7yd0fqhc","slide":7,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1516,428,58,28]}
+{"kind":"textbox","id":"sh/mx4jml0r","slide":7,"text":"继续原会话\n适合同一任务的补充与追问","textPreview":"继续原会话 | 适合同一任务的补充与追问","textChars":18,"textLines":2,"bbox":[1516,465,296,88]}
+{"kind":"shape","id":"sh/90v2h0zi","slide":7,"name":"callout-3","bbox":[1490,600,350,168]}
+{"kind":"textbox","id":"sh/8zm1ovyx","slide":7,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1516,618,58,28]}
+{"kind":"textbox","id":"sh/ruxkrahw","slide":7,"text":"新建会话\n适合新主题、新材料或新口径","textPreview":"新建会话 | 适合新主题、新材料或新口径","textChars":18,"textLines":2,"bbox":[1516,655,296,88]}
+{"kind":"image","id":"im/fyd4ji50","slide":7,"name":"","geometry":"rect","alt":"Tianma logo","bbox":[1590,52,240,57]}
+{"kind":"image","id":"im/et8n2hoj","slide":7,"name":"","geometry":"rect","alt":"会话管理：同一任务继续，不同主题新建","bbox":[92,196,1342,744]}
+{"kind":"notes","id":"nt/669ajm","slide":7,"text":"左侧是会话历史区。搜索时建议使用任务名称、文件名或业务对象，不要只用“测试”“分析”这类泛词。一个任务需要补充材料或继续追问时，留在原会话即可；换了业务主题、材料或统计口径时，应新建会话，避免旧材料和旧口径影响新任务。\n\n[Sources]\n- 正式环境截图：10_conversation_search.png\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}
+{"kind":"slide","id":"sl/6yryui","slide":8,"title":"02 · 天马智擎首页","textShapes":10}
+{"kind":"shape","id":"sh/sz69cna5","slide":8,"name":"accent","bbox":[80,60,12,76]}
+{"kind":"textbox","id":"sh/7yx83itk","slide":8,"name":"kicker","text":"02 · 天马智擎首页","textPreview":"02 · 天马智擎首页","textChars":11,"textLines":1,"bbox":[116,58,740,28]}
+{"kind":"textbox","id":"sh/6xoradsz","slide":8,"name":"title","text":"日常办公与专家模式：两条不同的任务路径","textPreview":"日常办公与专家模式：两条不同的任务路径","textChars":19,"textLines":1,"bbox":[116,88,1390,64]}
+{"kind":"shape","id":"sh/kv6983at","slide":8,"name":"footer-line","bbox":[80,995,1760,0]}
+{"kind":"textbox","id":"sh/jux8zyt8","slide":8,"name":"footer","text":"天马智擎 · 内部培训","textPreview":"天马智擎 · 内部培训","textChars":11,"textLines":1,"bbox":[80,1010,460,28]}
+{"kind":"textbox","id":"sh/itor6ts3","slide":8,"name":"page","text":"08 / 28","textPreview":"08 / 28","textChars":7,"textLines":1,"bbox":[1690,1010,150,28]}
+{"kind":"shape","id":"sh/xsfqxobi","slide":8,"name":"screenshot-frame","bbox":[78,182,1370,772]}
+{"kind":"shape","id":"sh/mpgrqh8v","slide":8,"name":"callout-1","bbox":[1490,220,350,168]}
+{"kind":"textbox","id":"sh/nqpszmpg","slide":8,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[1516,238,58,28]}
+{"kind":"textbox","id":"sh/8ry9srq1","slide":8,"text":"日常办公\n通用、轻量、横向协同","textPreview":"日常办公 | 通用、轻量、横向协同","textChars":15,"textLines":2,"bbox":[1516,275,296,88]}
+{"kind":"shape","id":"sh/9s7a1w7m","slide":8,"name":"callout-2","bbox":[1490,410,350,168]}
+{"kind":"textbox","id":"sh/ylwrmh8z","slide":8,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1516,428,58,28]}
+{"kind":"textbox","id":"sh/zm58vmpk","slide":8,"text":"专家模式\n专业、复杂、依赖方法与知识","textPreview":"专家模式 | 专业、复杂、依赖方法与知识","textChars":18,"textLines":2,"bbox":[1516,465,296,88]}
+{"kind":"shape","id":"sh/0ne9o7qp","slide":8,"name":"callout-3","bbox":[1490,600,350,168]}
+{"kind":"textbox","id":"sh/lonaxc7a","slide":8,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1516,618,58,28]}
+{"kind":"textbox","id":"sh/qxwrix8n","slide":8,"text":"混合任务\n先专家分析，再办公落地","textPreview":"混合任务 | 先专家分析，再办公落地","textChars":16,"textLines":2,"bbox":[1516,655,296,88]}
+{"kind":"image","id":"im/wjil8n2h","slide":8,"name":"","geometry":"rect","alt":"Tianma logo","bbox":[1590,52,240,57]}
+{"kind":"image","id":"im/don2p8jy","slide":8,"name":"","geometry":"rect","alt":"日常办公与专家模式：两条不同的任务路径","bbox":[92,196,1342,744]}
+{"kind":"notes","id":"nt/6yryui","slide":8,"text":"日常办公和专家模式不是普通版与高级版。日常办公适合写作、整理、信息查询，以及消息、待办、日程等通用协同；专家模式适合需要专业方法、专属知识或固定流程的专项任务。如果一个任务既要专业分析又要形成通知、待办或汇报，可以先用专家模式完成分析，再回到日常办公完成落地。\n\n[Sources]\n- 正式环境截图：02_mode_positioning.png\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}
+{"kind":"slide","id":"sl/9tzovh","slide":9,"title":"02 · 天马智擎首页","textShapes":10}
+{"kind":"shape","id":"sh/mxkfy5on","slide":9,"name":"accent","bbox":[80,60,12,76]}
+{"kind":"textbox","id":"sh/90betk7y","slide":9,"name":"kicker","text":"02 · 天马智擎首页","textPreview":"02 · 天马智擎首页","textChars":11,"textLines":1,"bbox":[116,58,740,28]}
+{"kind":"textbox","id":"sh/8z2x0f6d","slide":9,"name":"title","text":"选择智能体：先匹配任务，再准备输入","textPreview":"选择智能体：先匹配任务，再准备输入","textChars":17,"textLines":1,"bbox":[116,88,1390,64]}
+{"kind":"shape","id":"sh/u1kf2poj","slide":9,"name":"footer-line","bbox":[80,995,1760,0]}
+{"kind":"textbox","id":"sh/h4bexk7a","slide":9,"name":"footer","text":"天马智擎 · 内部培训","textPreview":"天马智擎 · 内部培训","textChars":11,"textLines":1,"bbox":[80,1010,460,28]}
+{"kind":"textbox","id":"sh/w32x4f6p","slide":9,"name":"page","text":"09 / 28","textPreview":"09 / 28","textChars":7,"textLines":1,"bbox":[1690,1010,150,28]}
+{"kind":"shape","id":"sh/jqdwzup0","slide":9,"name":"screenshot-frame","bbox":[78,182,1370,772]}
+{"kind":"shape","id":"sh/sfedgnmd","slide":9,"name":"callout-1","bbox":[1490,220,350,168]}
+{"kind":"textbox","id":"sh/tgnu9s3y","slide":9,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[1516,238,58,28]}
+{"kind":"textbox","id":"sh/6dwvex47","slide":9,"text":"看能力说明\n确认它解决什么问题","textPreview":"看能力说明 | 确认它解决什么问题","textChars":15,"textLines":2,"bbox":[1516,275,296,88]}
+{"kind":"shape","id":"sh/7e5c7ils","slide":9,"name":"callout-2","bbox":[1490,410,350,168]}
+{"kind":"textbox","id":"sh/gjydk7m9","slide":9,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1516,428,58,28]}
+{"kind":"textbox","id":"sh/hk7edc3u","slide":9,"text":"看所需材料\n准备必要字段与业务约束","textPreview":"看所需材料 | 准备必要字段与业务约束","textChars":17,"textLines":2,"bbox":[1516,465,296,88]}
+{"kind":"shape","id":"sh/uhwvix4j","slide":9,"name":"callout-3","bbox":[1490,600,350,168]}
+{"kind":"textbox","id":"sh/fipcb2lo","slide":9,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1516,618,58,28]}
+{"kind":"textbox","id":"sh/47ydo7ml","slide":9,"text":"看输出能否验证\n关键结果必须人工复核","textPreview":"看输出能否验证 | 关键结果必须人工复核","textChars":18,"textLines":2,"bbox":[1516,655,296,88]}
+{"kind":"image","id":"im/axsnids7","slide":9,"name":"","geometry":"rect","alt":"Tianma logo","bbox":[1590,52,240,57]}
+{"kind":"image","id":"im/nuh47y9w","slide":9,"name":"","geometry":"rect","alt":"选择智能体：先匹配任务，再准备输入","bbox":[92,196,1342,744]}
+{"kind":"notes","id":"nt/9tzovh","slide":9,"text":"进入专家模式后，会看到当前账号有权限使用的智能体。不要只看名字就开始提问，先阅读能力说明，确认它解决的问题与自己的任务一致；再准备它需要的输入材料和约束；最后确认输出是否可以核验。智能体数量和可见范围会随账号权限及版本调整，看不到某个智能体属于正常情况。\n\n[Sources]\n- 正式环境截图：03_expert_mode.png\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}
+{"kind":"slide","id":"sl/k5c8nf","slide":10,"title":"02 · 天马智擎首页","textShapes":10}
+{"kind":"shape","id":"sh/jidkzyt4","slide":10,"name":"accent","bbox":[80,60,12,76]}
+{"kind":"textbox","id":"sh/kj6ls3ap","slide":10,"name":"kicker","text":"02 · 天马智擎首页","textPreview":"02 · 天马智擎首页","textChars":11,"textLines":1,"bbox":[116,58,740,28]}
+{"kind":"textbox","id":"sh/lkf218ba","slide":10,"name":"title","text":"上传本地文件：适合临时、少量材料","textPreview":"上传本地文件：适合临时、少量材料","textChars":16,"textLines":1,"bbox":[116,88,1390,64]}
+{"kind":"shape","id":"sh/7mxk3itg","slide":10,"name":"footer-line","bbox":[80,995,1760,0]}
+{"kind":"textbox","id":"sh/876lwna1","slide":10,"name":"footer","text":"天马智擎 · 内部培训","textPreview":"天马智擎 · 内部培训","textChars":11,"textLines":1,"bbox":[80,1010,460,28]}
+{"kind":"textbox","id":"sh/t8fm5sb6","slide":10,"name":"page","text":"10 / 28","textPreview":"10 / 28","textChars":7,"textLines":1,"bbox":[1690,1010,150,28]}
+{"kind":"shape","id":"sh/mpkji9cr","slide":10,"name":"screenshot-frame","bbox":[78,182,1370,772]}
+{"kind":"shape","id":"sh/v2dovexc","slide":10,"name":"callout-1","bbox":[1490,220,350,168]}
+{"kind":"textbox","id":"sh/u147m9wr","slide":10,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[1516,238,58,28]}
+{"kind":"textbox","id":"sh/h4fqx4f2","slide":10,"text":"常见文档与表格\npdf / doc(x) / xls(x) / txt / md","textPreview":"常见文档与表格 | pdf / doc(x) / xls(x) / txt / md","textChars":40,"textLines":2,"bbox":[1516,275,296,88]}
+{"kind":"shape","id":"sh/g36pozeh","slide":10,"name":"callout-2","bbox":[1490,410,350,168]}
+{"kind":"textbox","id":"sh/7edorux0","slide":10,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1516,428,58,28]}
+{"kind":"textbox","id":"sh/6d47ipwf","slide":10,"text":"单文件不超过 10MB","textPreview":"单文件不超过 10MB","textChars":11,"textLines":1,"bbox":[1516,465,296,88]}
+{"kind":"shape","id":"sh/t0v6t4f6","slide":10,"name":"callout-3","bbox":[1490,600,350,168]}
+{"kind":"textbox","id":"sh/8fmpkzel","slide":10,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1516,618,58,28]}
+{"kind":"textbox","id":"sh/jatonux4","slide":10,"text":"一次最多挂载 3 个文件","textPreview":"一次最多挂载 3 个文件","textChars":12,"textLines":1,"bbox":[1516,655,296,88]}
+{"kind":"image","id":"im/z2xwr2lo","slide":10,"name":"","geometry":"rect","alt":"Tianma logo","bbox":[1590,52,240,57]}
+{"kind":"image","id":"im/yx8fah47","slide":10,"name":"","geometry":"rect","alt":"上传本地文件：适合临时、少量材料","bbox":[92,196,1342,744]}
+{"kind":"notes","id":"nt/k5c8nf","slide":10,"text":"在输入框旁点击添加附件，可以直接上传本地文件。当前页面提示支持常见文档与表格，单文件不超过 10MB，一次最多 3 个。这条路径适合临时、少量、一次性材料。如果文件更大、需要团队复用或长期维护，应先上传到知识中心。上传前仍需确认材料是否可以在当前权限范围内使用。\n\n[Sources]\n- 正式环境截图：05_local_attachment_limits.png\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}
+{"kind":"slide","id":"sl/pkly48","slide":11,"title":"02 · 天马智擎首页","textShapes":10}
+{"kind":"shape","id":"sh/cni5ovyh","slide":11,"name":"accent","bbox":[80,60,12,76]}
+{"kind":"textbox","id":"sh/bmp4fqxw","slide":11,"name":"kicker","text":"02 · 天马智擎首页","textPreview":"02 · 天马智擎首页","textChars":11,"textLines":1,"bbox":[116,58,740,28]}
+{"kind":"textbox","id":"sh/algnmlgb","slide":11,"name":"title","text":"引用知识文件：先处理成功，再回首页选择","textPreview":"引用知识文件：先处理成功，再回首页选择","textChars":19,"textLines":1,"bbox":[116,88,1390,64]}
+{"kind":"shape","id":"sh/kbi5svyt","slide":11,"name":"footer-line","bbox":[80,995,1760,0]}
+{"kind":"textbox","id":"sh/za9ojax8","slide":11,"name":"footer","text":"天马智擎 · 内部培训","textPreview":"天马智擎 · 内部培训","textChars":11,"textLines":1,"bbox":[80,1010,460,28]}
+{"kind":"textbox","id":"sh/y90nq5gn","slide":11,"name":"page","text":"11 / 28","textPreview":"11 / 28","textChars":7,"textLines":1,"bbox":[1690,1010,150,28]}
+{"kind":"shape","id":"sh/1g7m9gfu","slide":11,"name":"screenshot-frame","bbox":[78,182,1370,772]}
+{"kind":"shape","id":"sh/ed8bq54j","slide":11,"name":"callout-1","bbox":[1490,220,350,168]}
+{"kind":"textbox","id":"sh/fehcza54","slide":11,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[1516,238,58,28]}
+{"kind":"textbox","id":"sh/gfatsvmp","slide":11,"text":"选择公共或个人空间","textPreview":"选择公共或个人空间","textChars":9,"textLines":1,"bbox":[1516,275,296,88]}
+{"kind":"shape","id":"sh/1gju10na","slide":11,"name":"callout-2","bbox":[1490,410,350,168]}
+{"kind":"textbox","id":"sh/21sbu54v","slide":11,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1516,428,58,28]}
+{"kind":"textbox","id":"sh/321c3a5g","slide":11,"text":"按文件名搜索并确认知识库","textPreview":"按文件名搜索并确认知识库","textChars":12,"textLines":1,"bbox":[1516,465,296,88]}
+{"kind":"shape","id":"sh/o3atwfml","slide":11,"name":"callout-3","bbox":[1490,600,350,168]}
+{"kind":"textbox","id":"sh/p4ju5kn6","slide":11,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1516,618,58,28]}
+{"kind":"textbox","id":"sh/q5sbyp4r","slide":11,"text":"找不到时查状态、位置和权限","textPreview":"找不到时查状态、位置和权限","textChars":13,"textLines":1,"bbox":[1516,655,296,88]}
+{"kind":"image","id":"im/4fqx4v6d","slide":11,"name":"","geometry":"rect","alt":"Tianma logo","bbox":[1590,52,240,57]}
+{"kind":"image","id":"im/d4jyhk7u","slide":11,"name":"","geometry":"rect","alt":"引用知识文件：先处理成功，再回首页选择","bbox":[92,196,1342,744]}
+{"kind":"notes","id":"nt/pkly48","slide":11,"text":"需要使用知识中心里的材料时，在附件面板切换到知识中心，选择公共或个人空间，再按文件名搜索。文件必须先在知识中心处理成功。找不到时依次检查：是否处理完成、是否选对空间和知识库、文件名是否正确、当前账号是否有权限。选中文件后仍然要写清楚希望基于哪部分内容完成什么任务。\n\n[Sources]\n- 正式环境截图：06_knowledge_picker.png\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}
+{"kind":"slide","id":"sl/is0k57","slide":12,"title":"02 · 天马智擎首页","textShapes":10}
+{"kind":"shape","id":"sh/h03mh8bq","slide":12,"name":"accent","bbox":[80,60,12,76]}
+{"kind":"textbox","id":"sh/udcn6tcf","slide":12,"name":"kicker","text":"02 · 天马智擎首页","textPreview":"02 · 天马智擎首页","textChars":11,"textLines":1,"bbox":[116,58,740,28]}
+{"kind":"textbox","id":"sh/vel4fyt0","slide":12,"name":"title","text":"写好任务并发送：让结果可验证、可行动","textPreview":"写好任务并发送：让结果可验证、可行动","textChars":18,"textLines":1,"bbox":[116,88,1390,64]}
+{"kind":"shape","id":"sh/9c3mdobu","slide":12,"name":"footer-line","bbox":[80,995,1760,0]}
+{"kind":"textbox","id":"sh/m9sn2tc3","slide":12,"name":"footer","text":"天马智擎 · 内部培训","textPreview":"天马智擎 · 内部培训","textChars":11,"textLines":1,"bbox":[80,1010,460,28]}
+{"kind":"textbox","id":"sh/7a14byto","slide":12,"name":"page","text":"12 / 28","textPreview":"12 / 28","textChars":7,"textLines":1,"bbox":[1690,1010,150,28]}
+{"kind":"shape","id":"sh/k7a50jud","slide":12,"name":"screenshot-frame","bbox":[78,182,1370,772]}
+{"kind":"shape","id":"sh/tcve94va","slide":12,"name":"callout-1","bbox":[1490,220,350,168]}
+{"kind":"textbox","id":"sh/8bmx0zep","slide":12,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[1516,238,58,28]}
+{"kind":"textbox","id":"sh/7adw7ed4","slide":12,"text":"说清对象、范围和口径","textPreview":"说清对象、范围和口径","textChars":10,"textLines":1,"bbox":[1516,275,296,88]}
+{"kind":"shape","id":"sh/694fy9wz","slide":12,"name":"callout-2","bbox":[1490,410,350,168]}
+{"kind":"textbox","id":"sh/love54ve","slide":12,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1516,428,58,28]}
+{"kind":"textbox","id":"sh/knmdwzet","slide":12,"text":"说清任务、输出格式和限制","textPreview":"说清任务、输出格式和限制","textChars":12,"textLines":1,"bbox":[1516,465,296,88]}
+{"kind":"shape","id":"sh/jmdw3ud8","slide":12,"name":"callout-3","bbox":[1490,600,350,168]}
+{"kind":"textbox","id":"sh/ylkvupwn","slide":12,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1516,618,58,28]}
+{"kind":"textbox","id":"sh/xkbe1kv2","slide":12,"text":"不满意先重新编辑，再决定是否重试","textPreview":"不满意先重新编辑，再决定是否重试","textChars":16,"textLines":1,"bbox":[1516,655,296,88]}
+{"kind":"image","id":"im/10ve9cfi","slide":12,"name":"","geometry":"rect","alt":"Tianma logo","bbox":[1590,52,240,57]}
+{"kind":"image","id":"im/cbmxw7e1","slide":12,"name":"","geometry":"rect","alt":"写好任务并发送：让结果可验证、可行动","bbox":[92,196,1342,744]}
+{"kind":"notes","id":"nt/is0k57","slide":12,"text":"一个好任务至少说清六件事：分析对象、范围、口径、具体任务、输出结构和限制条件。发送后如果发现原问题写错或漏了要求，优先使用重新编辑，修改原问题后再次提交；相同输入下希望再尝试一次时，再使用重新生成。重要数字、外部动作和业务判断都要人工复核。\n\n[Sources]\n- 正式环境截图：08_data_analysis_prompt.png\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}
+{"kind":"slide","id":"sl/2mpg9u","slide":13,"title":"PART.02","textShapes":4}
+{"kind":"textbox","id":"sh/36dwnq54","slide":13,"text":"PART.02","textPreview":"PART.02","textChars":7,"textLines":1,"bbox":[120,270,520,60]}
+{"kind":"textbox","id":"sh/254fe54j","slide":13,"name":"title","text":"知识中心","textPreview":"知识中心","textChars":4,"textLines":1,"bbox":[120,365,1080,105]}
+{"kind":"textbox","id":"sh/dcfetkn6","slide":13,"text":"把一次性附件，沉淀成可复用的知识","textPreview":"把一次性附件，沉淀成可复用的知识","textChars":16,"textLines":1,"bbox":[125,505,1000,50]}
+{"kind":"shape","id":"sh/cb6xkfml","slide":13,"bbox":[120,600,240,10]}
+{"kind":"textbox","id":"sh/raxwra50","slide":13,"name":"page","text":"13 / 28","textPreview":"13 / 28","textChars":7,"textLines":1,"bbox":[1660,1008,170,28]}
+{"kind":"image","id":"im/hcnidsnu","slide":13,"name":"","alt":"天马集团模板章节背景","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/2mpg9u","slide":13,"text":"首页附件解决一次性使用，知识中心解决长期沉淀和团队复用。接下来重点看三件事：文件放到哪里、什么时候算处理完成，以及如何用小智问答和任务中心继续使用这些知识。\n\n[Sources]\n- 内部资料：天马智擎平台系统使用说明与正式环境实测\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}
+{"kind":"slide","id":"sl/771ujj","slide":14,"title":"03 · 知识中心","textShapes":10}
+{"kind":"shape","id":"sh/qpwfal4f","slide":14,"name":"accent","bbox":[80,60,12,76]}
+{"kind":"textbox","id":"sh/dsny5036","slide":14,"name":"kicker","text":"03 · 知识中心","textPreview":"03 · 知识中心","textChars":9,"textLines":1,"bbox":[116,58,740,28]}
+{"kind":"textbox","id":"sh/crexcvml","slide":14,"name":"title","text":"建设知识库：选对位置，再上传文件","textPreview":"建设知识库：选对位置，再上传文件","textChars":16,"textLines":1,"bbox":[116,88,1390,64]}
+{"kind":"shape","id":"sh/2lcf6l4j","slide":14,"name":"footer-line","bbox":[80,995,1760,0]}
+{"kind":"textbox","id":"sh/pony1g3a","slide":14,"name":"footer","text":"天马智擎 · 内部培训","textPreview":"天马智擎 · 内部培训","textChars":11,"textLines":1,"bbox":[80,1010,460,28]}
+{"kind":"textbox","id":"sh/4nex8bmp","slide":14,"name":"page","text":"14 / 28","textPreview":"14 / 28","textChars":7,"textLines":1,"bbox":[1690,1010,150,28]}
+{"kind":"shape","id":"sh/nipgbal8","slide":14,"name":"screenshot-frame","bbox":[78,182,1370,772]}
+{"kind":"shape","id":"sh/srihs3y9","slide":14,"name":"callout-1","bbox":[1490,220,350,168]}
+{"kind":"textbox","id":"sh/dsri18zu","slide":14,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[1516,238,58,28]}
+{"kind":"textbox","id":"sh/qp0zqdg3","slide":14,"text":"先确认空间、知识库与文件夹","textPreview":"先确认空间、知识库与文件夹","textChars":13,"textLines":1,"bbox":[1516,275,296,88]}
+{"kind":"shape","id":"sh/rq90zyho","slide":14,"name":"callout-2","bbox":[1490,410,350,168]}
+{"kind":"textbox","id":"sh/4niho3yx","slide":14,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1516,428,58,28]}
+{"kind":"textbox","id":"sh/5orix8zi","slide":14,"text":"单文件不超过 50MB","textPreview":"单文件不超过 50MB","textChars":11,"textLines":1,"bbox":[1516,465,296,88]}
+{"kind":"shape","id":"sh/ilgzmtg7","slide":14,"name":"callout-3","bbox":[1490,600,350,168]}
+{"kind":"textbox","id":"sh/3mp0vyhs","slide":14,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1516,618,58,28]}
+{"kind":"textbox","id":"sh/gzyhkjy1","slide":14,"text":"单次最多 100 个，等待处理成功","textPreview":"单次最多 100 个，等待处理成功","textChars":17,"textLines":1,"bbox":[1516,655,296,88]}
+{"kind":"image","id":"im/uhczi5oz","slide":14,"name":"","geometry":"rect","alt":"Tianma logo","bbox":[1590,52,240,57]}
+{"kind":"image","id":"im/7el0nqp8","slide":14,"name":"","geometry":"rect","alt":"建设知识库：选对位置，再上传文件","bbox":[92,196,1342,744]}
+{"kind":"notes","id":"nt/771ujj","slide":14,"text":"从顶部标签页进入知识中心后，先确认公共或个人空间，再进入目标知识库和文件夹。当前培训口径是单文件不超过 50MB、单次最多 100 个，并支持 CSV 等格式。上传完成不等于马上可用，必须等待处理成功后再进行问答或回首页引用。限制若有调整，以发版当日页面提示为准。\n\n[Sources]\n- 正式环境截图：15_knowledge_center_actions.png\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}
+{"kind":"slide","id":"sl/bpzoex","slide":15,"title":"03 · 知识中心","textShapes":10}
+{"kind":"shape","id":"sh/ah0nahgb","slide":15,"name":"accent","bbox":[80,60,12,76]}
+{"kind":"textbox","id":"sh/xkb65wf2","slide":15,"name":"kicker","text":"03 · 知识中心","textPreview":"03 · 知识中心","textChars":9,"textLines":1,"bbox":[116,58,740,28]}
+{"kind":"textbox","id":"sh/wj25cryh","slide":15,"name":"title","text":"小智问答：在限定知识范围内快速定位信息","textPreview":"小智问答：在限定知识范围内快速定位信息","textChars":19,"textLines":1,"bbox":[116,88,1390,64]}
+{"kind":"shape","id":"sh/ilk7e1gn","slide":15,"name":"footer-line","bbox":[80,995,1760,0]}
+{"kind":"textbox","id":"sh/5ob69gfy","slide":15,"name":"footer","text":"天马智擎 · 内部培训","textPreview":"天马智擎 · 内部培训","textChars":11,"textLines":1,"bbox":[80,1010,460,28]}
+{"kind":"textbox","id":"sh/kn2pgbyt","slide":15,"name":"page","text":"15 / 28","textPreview":"15 / 28","textChars":7,"textLines":1,"bbox":[1690,1010,150,28]}
+{"kind":"shape","id":"sh/7adob6x4","slide":15,"name":"screenshot-frame","bbox":[78,182,1370,772]}
+{"kind":"shape","id":"sh/0jilcbe5","slide":15,"name":"callout-1","bbox":[1490,220,350,168]}
+{"kind":"textbox","id":"sh/lkrmlgvq","slide":15,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[1516,238,58,28]}
+{"kind":"textbox","id":"sh/yh03a1wz","slide":15,"text":"先进入正确的知识库或文件范围","textPreview":"先进入正确的知识库或文件范围","textChars":14,"textLines":1,"bbox":[1516,275,296,88]}
+{"kind":"shape","id":"sh/zi9kj6dk","slide":15,"name":"callout-2","bbox":[1490,410,350,168]}
+{"kind":"textbox","id":"sh/8n2lgve1","slide":15,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1516,428,58,28]}
+{"kind":"textbox","id":"sh/9obmpgvm","slide":15,"text":"提问时写清制度、版本、时间或条款","textPreview":"提问时写清制度、版本、时间或条款","textChars":16,"textLines":1,"bbox":[1516,465,296,88]}
+{"kind":"shape","id":"sh/mlk3elwb","slide":15,"name":"callout-3","bbox":[1490,600,350,168]}
+{"kind":"textbox","id":"sh/nmt4nqdg","slide":15,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1516,618,58,28]}
+{"kind":"textbox","id":"sh/wr2lkved","slide":15,"text":"重要答案回查原文件与原文位置","textPreview":"重要答案回查原文件与原文位置","textChars":14,"textLines":1,"bbox":[1516,655,296,88]}
+{"kind":"image","id":"im/alg3a10f","slide":15,"name":"","geometry":"rect","alt":"Tianma logo","bbox":[1590,52,240,57]}
+{"kind":"image","id":"im/fit4vq1k","slide":15,"name":"","geometry":"rect","alt":"小智问答：在限定知识范围内快速定位信息","bbox":[92,196,1342,744]}
+{"kind":"notes","id":"nt/bpzoex","slide":15,"text":"小智问答适合在当前知识库或已打开文件范围内快速定位制度、流程和业务资料。提问时尽量写清制度名称、版本、时间或关注条款，并要求指出依据。小智的回答帮助我们找信息，但不能替代原文件；涉及制度解释和重要决策时，要回到原文或咨询责任部门。\n\n[Sources]\n- 正式环境截图：16_xiaozhi_qa.png\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}
+{"kind":"slide","id":"sl/9kkruc","slide":16,"title":"03 · 知识中心","textShapes":10}
+{"kind":"shape","id":"sh/pcjqdgvm","slide":16,"name":"accent","bbox":[80,60,12,76]}
+{"kind":"textbox","id":"sh/298ri1wv","slide":16,"name":"kicker","text":"03 · 知识中心","textPreview":"03 · 知识中心","textChars":9,"textLines":1,"bbox":[116,58,740,28]}
+{"kind":"textbox","id":"sh/nah8b6dg","slide":16,"name":"title","text":"任务中心：查看后台任务是否完成","textPreview":"任务中心：查看后台任务是否完成","textChars":15,"textLines":1,"bbox":[116,88,1390,64]}
+{"kind":"shape","id":"sh/x0jqhgvi","slide":16,"name":"footer-line","bbox":[80,995,1760,0]}
+{"kind":"textbox","id":"sh/adsrmlw7","slide":16,"name":"footer","text":"天马智擎 · 内部培训","textPreview":"天马智擎 · 内部培训","textChars":11,"textLines":1,"bbox":[80,1010,460,28]}
+{"kind":"textbox","id":"sh/be18f6ds","slide":16,"name":"page","text":"16 / 28","textPreview":"16 / 28","textChars":7,"textLines":1,"bbox":[1690,1010,150,28]}
+{"kind":"shape","id":"sh/s36pcret","slide":16,"name":"screenshot-frame","bbox":[78,182,1370,772]}
+{"kind":"shape","id":"sh/xsj2x0b6","slide":16,"name":"callout-1","bbox":[1490,220,350,168]}
+{"kind":"textbox","id":"sh/cra14vul","slide":16,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[1516,238,58,28]}
+{"kind":"textbox","id":"sh/bq1kvqt0","slide":16,"text":"查看处理中、成功或失败状态","textPreview":"查看处理中、成功或失败状态","textChars":13,"textLines":1,"bbox":[1516,275,296,88]}
+{"kind":"shape","id":"sh/apsj2lcf","slide":16,"name":"callout-2","bbox":[1490,410,350,168]}
+{"kind":"textbox","id":"sh/lw321kb2","slide":16,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1516,428,58,28]}
+{"kind":"textbox","id":"sh/kva18fuh","slide":16,"text":"任务较慢时不要连续重复提交","textPreview":"任务较慢时不要连续重复提交","textChars":13,"textLines":1,"bbox":[1516,465,296,88]}
+{"kind":"shape","id":"sh/zu1kzatw","slide":16,"name":"callout-3","bbox":[1490,600,350,168]}
+{"kind":"textbox","id":"sh/ytsj65cr","slide":16,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1516,618,58,28]}
+{"kind":"textbox","id":"sh/9k325kbe","slide":16,"text":"失败时记录时间、任务和错误信息","textPreview":"失败时记录时间、任务和错误信息","textChars":15,"textLines":1,"bbox":[1516,655,296,88]}
+{"kind":"image","id":"im/xob6l4nu","slide":16,"name":"","geometry":"rect","alt":"Tianma logo","bbox":[1590,52,240,57]}
+{"kind":"image","id":"im/kb2pgj6l","slide":16,"name":"","geometry":"rect","alt":"任务中心：查看后台任务是否完成","bbox":[92,196,1342,744]}
+{"kind":"notes","id":"nt/9kkruc","slide":16,"text":"部分上传、解析或执行任务需要后台处理，可以到任务中心查看状态。任务仍在处理中时不要连续重复提交，以免产生重复任务；成功后再回到对应页面继续使用；失败时记录发生时间、任务名称和错误信息，先刷新或重试一次，仍失败再反馈。\n\n[Sources]\n- 正式环境截图：17_task_center.png\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}
+{"kind":"slide","id":"sl/arjnij","slide":17,"title":"03 · 知识中心","textShapes":19}
+{"kind":"shape","id":"sh/e1sritwb","slide":17,"name":"accent","bbox":[80,60,12,76]}
+{"kind":"textbox","id":"sh/14jadovm","slide":17,"name":"kicker","text":"03 · 知识中心","textPreview":"03 · 知识中心","textChars":9,"textLines":1,"bbox":[116,58,740,28]}
+{"kind":"textbox","id":"sh/03atkjeh","slide":17,"name":"title","text":"模块协同：知识中心 → 首页对话","textPreview":"模块协同：知识中心 → 首页对话","textChars":16,"textLines":1,"bbox":[116,88,1390,64]}
+{"kind":"shape","id":"sh/25sbmtw7","slide":17,"name":"footer-line","bbox":[80,995,1760,0]}
+{"kind":"textbox","id":"sh/p83ah8vy","slide":17,"name":"footer","text":"天马智擎 · 内部培训","textPreview":"天马智擎 · 内部培训","textChars":11,"textLines":1,"bbox":[80,1010,460,28]}
+{"kind":"textbox","id":"sh/o7ato3ed","slide":17,"name":"page","text":"17 / 28","textPreview":"17 / 28","textChars":7,"textLines":1,"bbox":[1690,1010,150,28]}
+{"kind":"shape","id":"sh/3ahs3udo","slide":17,"name":"step-1","bbox":[92,340,300,250]}
+{"kind":"textbox","id":"sh/i98ra9w3","slide":17,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[120,374,70,36]}
+{"kind":"textbox","id":"sh/4n6hw7q9","slide":17,"text":"上传到正确知识库","textPreview":"上传到正确知识库","textChars":8,"textLines":1,"bbox":[120,440,244,92]}
+{"kind":"textbox","id":"sh/pofypc7u","slide":17,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[395,430,55,70]}
+{"kind":"shape","id":"sh/2lofux8j","slide":17,"name":"step-2","bbox":[442,340,300,250]}
+{"kind":"textbox","id":"sh/3mxgn2po","slide":17,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[470,374,70,36]}
+{"kind":"textbox","id":"sh/cr6h07ql","slide":17,"text":"等待处理成功","textPreview":"等待处理成功","textChars":6,"textLines":1,"bbox":[470,440,244,92]}
+{"kind":"textbox","id":"sh/dszytc76","slide":17,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[745,430,55,70]}
+{"kind":"shape","id":"sh/qpozyh8f","slide":17,"name":"step-3","bbox":[792,340,300,250]}
+{"kind":"textbox","id":"sh/bqxgrmp0","slide":17,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[820,374,70,36]}
+{"kind":"textbox","id":"sh/svmxonq1","slide":17,"text":"回首页选择知识文件","textPreview":"回首页选择知识文件","textChars":9,"textLines":1,"bbox":[820,440,244,92]}
+{"kind":"textbox","id":"sh/twvyhs7m","slide":17,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[1095,430,55,70]}
+{"kind":"shape","id":"sh/9cnel4jq","slide":17,"name":"step-4","bbox":[1142,340,300,250]}
+{"kind":"textbox","id":"sh/8bedsji5","slide":17,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[1170,374,70,36]}
+{"kind":"textbox","id":"sh/7q5wje1k","slide":17,"text":"选择日常或专家模式","textPreview":"选择日常或专家模式","textChars":9,"textLines":1,"bbox":[1170,440,244,92]}
+{"kind":"textbox","id":"sh/mpwvq90z","slide":17,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[1445,430,55,70]}
+{"kind":"shape","id":"sh/hg7epojm","slide":17,"name":"step-5","bbox":[1492,340,300,250]}
+{"kind":"textbox","id":"sh/wfedwji1","slide":17,"text":"05","textPreview":"05","textChars":2,"textLines":1,"bbox":[1520,374,70,36]}
+{"kind":"textbox","id":"sh/ve5wne1g","slide":17,"text":"写清任务并人工复核","textPreview":"写清任务并人工复核","textChars":9,"textLines":1,"bbox":[1520,440,244,92]}
+{"kind":"textbox","id":"sh/udwvu90v","slide":17,"name":"limits","text":"首页：≤10MB / 最多3个　　知识中心：≤50MB / 单次最多100个","textPreview":"首页：≤10MB / 最多3个　　知识中心：≤50MB / 单次最多100个","textChars":38,"textLines":1,"bbox":[330,700,1260,60]}
+{"kind":"image","id":"im/a18jul4j","slide":17,"name":"","geometry":"rect","alt":"Tianma logo","bbox":[1590,52,240,57]}
+{"kind":"notes","id":"nt/arjnij","slide":17,"text":"这条流程适合较大、需要多人复用或长期维护的材料。先在知识中心上传到正确位置，等待处理成功；再回到首页，从附件面板选择知识文件；随后选择日常办公或合适的专家智能体，写清任务并发送；最后回查材料、复核结果。请记住：首页是 10MB 和 3 个，知识中心是 50MB 和单次 100 个。\n\n[Sources]\n- 内部资料：天马智擎平台系统使用说明与正式环境实测\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}
+{"kind":"slide","id":"sl/q9cizg","slide":18,"title":"PART.03","textShapes":4}
+{"kind":"textbox","id":"sh/y1kbyxsz","slide":18,"text":"PART.03","textPreview":"PART.03","textChars":7,"textLines":1,"bbox":[120,270,520,60]}
+{"kind":"textbox","id":"sh/z2tcr2t4","slide":18,"name":"title","text":"工作台","textPreview":"工作台","textChars":3,"textLines":1,"bbox":[120,365,1080,105]}
+{"kind":"textbox","id":"sh/87md4ra1","slide":18,"text":"在权限范围内，快速进入内部系统","textPreview":"在权限范围内，快速进入内部系统","textChars":15,"textLines":1,"bbox":[125,505,1000,50]}
+{"kind":"shape","id":"sh/t8vuxwrm","slide":18,"bbox":[120,600,240,10]}
+{"kind":"textbox","id":"sh/m5kv2hsv","slide":18,"name":"page","text":"18 / 28","textPreview":"18 / 28","textChars":7,"textLines":1,"bbox":[1660,1008,170,28]}
+{"kind":"image","id":"im/kvad4325","slide":18,"name":"","alt":"天马集团模板章节背景","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/q9cizg","slide":18,"text":"知识中心讲完后，我们看工作台。这里的定位很明确：它是已配置内部系统的统一入口，方便大家搜索和跳转；它不等于首页对话已经自动读取所有系统数据，实际可见入口和系统内权限都以当前账号为准。\n\n[Sources]\n- 内部资料：天马智擎平台系统使用说明与正式环境实测\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}
+{"kind":"slide","id":"sl/e42azq","slide":19,"title":"04 · 工作台","textShapes":10}
+{"kind":"shape","id":"sh/p4vulgre","slide":19,"name":"accent","bbox":[80,60,12,76]}
+{"kind":"textbox","id":"sh/214va1s3","slide":19,"name":"kicker","text":"04 · 工作台","textPreview":"04 · 工作台","textChars":8,"textLines":1,"bbox":[116,58,740,28]}
+{"kind":"textbox","id":"sh/32dcj698","slide":19,"name":"title","text":"工作台：内部系统的统一入口","textPreview":"工作台：内部系统的统一入口","textChars":13,"textLines":1,"bbox":[116,88,1390,64]}
+{"kind":"shape","id":"sh/d8fepgrq","slide":19,"name":"footer-line","bbox":[80,995,1760,0]}
+{"kind":"textbox","id":"sh/q54velsz","slide":19,"name":"footer","text":"天马智擎 · 内部培训","textPreview":"天马智擎 · 内部培训","textChars":11,"textLines":1,"bbox":[80,1010,460,28]}
+{"kind":"textbox","id":"sh/r6dwnq9k","slide":19,"name":"page","text":"19 / 28","textPreview":"19 / 28","textChars":7,"textLines":1,"bbox":[1690,1010,150,28]}
+{"kind":"shape","id":"sh/0b6dkvq1","slide":19,"name":"screenshot-frame","bbox":[78,182,1370,772]}
+{"kind":"shape","id":"sh/hwne9w3y","slide":19,"name":"callout-1","bbox":[1490,220,350,168]}
+{"kind":"textbox","id":"sh/gvex0rmd","slide":19,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[1516,238,58,28]}
+{"kind":"textbox","id":"sh/fu5w7mls","slide":19,"text":"通过顶部标签页进入","textPreview":"通过顶部标签页进入","textChars":9,"textLines":1,"bbox":[1516,275,296,88]}
+{"kind":"shape","id":"sh/utwfyh47","slide":19,"name":"callout-2","bbox":[1490,410,350,168]}
+{"kind":"textbox","id":"sh/pk7edw3u","slide":19,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1516,428,58,28]}
+{"kind":"textbox","id":"sh/4jyx4bm9","slide":19,"text":"搜索当前账号可见的系统","textPreview":"搜索当前账号可见的系统","textChars":11,"textLines":1,"bbox":[1516,465,296,88]}
+{"kind":"shape","id":"sh/3ipwb6lo","slide":19,"name":"callout-3","bbox":[1490,600,350,168]}
+{"kind":"textbox","id":"sh/2xwf214j","slide":19,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1516,618,58,28]}
+{"kind":"textbox","id":"sh/5o3e1c3q","slide":19,"text":"入口不同通常来自权限与配置","textPreview":"入口不同通常来自权限与配置","textChars":13,"textLines":1,"bbox":[1516,655,296,88]}
+{"kind":"image","id":"im/x8fuh4j6","slide":19,"name":"","geometry":"rect","alt":"Tianma logo","bbox":[1590,52,240,57]}
+{"kind":"image","id":"im/o36dkz2p","slide":19,"name":"","geometry":"rect","alt":"工作台：内部系统的统一入口","bbox":[92,196,1342,744]}
+{"kind":"notes","id":"nt/e42azq","slide":19,"text":"工作台用于集中进入已经配置的内部系统，可以通过搜索快速定位。不同人员看到的系统卡片可能不一样，这是账号权限和管理员配置造成的正常差异。看到入口不等于首页对话已经自动读取该系统数据，也不等于拥有系统内的全部权限。登录或权限异常请第一时间联系朝暮。\n\n[Sources]\n- 正式环境截图：13_workbench.png\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}
+{"kind":"slide","id":"sl/ctxyfq","slide":20,"title":"PART.04","textShapes":4}
+{"kind":"textbox","id":"sh/6xcru1kz","slide":20,"text":"PART.04","textPreview":"PART.04","textChars":7,"textLines":1,"bbox":[120,270,520,60]}
+{"kind":"textbox","id":"sh/7yls361k","slide":20,"name":"title","text":"放进真实业务","textPreview":"放进真实业务","textChars":6,"textLines":1,"bbox":[120,365,1080,105]}
+{"kind":"textbox","id":"sh/gnet0v21","slide":20,"text":"从“能对话”走向“能完成具体任务”","textPreview":"从“能对话”走向“能完成具体任务”","textChars":17,"textLines":1,"bbox":[125,505,1000,50]}
+{"kind":"shape","id":"sh/hona9gjm","slide":20,"bbox":[120,600,240,10]}
+{"kind":"textbox","id":"sh/ulwrylkv","slide":20,"name":"page","text":"20 / 28","textPreview":"20 / 28","textChars":7,"textLines":1,"bbox":[1660,1008,170,28]}
+{"kind":"image","id":"im/kjqp0jux","slide":20,"name":"","alt":"天马集团模板章节背景","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/ctxyfq","slide":20,"text":"会操作只是第一步，真正的价值来自把工具放进业务流程。下面用组货专家、评价分析师和数据分析三个场景，说明怎样准备输入、怎样要求输出，以及怎样把结果转成下一步行动。\n\n[Sources]\n- 内部资料：天马智擎平台系统使用说明与正式环境实测\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}
+{"kind":"slide","id":"sl/acswac","slide":21,"title":"05 · 业务应用","textShapes":18}
+{"kind":"shape","id":"sh/ob21cf6d","slide":21,"name":"accent","bbox":[80,60,12,76]}
+{"kind":"textbox","id":"sh/natk3a5s","slide":21,"name":"kicker","text":"05 · 业务应用","textPreview":"05 · 业务应用","textChars":9,"textLines":1,"bbox":[116,58,740,28]}
+{"kind":"textbox","id":"sh/m9kja5o7","slide":21,"name":"title","text":"两个专家场景：组货与评价分析","textPreview":"两个专家场景：组货与评价分析","textChars":14,"textLines":1,"bbox":[116,88,1390,64]}
+{"kind":"shape","id":"sh/wzm1gf69","slide":21,"name":"footer-line","bbox":[80,995,1760,0]}
+{"kind":"textbox","id":"sh/bydk7a5o","slide":21,"name":"footer","text":"天马智擎 · 内部培训","textPreview":"天马智擎 · 内部培训","textChars":11,"textLines":1,"bbox":[80,1010,460,28]}
+{"kind":"textbox","id":"sh/axkjepo3","slide":21,"name":"page","text":"21 / 28","textPreview":"21 / 28","textChars":7,"textLines":1,"bbox":[1690,1010,150,28]}
+{"kind":"shape","id":"sh/54v2d4nq","slide":21,"bbox":[120,250,790,590]}
+{"kind":"textbox","id":"sh/k3m1kz6l","slide":21,"text":"组货专家","textPreview":"组货专家","textChars":4,"textLines":1,"bbox":[165,292,700,60]}
+{"kind":"textbox","id":"sh/61onyxgr","slide":21,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[168,400,54,30]}
+{"kind":"textbox","id":"sh/72xo72hw","slide":21,"text":"输入：预算、人数、性别比例、品类偏好","textPreview":"输入：预算、人数、性别比例、品类偏好","textChars":18,"textLines":1,"bbox":[240,380,610,72]}
+{"kind":"textbox","id":"sh/s3q507yh","slide":21,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[168,518,54,30]}
+{"kind":"textbox","id":"sh/t4z69sz2","slide":21,"text":"输出：商品组合、数量、金额与假设","textPreview":"输出：商品组合、数量、金额与假设","textChars":16,"textLines":1,"bbox":[240,498,610,72]}
+{"kind":"textbox","id":"sh/u58n2xgn","slide":21,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[168,636,54,30]}
+{"kind":"textbox","id":"sh/f6hob2h8","slide":21,"text":"复核：预算、库存、SKU、适用人群","textPreview":"复核：预算、库存、SKU、适用人群","textChars":17,"textLines":1,"bbox":[240,616,610,72]}
+{"kind":"shape","id":"sh/g7q547yt","slide":21,"bbox":[1010,250,790,590]}
+{"kind":"textbox","id":"sh/h8z6dcze","slide":21,"text":"评价分析师","textPreview":"评价分析师","textChars":5,"textLines":1,"bbox":[1055,292,700,60]}
+{"kind":"textbox","id":"sh/a94nqdgj","slide":21,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[1058,400,54,30]}
+{"kind":"textbox","id":"sh/vad4ziho","slide":21,"text":"输入：评价范围、时间、店铺或商品","textPreview":"输入：评价范围、时间、店铺或商品","textChars":16,"textLines":1,"bbox":[1130,380,610,72]}
+{"kind":"textbox","id":"sh/f29cbatk","slide":21,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1058,518,54,30]}
+{"kind":"textbox","id":"sh/e10bi5sz","slide":21,"text":"输出：问题归类、证据、影响与优先级","textPreview":"输出：问题归类、证据、影响与优先级","textChars":17,"textLines":1,"bbox":[1130,498,610,72]}
+{"kind":"textbox","id":"sh/14rudkba","slide":21,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1058,636,54,30]}
+{"kind":"textbox","id":"sh/03itkfa5","slide":21,"text":"复核：样本范围、原始评价、原因归因","textPreview":"复核：样本范围、原始评价、原因归因","textChars":17,"textLines":1,"bbox":[1130,616,610,72]}
+{"kind":"image","id":"im/8fed4vud","slide":21,"name":"","geometry":"rect","alt":"Tianma logo","bbox":[1590,52,240,57]}
+{"kind":"notes","id":"nt/acswac","slide":21,"text":"组货专家适合在预算、人数、性别比例和品类偏好明确时生成组合方案，结果要核对金额、数量、SKU、库存和系统假设。评价分析师适合从评价数据中发现问题线索，结果应按问题类型、品牌或商品、地区和物流等维度归类，并给出证据和影响范围。两类专家都依赖输入质量，数据不足时要明确说明，不能补造事实。\n\n[Sources]\n- 内部资料：天马智擎平台系统使用说明与正式环境实测\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}
+{"kind":"slide","id":"sl/7eybap","slide":22,"title":"05 · 业务应用","textShapes":16}
+{"kind":"shape","id":"sh/0fyhcj65","slide":22,"name":"accent","bbox":[80,60,12,76]}
+{"kind":"textbox","id":"sh/zep03epk","slide":22,"name":"kicker","text":"05 · 业务应用","textPreview":"05 · 业务应用","textChars":9,"textLines":1,"bbox":[116,58,740,28]}
+{"kind":"textbox","id":"sh/edgza9oz","slide":22,"name":"title","text":"数据分析：从业务问题到行动建议","textPreview":"数据分析：从业务问题到行动建议","textChars":15,"textLines":1,"bbox":[116,88,1390,64]}
+{"kind":"shape","id":"sh/cbyh8z6t","slide":22,"name":"footer-line","bbox":[80,995,1760,0]}
+{"kind":"textbox","id":"sh/rapgzup8","slide":22,"name":"footer","text":"天马智擎 · 内部培训","textPreview":"天马智擎 · 内部培训","textChars":11,"textLines":1,"bbox":[80,1010,460,28]}
+{"kind":"textbox","id":"sh/q9wz6po3","slide":22,"name":"page","text":"22 / 28","textPreview":"22 / 28","textChars":7,"textLines":1,"bbox":[1690,1010,150,28]}
+{"kind":"shape","id":"sh/x8ridoni","slide":22,"bbox":[110,230,500,250]}
+{"kind":"textbox","id":"sh/w7ihk36d","slide":22,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[140,260,70,35]}
+{"kind":"textbox","id":"sh/a9w3etsr","slide":22,"text":"定义问题\n要支持什么决策","textPreview":"定义问题 | 要支持什么决策","textChars":12,"textLines":2,"bbox":[140,315,440,120]}
+{"kind":"shape","id":"sh/bapknetc","slide":22,"bbox":[680,230,500,250]}
+{"kind":"textbox","id":"sh/cbylgjax","slide":22,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[710,260,70,35]}
+{"kind":"textbox","id":"sh/xc72pobi","slide":22,"text":"确认口径\n对象、时间、指标、维度","textPreview":"确认口径 | 对象、时间、指标、维度","textChars":16,"textLines":2,"bbox":[710,315,440,120]}
+{"kind":"shape","id":"sh/25wja9cv","slide":22,"bbox":[1250,230,500,250]}
+{"kind":"textbox","id":"sh/n65kjetg","slide":22,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1280,260,70,35]}
+{"kind":"textbox","id":"sh/o7e1cjal","slide":22,"text":"准备数据\n字段清楚、单位一致、必要脱敏","textPreview":"准备数据 | 字段清楚、单位一致、必要脱敏","textChars":19,"textLines":2,"bbox":[1280,315,440,120]}
+{"kind":"shape","id":"sh/p8n2lob6","slide":22,"bbox":[110,570,500,250]}
+{"kind":"textbox","id":"sh/m103mdsz","slide":22,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[140,600,70,35]}
+{"kind":"textbox","id":"sh/729kvytk","slide":22,"text":"选择路径\n首页临时上传或知识中心复用","textPreview":"选择路径 | 首页临时上传或知识中心复用","textChars":18,"textLines":2,"bbox":[140,655,440,120]}
+{"kind":"shape","id":"sh/3m10nq9w","slide":22,"bbox":[680,570,500,250]}
+{"kind":"textbox","id":"sh/ilsze5sb","slide":22,"text":"05","textPreview":"05","textChars":2,"textLines":1,"bbox":[710,600,70,35]}
+{"kind":"textbox","id":"sh/5ojip0r2","slide":22,"text":"执行核验\n看证据、抽查汇总与异常","textPreview":"执行核验 | 看证据、抽查汇总与异常","textChars":16,"textLines":2,"bbox":[710,655,440,120]}
+{"kind":"shape","id":"sh/4nahgvah","slide":22,"bbox":[1250,570,500,250]}
+{"kind":"textbox","id":"sh/rql0ra98","slide":22,"text":"06","textPreview":"06","textChars":2,"textLines":1,"bbox":[1280,600,70,35]}
+{"kind":"textbox","id":"sh/qpszi58n","slide":22,"text":"形成行动\n输出建议、责任人与下一步","textPreview":"形成行动 | 输出建议、责任人与下一步","textChars":17,"textLines":2,"bbox":[1280,655,440,120]}
+{"kind":"image","id":"im/8rq98ri5","slide":22,"name":"","geometry":"rect","alt":"Tianma logo","bbox":[1590,52,240,57]}
+{"kind":"notes","id":"nt/7eybap","slide":22,"text":"数据分析不是上传表格后等一句总结，而是一条完整工作流。先明确要支持什么决策，再确认对象、时间、指标和维度；整理字段、单位与敏感信息；根据文件大小和复用需求选择上传路径；选择数据分析专家并发送任务；抽查汇总、异常和证据；最后把结论变成可执行建议，并明确责任人和下一步。\n\n[Sources]\n- 内部资料：天马智擎平台系统使用说明与正式环境实测\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}
+{"kind":"slide","id":"sl/kout6e","slide":23,"title":"05 · 业务应用","textShapes":10}
+{"kind":"shape","id":"sh/4z6d03md","slide":23,"name":"accent","bbox":[80,60,12,76]}
+{"kind":"textbox","id":"sh/3ydcryls","slide":23,"name":"kicker","text":"05 · 业务应用","textPreview":"05 · 业务应用","textChars":9,"textLines":1,"bbox":[116,58,740,28]}
+{"kind":"textbox","id":"sh/2x4vyt47","slide":23,"name":"title","text":"数据分析提问：用六要素减少返工","textPreview":"数据分析提问：用六要素减少返工","textChars":15,"textLines":1,"bbox":[116,88,1390,64]}
+{"kind":"shape","id":"sh/c36d4n2p","slide":23,"name":"footer-line","bbox":[80,995,1760,0]}
+{"kind":"textbox","id":"sh/r2xcvil4","slide":23,"name":"footer","text":"天马智擎 · 内部培训","textPreview":"天马智擎 · 内部培训","textChars":11,"textLines":1,"bbox":[80,1010,460,28]}
+{"kind":"textbox","id":"sh/q1ov2d4j","slide":23,"name":"page","text":"23 / 28","textPreview":"23 / 28","textChars":7,"textLines":1,"bbox":[1690,1010,150,28]}
+{"kind":"shape","id":"sh/1sze1s36","slide":23,"name":"screenshot-frame","bbox":[78,182,1370,772]}
+{"kind":"shape","id":"sh/2x4va9gf","slide":23,"name":"callout-1","bbox":[1490,220,350,168]}
+{"kind":"textbox","id":"sh/nidcjex0","slide":23,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[1516,238,58,28]}
+{"kind":"textbox","id":"sh/ojmdcjy5","slide":23,"text":"对象 / 范围 / 口径","textPreview":"对象 / 范围 / 口径","textChars":12,"textLines":1,"bbox":[1516,275,296,88]}
+{"kind":"shape","id":"sh/pkvelofq","slide":23,"name":"callout-2","bbox":[1490,410,350,168]}
+{"kind":"textbox","id":"sh/al4vetgb","slide":23,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1516,428,58,28]}
+{"kind":"textbox","id":"sh/bmdw7yxw","slide":23,"text":"分析任务 / 输出结构","textPreview":"分析任务 / 输出结构","textChars":11,"textLines":1,"bbox":[1516,465,296,88]}
+{"kind":"shape","id":"sh/cnmdg3eh","slide":23,"name":"callout-3","bbox":[1490,600,350,168]}
+{"kind":"textbox","id":"sh/xofe98f2","slide":23,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1516,618,58,28]}
+{"kind":"textbox","id":"sh/qpkv2pg7","slide":23,"text":"约束：引用数据，不补造数字","textPreview":"约束：引用数据，不补造数字","textChars":13,"textLines":1,"bbox":[1516,655,296,88]}
+{"kind":"image","id":"im/87y9sfu9","slide":23,"name":"","geometry":"rect","alt":"Tianma logo","bbox":[1590,52,240,57]}
+{"kind":"image","id":"im/xcra54bq","slide":23,"name":"","geometry":"rect","alt":"数据分析提问：用六要素减少返工","bbox":[92,196,1342,744]}
+{"kind":"notes","id":"nt/kout6e","slide":23,"text":"演示中的提示词把要求拆成六类：分析对象、范围、指标口径、分析任务、输出结构和限制条件。例如要求按周、区域、渠道和品类汇总，列出异常证据和人工核验项，并明确所有结论必须引用附件数据、不能补造数字。大家可以替换为自己的字段，但这六类信息尽量保留。\n\n[Sources]\n- 正式环境截图：08_data_analysis_prompt.png\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}
+{"kind":"slide","id":"sl/zextgq","slide":24,"title":"05 · 业务应用","textShapes":10}
+{"kind":"shape","id":"sh/x83il0vq","slide":24,"name":"accent","bbox":[80,60,12,76]}
+{"kind":"textbox","id":"sh/a5sja5wz","slide":24,"name":"kicker","text":"05 · 业务应用","textPreview":"05 · 业务应用","textChars":9,"textLines":1,"bbox":[116,58,740,28]}
+{"kind":"textbox","id":"sh/v610jadk","slide":24,"name":"title","text":"真实测试出现异常：正确处理比反复点击更重要","textPreview":"真实测试出现异常：正确处理比反复点击更重要","textChars":21,"textLines":1,"bbox":[116,88,1390,64]}
+{"kind":"shape","id":"sh/5w3ipkvm","slide":24,"name":"footer-line","bbox":[80,995,1760,0]}
+{"kind":"textbox","id":"sh/i9cje5wv","slide":24,"name":"footer","text":"天马智擎 · 内部培训","textPreview":"天马智擎 · 内部培训","textChars":11,"textLines":1,"bbox":[80,1010,460,28]}
+{"kind":"textbox","id":"sh/jal0nadg","slide":24,"name":"page","text":"24 / 28","textPreview":"24 / 28","textChars":7,"textLines":1,"bbox":[1690,1010,150,28]}
+{"kind":"shape","id":"sh/sze1kfed","slide":24,"name":"screenshot-frame","bbox":[78,182,1370,772]}
+{"kind":"shape","id":"sh/tsvep8be","slide":24,"name":"callout-1","bbox":[1490,220,350,168]}
+{"kind":"textbox","id":"sh/srmdgnat","slide":24,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[1516,238,58,28]}
+{"kind":"textbox","id":"sh/rqdwnit8","slide":24,"text":"先保留会话、时间和错误画面","textPreview":"先保留会话、时间和错误画面","textChars":13,"textLines":1,"bbox":[1516,275,296,88]}
+{"kind":"shape","id":"sh/6pkveds3","slide":24,"name":"callout-2","bbox":[1490,410,350,168]}
+{"kind":"textbox","id":"sh/1gvetsbq","slide":24,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1516,428,58,28]}
+{"kind":"textbox","id":"sh/gfmdkna5","slide":24,"text":"刷新、检查文件并缩小范围重试","textPreview":"刷新、检查文件并缩小范围重试","textChars":14,"textLines":1,"bbox":[1516,465,296,88]}
+{"kind":"shape","id":"sh/fedwritk","slide":24,"name":"callout-3","bbox":[1490,600,350,168]}
+{"kind":"textbox","id":"sh/et4vidsz","slide":24,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1516,618,58,28]}
+{"kind":"textbox","id":"sh/hkbuhob6","slide":24,"text":"仍失败：群内反馈或“我要吐槽”","textPreview":"仍失败：群内反馈或“我要吐槽”","textChars":15,"textLines":1,"bbox":[1516,655,296,88]}
+{"kind":"image","id":"im/d0zalw7a","slide":24,"name":"","geometry":"rect","alt":"Tianma logo","bbox":[1590,52,240,57]}
+{"kind":"image","id":"im/wvut4v6t","slide":24,"name":"","geometry":"rect","alt":"真实测试出现异常：正确处理比反复点击更重要","bbox":[92,196,1342,744]}
+{"kind":"notes","id":"nt/zextgq","slide":24,"text":"本次正式环境测试中，数据分析智能体出现了执行异常。遇到这种情况不要连续重复点击。先保留会话、发生时间和错误画面，刷新页面，检查文件格式和任务复杂度，缩小范围后重试一次；如果仍然失败，在群里反馈，或通过“我要吐槽”填写场景、步骤、期望和实际结果，便于团队复现。\n\n[Sources]\n- 正式环境截图：09_data_analysis_processing.png\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}
+{"kind":"slide","id":"sl/j0naim","slide":25,"title":"05 · 业务应用","textShapes":10}
+{"kind":"shape","id":"sh/907adcj2","slide":25,"name":"accent","bbox":[80,60,12,76]}
+{"kind":"textbox","id":"sh/mdgrih0r","slide":25,"name":"kicker","text":"05 · 业务应用","textPreview":"05 · 业务应用","textChars":9,"textLines":1,"bbox":[116,58,740,28]}
+{"kind":"textbox","id":"sh/nepsbm1c","slide":25,"name":"title","text":"怎么用好工具：三条不变的原则","textPreview":"怎么用好工具：三条不变的原则","textChars":14,"textLines":1,"bbox":[116,88,1390,64]}
+{"kind":"shape","id":"sh/x4rahwje","slide":25,"name":"footer-line","bbox":[80,995,1760,0]}
+{"kind":"textbox","id":"sh/a10rmh0n","slide":25,"name":"footer","text":"天马智擎 · 内部培训","textPreview":"天马智擎 · 内部培训","textChars":11,"textLines":1,"bbox":[80,1010,460,28]}
+{"kind":"textbox","id":"sh/b29sfm18","slide":25,"name":"page","text":"25 / 28","textPreview":"25 / 28","textChars":7,"textLines":1,"bbox":[1690,1010,150,28]}
+{"kind":"shape","id":"sh/k7itsrip","slide":25,"name":"card-1","bbox":[130,300,520,420]}
+{"kind":"shape","id":"sh/l8ralwja","slide":25,"bbox":[130,300,520,12]}
+{"kind":"textbox","id":"sh/d8ji14jy","slide":25,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[164,338,80,38]}
+{"kind":"textbox","id":"sh/c7q18z2d","slide":25,"text":"选对路径\n通用协同走日常，专业任务走专家","textPreview":"选对路径 | 通用协同走日常，专业任务走专家","textChars":20,"textLines":2,"bbox":[164,405,452,230]}
+{"kind":"shape","id":"sh/rmh0zu18","slide":25,"name":"card-2","bbox":[700,300,520,420]}
+{"kind":"shape","id":"sh/ql8j6pkn","slide":25,"bbox":[700,300,520,12]}
+{"kind":"textbox","id":"sh/1cji5oja","slide":25,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[734,338,80,38]}
+{"kind":"textbox","id":"sh/0ba1cj2p","slide":25,"text":"给足上下文\n材料、范围、口径、格式和限制写清楚","textPreview":"给足上下文 | 材料、范围、口径、格式和限制写清楚","textChars":23,"textLines":2,"bbox":[734,405,452,230]}
+{"kind":"shape","id":"sh/za103e14","slide":25,"name":"card-3","bbox":[1270,300,520,420]}
+{"kind":"shape","id":"sh/e9sja9kj","slide":25,"bbox":[1270,300,520,12]}
+{"kind":"textbox","id":"sh/hgzitk3q","slide":25,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1304,338,80,38]}
+{"kind":"textbox","id":"sh/gf6h0f2l","slide":25,"text":"守住责任边界\n重要数字、外发、审批和决策必须人工确认","textPreview":"守住责任边界 | 重要数字、外发、审批和决策必须人工确认","textChars":26,"textLines":2,"bbox":[1304,405,452,230]}
+{"kind":"image","id":"im/t4fahczm","slide":25,"name":"","geometry":"rect","alt":"Tianma logo","bbox":[1590,52,240,57]}
+{"kind":"notes","id":"nt/j0naim","slide":25,"text":"无论是日常办公、专家分析还是知识问答，都遵循三条原则。第一，先选对路径：通用协同走日常办公，专业任务走专家。第二，给足上下文：材料、范围、口径、输出格式和限制写清楚。第三，守住责任边界：AI 可能出错，没有授权的数据不会自动获得，重要数字、外部发送、审批、下单和决策必须由责任人确认。\n\n[Sources]\n- 内部资料：天马智擎平台系统使用说明与正式环境实测\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}
+{"kind":"slide","id":"sl/npx0wg","slide":26,"title":"PART.05","textShapes":4}
+{"kind":"textbox","id":"sh/ponihkre","slide":26,"text":"PART.05","textPreview":"PART.05","textChars":7,"textLines":1,"bbox":[120,270,520,60]}
+{"kind":"textbox","id":"sh/one18fqt","slide":26,"name":"title","text":"问题反馈与 Q&A","textPreview":"问题反馈与 Q&A","textChars":9,"textLines":1,"bbox":[120,365,1080,105]}
+{"kind":"textbox","id":"sh/fyl0ba9c","slide":26,"text":"让第一版在真实使用中越用越好","textPreview":"让第一版在真实使用中越用越好","textChars":14,"textLines":1,"bbox":[125,505,1000,50]}
+{"kind":"shape","id":"sh/excz258r","slide":26,"bbox":[120,600,240,10]}
+{"kind":"textbox","id":"sh/1knid0ri","slide":26,"name":"page","text":"26 / 28","textPreview":"26 / 28","textChars":7,"textLines":1,"bbox":[1660,1008,170,28]}
+{"kind":"image","id":"im/3mp4z2t0","slide":26,"name":"","alt":"天马集团模板章节背景","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/npx0wg","slide":26,"text":"最后进入反馈和答疑。V1 的价值需要在真实工作中验证：遇到问题要提供可复现信息，想到业务需求要说明痛点和期望结果，好用的地方也要告诉团队为什么有效。接下来先演示反馈入口，再集中回答常见问题。\n\n[Sources]\n- 内部资料：天马智擎平台系统使用说明与正式环境实测\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}
+{"kind":"slide","id":"sl/p0ej9u","slide":27,"title":"06 · 问题反馈","textShapes":10}
+{"kind":"shape","id":"sh/5gbahkzy","slide":27,"name":"accent","bbox":[80,60,12,76]}
+{"kind":"textbox","id":"sh/itkrmpg7","slide":27,"name":"kicker","text":"06 · 问题反馈","textPreview":"06 · 问题反馈","textChars":9,"textLines":1,"bbox":[116,58,740,28]}
+{"kind":"textbox","id":"sh/3etsfuhs","slide":27,"name":"title","text":"问题反馈：点击“我要吐槽”，到钉钉填写","textPreview":"问题反馈：点击“我要吐槽”，到钉钉填写","textChars":19,"textLines":1,"bbox":[116,88,1390,64]}
+{"kind":"shape","id":"sh/dkval4zu","slide":27,"name":"footer-line","bbox":[80,995,1760,0]}
+{"kind":"textbox","id":"sh/qhkrqpgj","slide":27,"name":"footer","text":"天马智擎 · 内部培训","textPreview":"天马智擎 · 内部培训","textChars":11,"textLines":1,"bbox":[80,1010,460,28]}
+{"kind":"textbox","id":"sh/ridsjuho","slide":27,"name":"page","text":"27 / 28","textPreview":"27 / 28","textChars":7,"textLines":1,"bbox":[1690,1010,150,28]}
+{"kind":"shape","id":"sh/0nm9wjyl","slide":27,"name":"screenshot-frame","bbox":[78,182,1370,772]}
+{"kind":"shape","id":"sh/x4ji5o3y","slide":27,"name":"callout-1","bbox":[1490,220,350,168]}
+{"kind":"textbox","id":"sh/w3ahc3md","slide":27,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[1516,238,58,28]}
+{"kind":"textbox","id":"sh/v2103yl8","slide":27,"text":"问题反馈\n场景、步骤、期望、实际、时间和截图","textPreview":"问题反馈 | 场景、步骤、期望、实际、时间和截图","textChars":22,"textLines":2,"bbox":[1516,275,296,88]}
+{"kind":"shape","id":"sh/a1szat4n","slide":27,"name":"callout-2","bbox":[1490,410,350,168]}
+{"kind":"textbox","id":"sh/583i983a","slide":27,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1516,428,58,28]}
+{"kind":"textbox","id":"sh/k7uhg3mp","slide":27,"text":"需求建议\n说明业务痛点、使用人和期望结果","textPreview":"需求建议 | 说明业务痛点、使用人和期望结果","textChars":20,"textLines":2,"bbox":[1516,465,296,88]}
+{"kind":"shape","id":"sh/j6l07yl4","slide":27,"name":"callout-3","bbox":[1490,600,350,168]}
+{"kind":"textbox","id":"sh/i5czet4j","slide":27,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1516,618,58,28]}
+{"kind":"textbox","id":"sh/1czyx4nq","slide":27,"text":"正向反馈\n说明好用在哪里、节省了什么","textPreview":"正向反馈 | 说明好用在哪里、节省了什么","textChars":18,"textLines":2,"bbox":[1516,655,296,88]}
+{"kind":"image","id":"im/loj65svu","slide":27,"name":"","geometry":"rect","alt":"Tianma logo","bbox":[1590,52,240,57]}
+{"kind":"image","id":"im/8bap07ul","slide":27,"name":"","geometry":"rect","alt":"问题反馈：点击“我要吐槽”，到钉钉填写","bbox":[92,196,1342,744]}
+{"kind":"notes","id":"nt/p0ej9u","slide":27,"text":"点击平台里的“我要吐槽”后，通常会唤起或跳转到钉钉链接填写；浏览器页面本身可能保持不变。高质量反馈要写清业务场景、使用模式或智能体、材料类型、操作步骤、期望结果、实际结果、发生时间和影响，并附脱敏截图。说明文档里暂时体验不了的功能也不用惊慌，如果想到适合实际工作的需求，同样可以填写表格。正向反馈也很重要，请告诉我们哪项能力真正节省了时间、为什么好用。\n\n[Sources]\n- 正式环境截图：18_feedback_after_click.png\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}
+{"kind":"slide","id":"sl/laiel1","slide":28,"title":"06 · 常见问题","textShapes":14}
+{"kind":"shape","id":"sh/wze54juh","slide":28,"name":"accent","bbox":[80,60,12,76]}
+{"kind":"textbox","id":"sh/vy54vytc","slide":28,"name":"kicker","text":"06 · 常见问题","textPreview":"06 · 常见问题","textChars":9,"textLines":1,"bbox":[116,58,740,28]}
+{"kind":"textbox","id":"sh/uxwn2tcr","slide":28,"name":"title","text":"Q&A：先按这张表自查","textPreview":"Q&A：先按这张表自查","textChars":11,"textLines":1,"bbox":[116,88,1390,64]}
+{"kind":"shape","id":"sh/4ne583ut","slide":28,"name":"footer-line","bbox":[80,995,1760,0]}
+{"kind":"textbox","id":"sh/3m54zyt8","slide":28,"name":"footer","text":"天马智擎 · 内部培训","textPreview":"天马智擎 · 内部培训","textChars":11,"textLines":1,"bbox":[80,1010,460,28]}
+{"kind":"textbox","id":"sh/ilwn6tcn","slide":28,"name":"page","text":"28 / 28","textPreview":"28 / 28","textChars":7,"textLines":1,"bbox":[1690,1010,150,28]}
+{"kind":"shape","id":"sh/ls3mp4bu","slide":28,"bbox":[120,220,1680,118]}
+{"kind":"textbox","id":"sh/krulwzup","slide":28,"text":"登录或权限异常","textPreview":"登录或权限异常","textChars":7,"textLines":1,"bbox":[160,247,560,58]}
+{"kind":"textbox","id":"sh/q5k3udw7","slide":28,"text":"联系朝暮","textPreview":"联系朝暮","textChars":4,"textLines":1,"bbox":[760,247,980,58]}
+{"kind":"shape","id":"sh/rqdk3ids","slide":28,"bbox":[120,350,1680,118]}
+{"kind":"textbox","id":"sh/srmlwnex","slide":28,"text":"找不到知识文件","textPreview":"找不到知识文件","textChars":7,"textLines":1,"bbox":[160,377,560,58]}
+{"kind":"textbox","id":"sh/dsv25svi","slide":28,"text":"查处理状态、空间、知识库、文件名与权限","textPreview":"查处理状态、空间、知识库、文件名与权限","textChars":19,"textLines":1,"bbox":[760,377,980,58]}
+{"kind":"shape","id":"sh/et43ydw3","slide":28,"bbox":[120,480,1680,118]}
+{"kind":"textbox","id":"sh/fudk7ido","slide":28,"text":"回答或执行异常","textPreview":"回答或执行异常","textChars":7,"textLines":1,"bbox":[160,507,560,58]}
+{"kind":"textbox","id":"sh/0vml0ne9","slide":28,"text":"刷新或缩小任务重试；仍失败再反馈","textPreview":"刷新或缩小任务重试；仍失败再反馈","textChars":16,"textLines":1,"bbox":[760,507,980,58]}
+{"kind":"shape","id":"sh/1wv29svu","slide":28,"bbox":[120,610,1680,118]}
+{"kind":"textbox","id":"sh/2x432xwf","slide":28,"text":"与同事看到的功能不同","textPreview":"与同事看到的功能不同","textChars":10,"textLines":1,"bbox":[160,637,560,58]}
+{"kind":"textbox","id":"sh/nyxkb2d0","slide":28,"text":"多为账号权限差异，属于正常情况","textPreview":"多为账号权限差异，属于正常情况","textChars":15,"textLines":1,"bbox":[760,637,980,58]}
+{"kind":"shape","id":"sh/z2xkj2ts","slide":28,"bbox":[120,740,1680,118]}
+{"kind":"textbox","id":"sh/y1ojqxs7","slide":28,"text":"有新的业务需求","textPreview":"有新的业务需求","textChars":7,"textLines":1,"bbox":[160,767,560,58]}
+{"kind":"textbox","id":"sh/lof2lcby","slide":28,"text":"通过“我要吐槽”填写场景与期望","textPreview":"通过“我要吐槽”填写场景与期望","textChars":15,"textLines":1,"bbox":[760,767,980,58]}
+{"kind":"image","id":"im/oralovq1","slide":28,"name":"","geometry":"rect","alt":"Tianma logo","bbox":[1590,52,240,57]}
+{"kind":"notes","id":"nt/laiel1","slide":28,"text":"最后进入问答。登录或权限异常联系朝暮；找不到知识文件时检查处理状态、位置、名称和权限；回答或执行异常先刷新或缩小任务重试，仍失败再反馈；与同事看到的智能体、知识库或工作台入口不同，多数是权限差异；有新的业务场景和需求，可以直接通过表格提交。现场无法确认的问题不要猜，记录后统一核实。\n\n[Sources]\n- 内部资料：天马智擎平台系统使用说明与正式环境实测\n- 视觉参考：天马集团PPT统一模板-20251119版.pptx"}

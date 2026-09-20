@@ -74,7 +74,7 @@ type UserScriptDraft = { id: string; name: string; description: string; content:
 let qpIdSeq = 1
 let usIdSeq = 1
 
-const steps = ['基础设定', '角色设定', '能力扩展', '用户剧本']
+const steps = ['基础设定', '角色设定', '能力扩展', '快捷提示词']
 const categories = ['日常办公', '通用助手', '数据与洞察', '供应链与商品', '营销与增长']
 const models = ['deepseek-v4-flash（deepseek-v4-flash）', 'Qwen3 企业主模型', 'DeepSeek 推理模型']
 const departmentOptions = ['通用', '商品部', '平台部', 'B2C线上', 'B2C线下']
@@ -241,6 +241,11 @@ function saveAgent() {
   if (!draft.name.trim()) {
     activeStep.value = 1
     notify('请输入智能体名称')
+    return
+  }
+  if (draft.name === '耶虎' && !draft.icon) {
+    activeStep.value = 4
+    notify('耶虎需要上传图标')
     return
   }
   const wasEditing = formMode.value === 'edit'
@@ -419,10 +424,10 @@ function closeScriptModal() {
 function confirmScript() {
   const name = scriptFormName.value.trim()
   const content = scriptFormContent.value.trim()
-  if (!name) { notify('请输入剧本卡片'); return }
-  if (!content) { notify('请输入剧本内容'); return }
-  if (name.length > 20) { notify('剧本卡片不超过20字'); return }
-  if (content.length > 500) { notify('剧本内容不超过500字'); return }
+  if (!name) { notify('请输入提示词卡片'); return }
+  if (!content) { notify('请输入提示词内容'); return }
+  if (name.length > 20) { notify('提示词卡片不超过20字'); return }
+  if (content.length > 500) { notify('提示词内容不超过500字'); return }
   if (scriptModalMode.value === 'edit') {
     const s = draft.userScripts.find(s => s.id === scriptEditId.value)
     if (s) { s.name = name; s.content = content }
@@ -627,39 +632,6 @@ function toggleLimited(list: string[], value: string, limit: number) {
                 <input ref="avatarInput" class="hidden" type="file" accept=".jpg,.jpeg,.png,.svg,.webp" @change="handleAvatar" />
               </div>
 
-              <div class="mt-5 grid gap-5 sm:grid-cols-2">
-                <div>
-                  <label class="block text-sm font-medium">标识<span class="ml-1 inline-flex cursor-help items-center text-zinc-400 transition-colors hover:text-zinc-600" title="聊天界面顶部展示的品牌标识"><CircleHelp :size="12" /></span></label>
-                  <div class="relative mt-2">
-                    <button type="button" class="flex h-10 w-full items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 text-sm outline-none focus:border-zinc-400" @click="logoDropdownOpen = !logoDropdownOpen">
-                      <span class="text-zinc-900">{{ draft.logo || '请选择标识' }}</span>
-                      <ChevronDown :size="16" class="text-zinc-400" />
-                    </button>
-                    <div v-if="logoDropdownOpen" class="absolute z-10 mt-1 w-full rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
-                      <div v-for="opt in logoOptions" :key="opt" class="px-3 py-2 text-sm hover:bg-zinc-50 cursor-pointer" :class="{ 'bg-zinc-100 font-medium': draft.logo === opt }" @click="selectLogoOption(opt)">{{ opt }}</div>
-                      <div class="border-t border-zinc-100 px-3 py-2">
-                        <div class="flex items-center gap-2">
-                          <input v-model="logoCustomInput" maxlength="20" class="flex-1 rounded border border-zinc-200 px-2 py-1 text-sm outline-none focus:border-zinc-400" placeholder="自定义标识" @keydown.enter.prevent="addLogoOption" />
-                          <button type="button" class="h-7 rounded bg-[#171717] px-2 text-xs text-white hover:bg-black" @click="addLogoOption">添加</button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <p class="mt-1 text-[11px] text-zinc-400">单选，可自定义选项</p>
-                </div>
-                <div>
-                  <label class="block text-sm font-medium">图标 <b class="text-red-500">*</b><span class="ml-1 inline-flex cursor-help items-center text-zinc-400 transition-colors hover:text-zinc-600" title="用于侧边栏、收藏等场景的小尺寸图标"><CircleHelp :size="12" /></span></label>
-                  <div class="mt-2 flex items-center gap-3">
-                    <button type="button" class="grid h-[44px] w-[44px] place-items-center overflow-hidden rounded-lg border border-dashed border-zinc-300 bg-[#fafafa] text-zinc-400 hover:border-zinc-400" aria-label="上传图标" @click="iconInput?.click()">
-                      <img v-if="draft.icon" :src="draft.icon" alt="图标" class="h-full w-full object-cover" />
-                      <span v-else class="flex items-center gap-1 text-xs"><ImageIcon :size="14" />图标</span>
-                    </button>
-                    <input ref="iconInput" class="hidden" type="file" accept=".jpg,.jpeg,.png,.svg,.webp" @change="handleIcon" />
-                  </div>
-                  <p class="mt-1 text-[11px] text-zinc-400">建议 1:1 正方形，64×64px 以上</p>
-                </div>
-              </div>
-
               <div class="mt-5 grid gap-4 sm:grid-cols-[1fr_80px]">
                 <label class="block text-sm font-medium">名称 <b class="text-red-500">*</b>
                   <span class="relative mt-2 block"><input v-model="draft.name" maxlength="50" class="h-10 w-full rounded-lg border border-zinc-200 px-3 pr-14 text-sm outline-none focus:border-zinc-400" placeholder="请输入智能体名称" /><small class="absolute right-3 top-3 text-zinc-300">{{ draft.name.length }}/50</small></span>
@@ -759,13 +731,40 @@ function toggleLimited(list: string[], value: string, limit: number) {
           </div>
 
           <div v-else class="min-h-[450px]">
+            <!-- 耶虎专属配置：图标和标识 -->
+            <div v-if="draft.name === '耶虎'" class="mb-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+              <h3 class="text-sm font-semibold text-zinc-700">快捷提示词配置</h3>
+              <div class="mt-3 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label class="block text-sm font-medium">图标 <b class="text-red-500">*</b><span class="ml-1 inline-flex cursor-help items-center text-zinc-400 transition-colors hover:text-zinc-600" title="用于侧边栏、收藏等场景的小尺寸图标"><CircleHelp :size="12" /></span></label>
+                  <div class="mt-2 flex items-center gap-3">
+                    <button type="button" class="grid h-[44px] w-[44px] place-items-center overflow-hidden rounded-lg border border-dashed border-zinc-300 bg-white text-zinc-400 hover:border-zinc-400" aria-label="上传图标" @click="iconInput?.click()">
+                      <img v-if="draft.icon" :src="draft.icon" alt="图标" class="h-full w-full object-cover" />
+                      <span v-else class="flex items-center gap-1 text-xs"><ImageIcon :size="14" />图标</span>
+                    </button>
+                    <input ref="iconInput" class="hidden" type="file" accept=".jpg,.jpeg,.png,.svg,.webp" @change="handleIcon" />
+                  </div>
+                  <p class="mt-1 text-[11px] text-zinc-400">支持 JPG、PNG、SVG，1:1 正方形，≥128px，≤2MB</p>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium">标识<span class="ml-1 inline-flex cursor-help items-center text-zinc-400 transition-colors hover:text-zinc-600" title="聊天界面顶部展示的品牌标识"><CircleHelp :size="12" /></span></label>
+                  <div class="mt-2">
+                    <el-select v-model="draft.logo" placeholder="请选择标识" allow-create default-first-option filterable clearable style="width: 100%">
+                      <el-option v-for="opt in logoOptions" :key="opt" :label="opt" :value="opt" />
+                    </el-select>
+                  </div>
+                  <p class="mt-1 text-[11px] text-zinc-400">单选，可自定义选项</p>
+                </div>
+              </div>
+            </div>
+
             <div class="flex items-center justify-between">
               <div>
-                <h2 class="text-lg font-semibold">用户剧本</h2>
-                <p class="mt-1 text-xs text-zinc-400">编排复杂的对话流程</p>
+                <h2 class="text-lg font-semibold">快捷提示词</h2>
+                <p class="mt-1 text-xs text-zinc-400">配置常用提示词，方便快捷调用</p>
               </div>
               <button type="button" class="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#171717] px-3 text-xs font-medium text-white hover:bg-black" @click="openAddScript">
-                <Plus class="h-3.5 w-3.5" />新建剧本
+                <Plus class="h-3.5 w-3.5" />添加提示词
               </button>
             </div>
             <div class="mt-4 space-y-2">
@@ -782,7 +781,7 @@ function toggleLimited(list: string[], value: string, limit: number) {
               <div v-if="!draft.userScripts.length" class="grid min-h-[280px] place-items-center text-center">
                 <div>
                   <FileText class="mx-auto h-12 w-12 text-zinc-300" />
-                  <p class="mt-4 text-sm text-zinc-400">暂无预设剧本，点击上方按钮添加</p>
+                  <p class="mt-4 text-sm text-zinc-400">暂无提示词，点击上方按钮添加</p>
                 </div>
               </div>
             </div>
@@ -855,21 +854,21 @@ function toggleLimited(list: string[], value: string, limit: number) {
       <div v-if="scriptModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30" @mousedown.self="closeScriptModal">
         <div class="w-full max-w-[480px] rounded-xl border border-zinc-200 bg-white shadow-2xl">
           <div class="flex items-center justify-between border-b border-zinc-100 px-6 py-4">
-            <h3 class="text-base font-semibold">{{ scriptModalMode === 'add' ? '新建' : '编辑' }}剧本</h3>
+            <h3 class="text-base font-semibold">{{ scriptModalMode === 'add' ? '添加' : '编辑' }}提示词</h3>
             <button type="button" class="grid h-8 w-8 place-items-center rounded-lg text-zinc-400 hover:bg-zinc-100" @click="closeScriptModal"><X class="h-4 w-4" /></button>
           </div>
           <div class="px-6 py-5 space-y-5">
             <label class="block">
-              <span class="text-sm font-medium">剧本卡片 <b class="text-red-500">*</b></span>
+              <span class="text-sm font-medium">提示词卡片 <b class="text-red-500">*</b></span>
               <span class="relative mt-2 block">
-                <input v-model="scriptFormName" maxlength="20" class="h-10 w-full rounded-lg border border-zinc-200 px-3 pr-14 text-sm outline-none focus:border-zinc-400" placeholder="用于在列表中快速识别该剧本" />
+                <input v-model="scriptFormName" maxlength="20" class="h-10 w-full rounded-lg border border-zinc-200 px-3 pr-14 text-sm outline-none focus:border-zinc-400" placeholder="用于在列表中快速识别该提示词" />
                 <small class="absolute right-3 top-3 text-zinc-300">{{ scriptFormName.length }}/20</small>
               </span>
             </label>
             <label class="block">
-              <span class="text-sm font-medium">剧本内容 <b class="text-red-500">*</b></span>
+              <span class="text-sm font-medium">提示词内容 <b class="text-red-500">*</b></span>
               <span class="relative mt-2 block">
-                <textarea v-model="scriptFormContent" maxlength="500" rows="6" class="w-full resize-none rounded-lg border border-zinc-200 p-3 pb-8 text-sm outline-none focus:border-zinc-400" placeholder="详细的剧本内容..." />
+                <textarea v-model="scriptFormContent" maxlength="500" rows="6" class="w-full resize-none rounded-lg border border-zinc-200 p-3 pb-8 text-sm outline-none focus:border-zinc-400" placeholder="详细的提示词内容..." />
                 <small class="absolute bottom-3 right-3 text-zinc-300">{{ scriptFormContent.length }}/500</small>
               </span>
             </label>

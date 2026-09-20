@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1400" viewBox="0 0 2000 1400">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#04112f"/><stop offset="0.55" stop-color="#0a1645"/><stop offset="1" stop-color="#22115b"/></linearGradient>
+    <linearGradient id="ai" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#155bd8"/><stop offset="1" stop-color="#5b3fcb"/></linearGradient>
+    <linearGradient id="shop" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#174f9b"/><stop offset="1" stop-color="#b34d62"/></linearGradient>
+    <filter id="shadow"><feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000" flood-opacity="0.34"/></filter>
+    <style>
+      .t{font-family:'Microsoft YaHei','Noto Sans SC',sans-serif;fill:#fff}.muted{fill:#a9c6ee}.box{fill:#0b2053;stroke:#438df4;stroke-width:2}.tech{fill:#191957;stroke:#9a6cff;stroke-width:3}.ops{fill:#10234d;stroke:#f39a5d;stroke-width:3}.line{fill:none;stroke:#5aaaf7;stroke-width:4;stroke-linecap:round}.loop{fill:none;stroke:#ff9966;stroke-width:5;stroke-linecap:round;stroke-dasharray:12 10}
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#5aaaf7"/></marker>
+    <marker id="arrow2" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#ff9966"/></marker>
+  </defs>
+  <rect width="2000" height="1400" rx="36" fill="url(#bg)"/>
+  <circle cx="1000" cy="130" r="110" fill="#4667ff" opacity="0.16"/>
+  <rect x="655" y="50" width="690" height="160" rx="36" fill="#0a1b4d" stroke="#6ecbff" stroke-width="3" filter="url(#shadow)"/>
+  <text class="t" x="1000" y="112" text-anchor="middle" font-size="25" font-weight="700">TIANMA AI BUSINESS SYSTEM</text>
+  <text class="t" x="1000" y="170" text-anchor="middle" font-size="46" font-weight="800">天马AI能力 × 电商无人店铺</text>
+
+  <path class="line" d="M1000 210 C1000 260 500 240 500 310"/>
+  <path class="line" d="M1000 210 C1000 260 1480 240 1480 310"/>
+
+  <rect x="80" y="290" width="840" height="1020" rx="34" fill="#07183e" stroke="#477cf0" stroke-width="3"/>
+  <rect x="105" y="320" width="790" height="92" rx="25" fill="url(#ai)"/>
+  <text class="t" x="500" y="378" text-anchor="middle" font-size="38" font-weight="800">主线一｜AI能力底座</text>
+
+  <rect class="tech" x="135" y="450" width="230" height="150" rx="24"/>
+  <text class="t" x="250" y="500" text-anchor="middle" font-size="28" font-weight="800">天马大模型</text>
+  <text class="muted" x="250" y="540" text-anchor="middle" font-size="19">垂类电商理解与推理</text>
+  <text class="muted" x="250" y="572" text-anchor="middle" font-size="17">知识 · 数据 · 任务编排</text>
+
+  <rect class="tech" x="385" y="450" width="230" height="150" rx="24"/>
+  <text class="t" x="500" y="500" text-anchor="middle" font-size="28" font-weight="800">天马幻绘</text>
+  <text class="muted" x="500" y="540" text-anchor="middle" font-size="19">AIGC视觉内容生成</text>
+  <text class="muted" x="500" y="572" text-anchor="middle" font-size="17">主图 · 场景 · 模特 · 营销</text>
+
+  <rect class="tech" x="635" y="450" width="230" height="150" rx="24"/>
+  <text class="t" x="750" y="500" text-anchor="middle" font-size="28" font-weight="800">天马智擎</text>
+  <text class="muted" x="750" y="540" text-anchor="middle" font-size="19">企业级AI工作台</text>
+  <text class="muted" x="750" y="572" text-anchor="middle" font-size="17">统一入口 · 数智员工协同</text>
+
+  <path class="line" marker-end="url(#arrow)" d="M250 600 C280 655 420 650 470 695"/>
+  <path class="line" marker-end="url(#arrow)" d="M500 600 L500 685"/>
+  <path class="line" marker-end="url(#arrow)" d="M750 600 C720 655 580 650 530 695"/>
+
+  <rect x="135" y="690" width="730" height="90" rx="22" fill="#143370" stroke="#61caff" stroke-width="2"/>
+  <text class="t" x="500" y="745" text-anchor="middle" font-size="31" font-weight="800">天马智擎助手 + 9位专家数智员工</text>
+
+  <g font-family="Microsoft YaHei,Noto Sans SC,sans-serif" font-size="20" font-weight="700" text-anchor="middle">
+    <rect class="box" x="135" y="815" width="225" height="100" rx="20"/><text class="t" x="248" y="875">数据分析师</text>
+    <rect class="box" x="387" y="815" width="225" height="100" rx="20"/><text class="t" x="500" y="875">组货专家</text>
+    <rect class="box" x="640" y="815" width="225" height="100" rx="20"/><text class="t" x="753" y="875">评论分析师</text>
+    <rect class="box" x="135" y="940" width="225" height="100" rx="20"/><text class="t" x="248" y="1000">营销图文设计师</text>
+    <rect class="box" x="387" y="940" width="225" height="100" rx="20"/><text class="t" x="500" y="1000">脚本大师</text>
+    <rect class="box" x="640" y="940" width="225" height="100" rx="20"/><text class="t" x="753" y="1000">销售订单分析师</text>
+    <rect class="box" x="135" y="1065" width="225" height="100" rx="20"/><text class="t" x="248" y="1125">现货销售分析师</text>
+    <rect class="box" x="387" y="1065" width="225" height="100" rx="20"/><text class="t" x="500" y="1125">全网比价助手</text>
+    <rect class="box" x="640" y="1065" width="225" height="100" rx="20"/><text class="t" x="753" y="1125">TOP款分析师</text>
+  </g>
+  <rect x="135" y="1200" width="730" height="72" rx="20" fill="#152b66"/>
+  <text class="t" x="500" y="1247" text-anchor="middle" font-size="23" font-weight="700">模型能力 × 内容生产 × 业务分析 × 流程执行</text>
+
+  <rect x="960" y="290" width="960" height="1020" rx="34" fill="#07183e" stroke="#f07c74" stroke-width="3"/>
+  <rect x="985" y="320" width="910" height="92" rx="25" fill="url(#shop)"/>
+  <text class="t" x="1440" y="378" text-anchor="middle" font-size="38" font-weight="800">主线二｜电商无人店铺</text>
+
+  <g font-family="Microsoft YaHei,Noto Sans SC,sans-serif">
+    <rect class="tech" x="1010" y="455" width="390" height="125" rx="22"/>
+    <text class="t" x="1040" y="500" font-size="25" font-weight="800">01 市场分析与趋势预测</text>
+    <text class="muted" x="1040" y="540" font-size="18">数据分析师 · 未来1—2季需求判断</text>
+    <rect class="tech" x="1480" y="455" width="390" height="125" rx="22"/>
+    <text class="t" x="1510" y="500" font-size="25" font-weight="800">02 智能选品与组货</text>
+    <text class="muted" x="1510" y="540" font-size="18">期货 · 现货 · 毛利 · 售罄 · 比价</text>
+
+    <rect class="box" x="1010" y="625" width="390" height="125" rx="22"/>
+    <text class="t" x="1040" y="670" font-size="25" font-weight="800">03 进货、定价与入库</text>
+    <text class="muted" x="1040" y="710" font-size="18">付款 · 信息维护 · 分货 · 质检</text>
+    <rect class="tech" x="1480" y="625" width="390" height="125" rx="22"/>
+    <text class="t" x="1510" y="670" font-size="25" font-weight="800">04 自动拍摄与内容生成</text>
+    <text class="muted" x="1510" y="710" font-size="18">自动拍照机 · 天马幻绘 · 自动上传</text>
+
+    <rect class="tech" x="1010" y="795" width="390" height="125" rx="22"/>
+    <text class="t" x="1040" y="840" font-size="25" font-weight="800">05 自动化上架</text>
+    <text class="muted" x="1040" y="880" font-size="18">平台 · 类目 · SKU · 属性 · 价格</text>
+    <rect class="ops" x="1480" y="795" width="390" height="125" rx="22"/>
+    <text class="t" x="1510" y="840" font-size="25" font-weight="800">06 智能运营</text>
+    <text class="muted" x="1510" y="880" font-size="18">货品 · 人群 · 营销 · 经营分析</text>
+
+    <rect class="tech" x="1010" y="965" width="390" height="125" rx="22"/>
+    <text class="t" x="1040" y="1010" font-size="25" font-weight="800">07 智能投流与数字人直播</text>
+    <text class="muted" x="1040" y="1050" font-size="18">付费流量 · 场域资源 · 内容转化</text>
+    <rect class="tech" x="1480" y="965" width="390" height="125" rx="22"/>
+    <text class="t" x="1510" y="1010" font-size="25" font-weight="800">08 自动调拨与仓储物流</text>
+    <text class="muted" x="1510" y="1050" font-size="18">库存调控 · 找货 · 打包 · 发货</text>
+
+    <rect class="tech" x="1010" y="1135" width="390" height="125" rx="22"/>
+    <text class="t" x="1040" y="1180" font-size="25" font-weight="800">09 智能客服与售后</text>
+    <text class="muted" x="1040" y="1220" font-size="18">售前 · 售中 · 售后 · 逆向物流</text>
+    <rect class="ops" x="1480" y="1135" width="390" height="125" rx="22"/>
+    <text class="t" x="1510" y="1180" font-size="25" font-weight="800">10 数据回流与自主优化</text>
+    <text class="muted" x="1510" y="1220" font-size="18">经营结果反馈模型与数智员工</text>
+  </g>
+
+  <path class="line" marker-end="url(#arrow)" d="M1400 517 L1470 517"/>
+  <path class="line" marker-end="url(#arrow)" d="M1675 580 C1675 610 1205 595 1205 615"/>
+  <path class="line" marker-end="url(#arrow)" d="M1400 687 L1470 687"/>
+  <path class="line" marker-end="url(#arrow)" d="M1675 750 C1675 780 1205 765 1205 785"/>
+  <path class="line" marker-end="url(#arrow)" d="M1400 857 L1470 857"/>
+  <path class="line" marker-end="url(#arrow)" d="M1675 920 C1675 950 1205 935 1205 955"/>
+  <path class="line" marker-end="url(#arrow)" d="M1400 1027 L1470 1027"/>
+  <path class="line" marker-end="url(#arrow)" d="M1675 1090 C1675 1120 1205 1105 1205 1125"/>
+  <path class="line" marker-end="url(#arrow)" d="M1400 1197 L1470 1197"/>
+  <path class="loop" marker-end="url(#arrow2)" d="M1870 1197 C1940 1197 1940 450 1810 450"/>
+
+  <rect x="760" y="1330" width="480" height="48" rx="24" fill="#2c347b"/>
+  <text class="t" x="1000" y="1362" text-anchor="middle" font-size="21" font-weight="700">商品进去 → 生意出来 → 数据回来 → 系统更聪明</text>
+</svg>

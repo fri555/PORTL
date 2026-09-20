@@ -1,0 +1,439 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/f1hysu",
+    "id": "f1hysu",
+    "slide": 1,
+    "layoutId": "b60dcd7e-e319-466e-a8be-9d2164ecb401",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "9643019c-d05f-4034-9926-6e2dedb102c2",
+    "masterLayoutName": "Master",
+    "backgroundColor": "#FFFFFF",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1920,
+      "height": 1080
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "+mn-lt"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "b60dcd7e-e319-466e-a8be-9d2164ecb401",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "9643019c-d05f-4034-9926-6e2dedb102c2",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "9643019c-d05f-4034-9926-6e2dedb102c2",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/wvy50ja5",
+      "id": "1",
+      "name": "background",
+      "bbox": [
+        0,
+        0,
+        1920,
+        1080
+      ],
+      "geometry": "rect",
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/vu5oretk",
+      "id": "2",
+      "bbox": [
+        86,
+        324,
+        300,
+        60
+      ],
+      "geometry": "rect",
+      "text": "TIANMA",
+      "textPreview": "TIANMA",
+      "resolvedFontSize": 28,
+      "resolvedTextStyle": {
+        "fontSize": 28,
+        "typeface": "+mn-lt",
+        "color": "#211A16",
+        "bold": true,
+        "alignment": "left",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "TIANMA"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "TIANMA",
+          "resolvedTextStyle": {
+            "fontSize": 28,
+            "color": "#211A16",
+            "bold": true
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "TIANMA",
+              "fontSize": 28,
+              "color": "#211A16",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/utwny9sz",
+      "id": "3",
+      "bbox": [
+        86,
+        430,
+        620,
+        34
+      ],
+      "geometry": "rect",
+      "text": "TIANMA · INTERNAL TRAINING",
+      "textPreview": "TIANMA · INTERNAL TRAINING",
+      "resolvedFontSize": 16,
+      "resolvedTextStyle": {
+        "fontSize": 16,
+        "typeface": "+mn-lt",
+        "color": "#FF6A00",
+        "bold": true,
+        "alignment": "left",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "TIANMA · INTERNAL TRAINING"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "TIANMA · INTERNAL TRAINING",
+          "resolvedTextStyle": {
+            "fontSize": 16,
+            "color": "#FF6A00",
+            "bold": true
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "TIANMA · INTERNAL TRAINING",
+              "fontSize": 16,
+              "color": "#FF6A00",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/5076xob2",
+      "id": "4",
+      "name": "title",
+      "bbox": [
+        86,
+        505,
+        1500,
+        100
+      ],
+      "geometry": "rect",
+      "text": "天马智擎平台培训",
+      "textPreview": "天马智擎平台培训",
+      "resolvedFontSize": 72,
+      "resolvedTextStyle": {
+        "fontSize": 72,
+        "typeface": "+mn-lt",
+        "color": "#211A16",
+        "bold": true,
+        "alignment": "left",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "天马智擎平台培训"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "天马智擎平台培训",
+          "resolvedTextStyle": {
+            "fontSize": 72,
+            "color": "#211A16",
+            "bold": true
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "天马智擎平台培训",
+              "fontSize": 72,
+              "color": "#211A16",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/4zy54jah",
+      "id": "5",
+      "bbox": [
+        86,
+        635,
+        1450,
+        55
+      ],
+      "geometry": "rect",
+      "text": "会用功能 · 做对任务 · 守住边界 · 反馈共建",
+      "textPreview": "会用功能 · 做对任务 · 守住边界 · 反馈共建",
+      "resolvedFontSize": 28,
+      "resolvedTextStyle": {
+        "fontSize": 28,
+        "typeface": "+mn-lt",
+        "color": "#76675E",
+        "alignment": "left",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "会用功能 · 做对任务 · 守住边界 · 反馈共建"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "会用功能 · 做对任务 · 守住边界 · 反馈共建",
+          "resolvedTextStyle": {
+            "fontSize": 28,
+            "color": "#76675E"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "会用功能 · 做对任务 · 守住边界 · 反馈共建",
+              "fontSize": 28,
+              "color": "#76675E"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/jypovetw",
+      "id": "6",
+      "bbox": [
+        86,
+        760,
+        700,
+        32
+      ],
+      "geometry": "rect",
+      "text": "V1 内部培训版 · 1920×1080 · 2026",
+      "textPreview": "V1 内部培训版 · 1920×1080 · 2026",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "fontSize": 17,
+        "typeface": "+mn-lt",
+        "color": "#76675E",
+        "alignment": "left",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "V1 内部培训版 · 1920×1080 · 2026"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "V1 内部培训版 · 1920×1080 · 2026",
+          "resolvedTextStyle": {
+            "fontSize": 17,
+            "color": "#76675E"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "V1 内部培训版 · 1920×1080 · 2026",
+              "fontSize": 17,
+              "color": "#76675E"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ixgn29sb",
+      "id": "7",
+      "bbox": [
+        1690,
+        1030,
+        150,
+        22
+      ],
+      "geometry": "rect",
+      "text": "01 / 26",
+      "textPreview": "01 / 26",
+      "resolvedFontSize": 12,
+      "resolvedTextStyle": {
+        "fontSize": 12,
+        "typeface": "+mn-lt",
+        "color": "#76675E",
+        "alignment": "left",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "01 / 26"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "01 / 26",
+          "resolvedTextStyle": {
+            "fontSize": 12,
+            "color": "#76675E"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "01 / 26",
+              "fontSize": 12,
+              "color": "#76675E"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

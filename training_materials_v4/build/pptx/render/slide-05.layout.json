@@ -1,0 +1,358 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/omyphn",
+    "id": "omyphn",
+    "slide": 5,
+    "layoutId": "878b0f2f-3c22-4f9f-90a7-ea66b170e274",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "44110436-2366-4d1e-9b16-d2e36a443141",
+    "masterLayoutName": "Master",
+    "backgroundColor": "#FFFFFF",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1920,
+      "height": 1080
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "+mn-lt"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "878b0f2f-3c22-4f9f-90a7-ea66b170e274",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "44110436-2366-4d1e-9b16-d2e36a443141",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "44110436-2366-4d1e-9b16-d2e36a443141",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "image",
+      "scope": "slide",
+      "aid": "im/yt8batob",
+      "id": "1",
+      "bbox": [
+        0,
+        0,
+        1920,
+        1080
+      ],
+      "alt": "天马集团模板章节背景",
+      "contentType": "image/jpeg",
+      "imageFit": "cover",
+      "asset": {
+        "assetId": "123f1d7d-78e3-4d7c-a238-23459e44f46b",
+        "contentType": "image/jpeg",
+        "byteLength": 1904384
+      }
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/szmtk7yx",
+      "id": "2",
+      "bbox": [
+        120,
+        270,
+        520,
+        60
+      ],
+      "geometry": "rect",
+      "text": "PART.01",
+      "textPreview": "PART.01",
+      "resolvedFontSize": 27,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 27,
+        "typeface": "+mn-lt",
+        "color": "#FF6600",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "PART.01"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "PART.01",
+          "resolvedTextStyle": {
+            "fontSize": 27,
+            "color": "#FF6600",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "PART.01",
+              "fontSize": 27,
+              "color": "#FF6600",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/t0vatczi",
+      "id": "3",
+      "name": "title",
+      "bbox": [
+        120,
+        365,
+        1080,
+        105
+      ],
+      "geometry": "rect",
+      "text": "天马智擎首页",
+      "textPreview": "天马智擎首页",
+      "resolvedFontSize": 66,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 66,
+        "typeface": "+mn-lt",
+        "color": "#272727",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "天马智擎首页"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "天马智擎首页",
+          "resolvedTextStyle": {
+            "fontSize": 66,
+            "color": "#272727",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "天马智擎首页",
+              "fontSize": 66,
+              "color": "#272727",
+              "bold": true,
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/e1obmhg3",
+      "id": "4",
+      "bbox": [
+        125,
+        505,
+        1000,
+        50
+      ],
+      "geometry": "rect",
+      "text": "从找到入口，到把任务说清楚",
+      "textPreview": "从找到入口，到把任务说清楚",
+      "resolvedFontSize": 25,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 25,
+        "typeface": "+mn-lt",
+        "color": "#6F6F6F",
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "从找到入口，到把任务说清楚"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "从找到入口，到把任务说清楚",
+          "resolvedTextStyle": {
+            "fontSize": 25,
+            "color": "#6F6F6F",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "从找到入口，到把任务说清楚",
+              "fontSize": 25,
+              "color": "#6F6F6F",
+              "alignment": "left"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/f2xsvmho",
+      "id": "5",
+      "bbox": [
+        120,
+        600,
+        240,
+        10
+      ],
+      "geometry": "rect",
+      "fillColor": "#FF6600",
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/g36toryt",
+      "id": "6",
+      "name": "page",
+      "bbox": [
+        1660,
+        1008,
+        170,
+        28
+      ],
+      "geometry": "rect",
+      "text": "05 / 28",
+      "textPreview": "05 / 28",
+      "resolvedFontSize": 13,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 13,
+        "typeface": "+mn-lt",
+        "color": "#6F6F6F",
+        "alignment": "right",
+        "verticalAlignment": "middle",
+        "insets": {
+          "top": 4.8,
+          "right": 9.6,
+          "bottom": 4.8,
+          "left": 9.6
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "05 / 28"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "05 / 28",
+          "resolvedTextStyle": {
+            "fontSize": 13,
+            "color": "#6F6F6F",
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "05 / 28",
+              "fontSize": 13,
+              "color": "#6F6F6F",
+              "alignment": "right"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

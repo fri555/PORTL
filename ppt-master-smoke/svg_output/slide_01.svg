@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" data-pptx-page-role="cover">
+  <rect width="1280" height="720" fill="#0F172A"/>
+  <rect id="accent-rule" x="96" y="96" width="12" height="528" rx="6" fill="#38BDF8" data-pptx-role="decoration"/>
+  <g id="title-group" data-pptx-bounds="160 226 720 150">
+    <text x="160" y="290" font-family="Arial" font-size="64" font-weight="700" fill="#F8FAFC">PPT Master</text>
+    <text x="160" y="365" font-family="Arial" font-size="30" fill="#BAE6FD">Editable PowerPoint smoke test</text>
+  </g>
+  <g id="status-group" data-pptx-bounds="160 455 250 66">
+    <rect x="160" y="455" width="250" height="66" rx="16" fill="#0EA5E9"/>
+    <text x="205" y="499" font-family="Arial" font-size="24" font-weight="700" fill="#FFFFFF">Deployment OK</text>
+  </g>
+</svg>

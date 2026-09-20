@@ -1,0 +1,68 @@
+{"kind":"slide","id":"sl/y90nupkv","slide":1,"title":"天马集团PPT模板","textShapes":3}
+{"kind":"shape","id":"sh/547294r6","slide":1,"name":"标题 1","placeholder":"title","bbox":[0,0,0,0]}
+{"kind":"textbox","id":"sh/7qp4be9c","slide":1,"name":"文本框 3","text":"天马集团PPT模板","textPreview":"天马集团PPT模板","textChars":9,"textLines":1,"bbox":[80.6,174.47,876.93,132.07]}
+{"kind":"textbox","id":"sh/65g3298r","slide":1,"name":"文本框 4","text":"演讲人","textPreview":"演讲人","textChars":3,"textLines":1,"bbox":[80.6,439.27,426.67,48.33]}
+{"kind":"textbox","id":"sh/ts7md4r2","slide":1,"name":"文本框 5","text":"副标题内容","textPreview":"副标题内容","textChars":5,"textLines":1,"bbox":[80.6,316,426.67,80.67]}
+{"kind":"image","id":"im/dkb2xcfy","slide":1,"name":"图片 2","bbox":[0,0,1279.87,719.93]}
+{"kind":"image","id":"im/6lgjadw3","slide":1,"name":"图片 6","bbox":[85.33,75.33,188.6,45.27]}
+{"kind":"slide","id":"sl/hwbqtkby","slide":2,"title":"CONTENTS","textShapes":11}
+{"kind":"shape","id":"sh/q5wjelsz","slide":2,"name":"矩形 8","bbox":[632.4,148.67,531.4,13.93]}
+{"kind":"textbox","id":"sh/r65knqtk","slide":2,"name":"文本框 7","text":"CONTENTS","textPreview":"CONTENTS","textChars":8,"textLines":1,"bbox":[664.53,75.47,467.2,106.53]}
+{"kind":"textbox","id":"sh/9072xkry","slide":2,"name":"文本框 1","text":"目录内容目录内容","textPreview":"目录内容目录内容","textChars":8,"textLines":1,"bbox":[814,216.93,280.13,48.33]}
+{"kind":"textbox","id":"sh/a10jqpsj","slide":2,"name":"文本框 4","text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[708.6,196.53,91.6,80.67]}
+{"kind":"textbox","id":"sh/9wnqhczy","slide":2,"name":"文本框 10","text":"目录内容目录内容","textPreview":"目录内容目录内容","textChars":8,"textLines":1,"bbox":[814,305.73,280.13,48.33]}
+{"kind":"textbox","id":"sh/mtwrmxg7","slide":2,"name":"文本框 11","text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[708.6,285.33,91.6,80.67]}
+{"kind":"textbox","id":"sh/gbmxszmt","slide":2,"name":"文本框 24","text":"目录内容目录内容","textPreview":"目录内容目录内容","textChars":8,"textLines":1,"bbox":[814,394.53,280.13,48.33]}
+{"kind":"textbox","id":"sh/fadgzu58","slide":2,"name":"文本框 25","text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[708.6,374.13,91.6,80.67]}
+{"kind":"textbox","id":"sh/p0vy54na","slide":2,"name":"文本框 27","text":"目录内容目录内容","textPreview":"目录内容目录内容","textChars":8,"textLines":1,"bbox":[814,483.33,280.13,48.33]}
+{"kind":"textbox","id":"sh/4zmxwzmp","slide":2,"name":"文本框 28","text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[708.6,462.93,91.6,80.67]}
+{"kind":"textbox","id":"sh/x4r21kru","slide":2,"name":"文本框 5","text":"目录内容目录内容","textPreview":"目录内容目录内容","textChars":8,"textLines":1,"bbox":[814,572.13,280.13,48.33]}
+{"kind":"textbox","id":"sh/w3i1sfa9","slide":2,"name":"文本框 6","text":"05","textPreview":"05","textChars":2,"textLines":1,"bbox":[708.6,551.73,91.6,80.67]}
+{"kind":"image","id":"im/xo7il4ne","slide":2,"name":"图片 3","bbox":[0,0,1280,720]}
+{"kind":"slide","id":"sl/ofy9wn61","slide":3,"title":"PART.1","textShapes":2}
+{"kind":"shape","id":"sh/n6ls3alk","slide":3,"name":"矩形 8","bbox":[652.2,321.47,393.4,10.33]}
+{"kind":"textbox","id":"sh/m5cra54z","slide":3,"name":"文本框 7","text":"PART.1","textPreview":"PART.1","textChars":6,"textLines":1,"bbox":[658.53,227.4,403.2,125.87]}
+{"kind":"textbox","id":"sh/cza94vmx","slide":3,"name":"文本框 1","text":"章节标题","textPreview":"章节标题","textChars":4,"textLines":1,"bbox":[646.8,365.47,426.67,90.33]}
+{"kind":"image","id":"im/4repgvex","slide":3,"name":"图片 3","bbox":[0,0,1280,720]}
+{"kind":"slide","id":"sl/jyx0ra1s","slide":4,"title":"标题栏文字内容","textShapes":1}
+{"kind":"textbox","id":"sh/1cj2d8b6","slide":4,"name":"文本框 1","text":"标题栏文字内容","textPreview":"标题栏文字内容","textChars":7,"textLines":1,"bbox":[58.2,30.7,426.67,48.33]}
+{"kind":"shape","id":"sh/w72947yt","slide":4,"name":"圆角矩形 13","bbox":[42.4,35.2,11.93,40.4]}
+{"kind":"slide","id":"sl/i107q5of","slide":5,"title":"Slide 5","textShapes":0}
+{"kind":"slide","id":"sl/x8f69ofe","slide":6,"title":"PART.2","textShapes":2}
+{"kind":"shape","id":"sh/pc76hkr2","slide":6,"name":"矩形 8","bbox":[652.2,321.47,393.4,10.33]}
+{"kind":"textbox","id":"sh/oryp8fah","slide":6,"name":"文本框 7","text":"PART.2","textPreview":"PART.2","textChars":6,"textLines":1,"bbox":[646.53,227.4,403.2,125.87]}
+{"kind":"textbox","id":"sh/yhg7epsj","slide":6,"name":"文本框 1","text":"章节标题","textPreview":"章节标题","textChars":4,"textLines":1,"bbox":[646.8,365.47,426.67,90.33]}
+{"kind":"image","id":"im/6xcbq9cz","slide":6,"name":"图片 3","bbox":[0,0,991.33,720]}
+{"kind":"slide","id":"sl/gnmp4jqx","slide":7,"title":"标题栏文字内容","textShapes":1}
+{"kind":"textbox","id":"sh/cb2tkvap","slide":7,"name":"文本框 1","text":"标题栏文字内容","textPreview":"标题栏文字内容","textChars":7,"textLines":1,"bbox":[58.2,30.7,426.67,48.33]}
+{"kind":"shape","id":"sh/n6x0fqlo","slide":7,"name":"圆角矩形 13","bbox":[42.4,35.2,11.93,40.4]}
+{"kind":"slide","id":"sl/fu1gfa1s","slide":8,"title":"Slide 8","textShapes":0}
+{"kind":"slide","id":"sl/udsvah03","slide":9,"title":"PART.3","textShapes":2}
+{"kind":"shape","id":"sh/ah8nu54b","slide":9,"name":"矩形 8","bbox":[652.2,321.47,393.4,10.33]}
+{"kind":"textbox","id":"sh/bih4na5w","slide":9,"name":"文本框 7","text":"PART.3","textPreview":"PART.3","textChars":6,"textLines":1,"bbox":[658.47,227.4,379.4,125.87]}
+{"kind":"textbox","id":"sh/1cfmhgne","slide":9,"name":"文本框 1","text":"章节标题","textPreview":"章节标题","textChars":4,"textLines":1,"bbox":[646.8,365.47,426.67,90.33]}
+{"kind":"image","id":"im/faho3ad0","slide":9,"name":"图片 2","bbox":[0,0,991.33,720]}
+{"kind":"slide","id":"sl/m90b6t0r","slide":10,"title":"标题栏文字内容","textShapes":1}
+{"kind":"textbox","id":"sh/xc3mho32","slide":10,"name":"文本框 1","text":"标题栏文字内容","textPreview":"标题栏文字内容","textChars":7,"textLines":1,"bbox":[58.2,30.7,426.67,48.33]}
+{"kind":"shape","id":"sh/0bit8b2d","slide":10,"name":"圆角矩形 13","bbox":[42.4,35.2,11.93,40.4]}
+{"kind":"slide","id":"sl/jetc3ut0","slide":11,"title":"Slide 11","textShapes":0}
+{"kind":"slide","id":"sl/8f2psfyx","slide":12,"title":"PART.4","textShapes":2}
+{"kind":"shape","id":"sh/a543mx4r","slide":12,"name":"矩形 8","bbox":[652.2,321.47,393.4,10.33]}
+{"kind":"textbox","id":"sh/b6d4f2lc","slide":12,"name":"文本框 7","text":"PART.4","textPreview":"PART.4","textChars":6,"textLines":1,"bbox":[658.47,227.4,379.4,125.87]}
+{"kind":"textbox","id":"sh/1gbm9s3a","slide":12,"name":"文本框 1","text":"章节标题","textPreview":"章节标题","textChars":4,"textLines":1,"bbox":[646.8,365.47,426.67,90.33]}
+{"kind":"image","id":"im/rqdo7qls","slide":12,"name":"图片 3","bbox":[0,0,991.33,720]}
+{"kind":"slide","id":"sl/hgzapcr6","slide":13,"title":"标题栏文字内容","textShapes":1}
+{"kind":"textbox","id":"sh/q50nydsj","slide":13,"name":"文本框 1","text":"标题栏文字内容","textPreview":"标题栏文字内容","textChars":7,"textLines":1,"bbox":[58.2,30.7,426.67,48.33]}
+{"kind":"shape","id":"sh/t8fy5k3i","slide":13,"name":"圆角矩形 13","bbox":[42.4,35.2,11.93,40.4]}
+{"kind":"slide","id":"sl/6lsnupw7","slide":14,"title":"Slide 14","textShapes":0}
+{"kind":"slide","id":"sl/vaxsvy10","slide":15,"title":"PART.5","textShapes":2}
+{"kind":"shape","id":"sh/m9c3e1kn","slide":15,"name":"矩形 8","bbox":[652.2,321.47,393.4,10.33]}
+{"kind":"textbox","id":"sh/na5476l8","slide":15,"name":"文本框 7","text":"PART.5","textPreview":"PART.5","textChars":6,"textLines":1,"bbox":[658.47,227.4,379.4,125.87]}
+{"kind":"textbox","id":"sh/547mhg3m","slide":15,"name":"文本框 1","text":"章节标题","textPreview":"章节标题","textChars":4,"textLines":1,"bbox":[646.8,365.47,426.67,90.33]}
+{"kind":"image","id":"im/va1k7y9w","slide":15,"name":"图片 2","bbox":[0,0,991.33,720]}
+{"kind":"slide","id":"sl/gny5sjyp","slide":16,"title":"标题栏文字内容","textShapes":1}
+{"kind":"textbox","id":"sh/8z2h8bq1","slide":16,"name":"文本框 1","text":"标题栏文字内容","textPreview":"标题栏文字内容","textChars":7,"textLines":1,"bbox":[58.2,30.7,426.67,48.33]}
+{"kind":"shape","id":"sh/nqlg3a5k","slide":16,"name":"圆角矩形 13","bbox":[42.4,35.2,11.93,40.4]}
+{"kind":"slide","id":"sl/14bup87q","slide":17,"title":"Slide 17","textShapes":0}
+{"kind":"slide","id":"sl/y5wne50z","slide":18,"title":"THANKS","textShapes":1}
+{"kind":"textbox","id":"sh/itw3upcf","slide":18,"name":"文本框 3","text":"THANKS","textPreview":"THANKS","textChars":6,"textLines":1,"bbox":[73.73,187.8,876.93,132.07]}

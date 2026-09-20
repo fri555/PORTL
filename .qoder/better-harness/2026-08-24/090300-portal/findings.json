@@ -1,0 +1,272 @@
+{
+  "project": "天马智擎 (Tianma AI Portal)",
+  "workspace": "d:\\工作\\portal",
+  "analyzedAt": "2026-08-24T09:03:00+08:00",
+  "summary": {
+    "score": 68,
+    "grade": "B-",
+    "verdict": "项目拥有丰富的产品上下文和设计文档，前端工程化成熟，但 AI Agent 指令体系碎片化、后端缺乏 Agent 引导、安全与规范层存在明显短板。"
+  },
+  "categories": [
+    {
+      "name": "Agent 指令与规范",
+      "score": 45,
+      "findings": [
+        {
+          "id": "A1",
+          "title": "缺少根级 AGENTS.md 统一跨工具约定",
+          "severity": "high",
+          "description": "项目无 AGENTS.md 或 .cursorrules，AI Agent 跨工具工作时缺少统一的编码约定、命名规范和架构约束。当前 .claude/agent.md 仅覆盖测试流程，不承载通用规范。",
+          "impact": "不同 AI 工具（Claude、Cursor、Copilot）各自推断约定，产出风格不一致。",
+          "recommendation": "在项目根目录创建 AGENTS.md，集中声明：技术栈、目录职责、命名规范、提交约定、禁止事项。"
+        },
+        {
+          "id": "A2",
+          "title": "后端无 Agent 指令文件",
+          "severity": "high",
+          "description": "backend/ 目录完全没有 Agent 引导文件。AI 处理后端代码时只能依赖代码推断，缺少 API 设计约定、数据库规范、认证流程等关键上下文。",
+          "impact": "后端代码修改质量不可控，容易引入不符合项目架构的变更。",
+          "recommendation": "在 backend/ 下添加 AGENTS.md，说明 FastAPI 路由约定、Pydantic schema 规范、数据库迁移流程和环境变量管理。"
+        },
+        {
+          "id": "A3",
+          "title": ".claude/settings.json 权限列表为硬编码调试残留",
+          "severity": "medium",
+          "description": "当前 settings.json 中的 allow 列表包含特定调试路径（/tmp/PORTL、localhost:5176），属于开发过程中的临时授权，不应作为持久配置。",
+          "impact": "权限配置不具通用性，其他开发者环境无法复用，且可能暴露不必要的文件系统访问。",
+          "recommendation": "清理为通用权限规则，或改用 Bash 命令模式匹配而非精确路径。"
+        }
+      ]
+    },
+    {
+      "name": "上下文与文档体系",
+      "score": 85,
+      "findings": [
+        {
+          "id": "B1",
+          "title": "CONTEXT.md 产品术语词汇表极为详尽",
+          "severity": "positive",
+          "description": "272 行的 CONTEXT.md 覆盖了完整的产品术语定义，每个概念都有明确的业务含义和 Avoid 清单。这是非常优秀的 AI 上下文引导。",
+          "impact": "AI 能准确理解产品概念边界，避免在实现中混淆术语。"
+        },
+        {
+          "id": "B2",
+          "title": "前端 DESIGN.md + PRODUCT.md 形成完整设计意图",
+          "severity": "positive",
+          "description": "DESIGN.md 定义了视觉系统（配色、字体、组件），PRODUCT.md 明确了用户画像、品牌个性和反模式。两者配合为 AI 提供了设计决策的完整上下文。",
+          "impact": "AI 生成的前端代码能保持与产品设计一致。"
+        },
+        {
+          "id": "B3",
+          "title": "DESIGN-minimax.md 外部设计分析作为参考",
+          "severity": "positive",
+          "description": "747 行的 MiniMax 设计分析文档展示了团队对设计系统方法论的深入理解，包含完整的 token 体系、组件规范和响应式策略。",
+          "impact": "为项目自身设计系统提供了可参考的方法论模板。"
+        },
+        {
+          "id": "B4",
+          "title": "docs/ 目录包含丰富的 PRD 和评审记录",
+          "severity": "positive",
+          "description": "docs/产品文档/ 下有超过 30 个 PRD 和评审文档，docs/竞品分析/ 有竞品研究，docs/基础知识/ 有技术基础文档。",
+          "impact": "AI 可以回溯产品决策历史，理解功能演进原因。"
+        },
+        {
+          "id": "B5",
+          "title": "缺少架构决策记录 (ADR)",
+          "severity": "medium",
+          "description": "项目没有 ADR (Architecture Decision Records) 目录或文件。技术选型（Vue 3 + Vite、FastAPI + SQLAlchemy、SQLite 等）的决策原因未被记录。",
+          "impact": "AI 无法理解为何选择特定技术栈，可能在建议中引入不兼容的技术方案。",
+          "recommendation": "创建 docs/adr/ 目录，记录关键技术决策及其理由。"
+        }
+      ]
+    },
+    {
+      "name": "工程化与 CI/CD",
+      "score": 70,
+      "findings": [
+        {
+          "id": "C1",
+          "title": "前端测试体系完善",
+          "severity": "positive",
+          "description": "Vitest + jsdom 环境、vue-test-utils、完整的测试脚本（功能测试→回归测试→残留检查→构建检查），design-qa.md 记录了 138 个测试全部通过。",
+          "impact": "AI 修改代码后可快速验证正确性。"
+        },
+        {
+          "id": "C2",
+          "title": "GitHub Actions 部署流水线",
+          "severity": "positive",
+          "description": "deploy-frontend.yml 实现了推送部署、定时构建和手动触发，使用 pnpm + Node 22，配置了并发控制。",
+          "impact": "代码变更可自动化部署到 GitHub Pages。"
+        },
+        {
+          "id": "C3",
+          "title": "后端缺少测试配置",
+          "severity": "high",
+          "description": "backend/tests/ 目录存在但无可见的测试文件或测试配置。requirements.txt 中没有 pytest 等测试依赖。",
+          "impact": "后端代码修改无法通过自动化测试验证，AI 修改后端代码风险高。",
+          "recommendation": "添加 pytest 依赖，编写基础测试，在 CI 中增加后端测试步骤。"
+        },
+        {
+          "id": "C4",
+          "title": "缺少 ESLint / Prettier 统一配置（前端）",
+          "severity": "medium",
+          "description": "前端有 .prettierrc 和 .prettierignore，但根目录和前端目录均无 ESLint 配置。AI 生成的代码格式和 lint 规则无法被自动校验。",
+          "impact": "代码风格一致性依赖人工检查，AI 产出可能引入格式问题。",
+          "recommendation": "添加 ESLint 配置（推荐 @antfu/eslint-config 或项目自定义规则），并在 agent.md 中声明 lint 检查步骤。"
+        },
+        {
+          "id": "C5",
+          "title": "pnpm workspace 配置存在但根目录使用 npm",
+          "severity": "low",
+          "description": "frontend-mvp/ 内有 pnpm-workspace.yaml 和 pnpm-lock.yaml，但根目录使用 package-lock.json，包管理器不统一。",
+          "impact": "依赖管理混乱，AI 可能被指导使用错误的包管理器。",
+          "recommendation": "统一使用 pnpm 作为全项目包管理器，根目录也使用 pnpm-lock.yaml。"
+        }
+      ]
+    },
+    {
+      "name": "安全与配置",
+      "score": 40,
+      "findings": [
+        {
+          "id": "D1",
+          "title": ".env.example 包含疑似真实 API Key",
+          "severity": "critical",
+          "description": "backend/.env.example 中 AI_API_KEY=sk-c50f37bbb57747a9b92b25915c9d8d97 看起来是真实密钥而非占位符。.env.example 应只包含示例值。",
+          "impact": "密钥可能已泄露到版本控制，存在安全风险。",
+          "recommendation": "立即轮换该密钥，将 .env.example 中的值替换为明确的占位符（如 sk-your-api-key-here）。"
+        },
+        {
+          "id": "D2",
+          "title": ".gitignore 未覆盖 .qoder 输出目录",
+          "severity": "low",
+          "description": ".gitignore 中没有排除 .qoder/、.superpowers/（已排除）、.workbuddy/ 等 AI 工具输出目录。",
+          "impact": "AI 工具生成的临时文件可能被意外提交。",
+          "recommendation": "在 .gitignore 中添加 .qoder/、.workbuddy/ 等 AI 工具目录。"
+        },
+        {
+          "id": "D3",
+          "title": "CORS 配置过于宽松",
+          "severity": "medium",
+          "description": "backend/app/main.py 中 allow_methods=['*'] 和 allow_headers=['*'] 在生产环境过于宽松。",
+          "impact": "安全风险，可能被利用进行跨域攻击。",
+          "recommendation": "生产环境限制允许的 methods 和 headers，使用环境变量管理 CORS 配置。"
+        }
+      ]
+    },
+    {
+      "name": "工具集成与技能",
+      "score": 65,
+      "findings": [
+        {
+          "id": "E1",
+          "title": "MCP 集成钉钉文档",
+          "severity": "positive",
+          "description": ".mcp.json 配置了钉钉文档 MCP 服务器，使用 streamable-http 协议。",
+          "impact": "AI 可以直接读写钉钉文档，提升产品文档协作效率。"
+        },
+        {
+          "id": "E2",
+          "title": "PRD 生成器技能完整",
+          "severity": "positive",
+          "description": "skills/prd-generator/ 包含完整的 SKILL.md、示例文档、输出模式和工作流定义，通过 .clawhub 管理版本。",
+          "impact": "AI 可以按标准化流程生成产品需求文档。"
+        },
+        {
+          "id": "E3",
+          "title": "Session 预算管理 (claude-headroom)",
+          "severity": "positive",
+          "description": ".claude/claude-headroom.json 实现了 session 和 weekly 两级预算监控，包含 low/mid/panic 三级告警。",
+          "impact": "有效控制 AI 使用成本，防止超出预算。"
+        },
+        {
+          "id": "E4",
+          "title": "MCP 集成范围有限",
+          "severity": "medium",
+          "description": "仅配置了钉钉文档一个 MCP 服务器。考虑到项目深度集成钉钉生态（登录、消息、待办、日历等），MCP 覆盖不足。",
+          "impact": "AI 无法直接操作钉钉的其他能力，部分工作流需手动完成。",
+          "recommendation": "评估添加钉钉待办、日历等 MCP 服务器的可行性。"
+        },
+        {
+          "id": "E5",
+          "title": "缺少代码生成/脚手架技能",
+          "severity": "low",
+          "description": "目前只有一个 prd-generator 技能，缺少前端组件生成器、API 路由生成器等面向开发的技能。",
+          "impact": "AI 在代码生成时缺少标准化模板，产出一致性依赖即时提示。",
+          "recommendation": "创建 vue-component 和 fastapi-route 等代码生成技能。"
+        }
+      ]
+    },
+    {
+      "name": "项目结构与可维护性",
+      "score": 75,
+      "findings": [
+        {
+          "id": "F1",
+          "title": "前端目录结构清晰",
+          "severity": "positive",
+          "description": "frontend-mvp/src/ 采用标准 Vue 3 项目结构：views/、components/（按功能分子目录）、composables/、stores/、services/、types/、router/。",
+          "impact": "AI 能快速定位代码位置，理解模块边界。"
+        },
+        {
+          "id": "F2",
+          "title": "Vite 插件系统承载业务逻辑",
+          "severity": "positive",
+          "description": "vite.config.ts 通过自定义插件（dwsWorkbenchPlugin、emailSummaryPlugin、todoExtractionPlugin）在开发服务器中集成业务能力。",
+          "impact": "开发环境与业务逻辑解耦，AI 修改时边界清晰。"
+        },
+        {
+          "id": "F3",
+          "title": "单 store 架构",
+          "severity": "medium",
+          "description": "stores/ 目录只有一个 app.ts，所有状态集中在单一 Pinia store。随着功能增长，这会成为维护瓶颈。",
+          "impact": "AI 修改状态逻辑时需要在大型单文件中导航，容易引入副作用。",
+          "recommendation": "按功能域拆分 store（如 auth.ts、knowledge.ts、workspace.ts），保持单一职责。"
+        },
+        {
+          "id": "F4",
+          "title": "视图文件数量多且职责混合",
+          "severity": "medium",
+          "description": "views/ 目录有 27 个视图文件，部分视图（如 HomeView.vue）可能承载过多逻辑。存在旧版本文件（HomeView.v1.old）未清理。",
+          "impact": "AI 可能被过时文件干扰，或在大型视图文件中迷失。",
+          "recommendation": "清理 .old 文件，考虑将复杂视图拆分为更小的页面组件。"
+        },
+        {
+          "id": "F5",
+          "title": "缺少 CONTRIBUTING.md",
+          "severity": "low",
+          "description": "项目没有贡献指南或开发者入门文档。AI Agent 无法快速了解开发环境搭建步骤。",
+          "impact": "新 AI 会话需要重新推断开发环境配置。",
+          "recommendation": "添加 CONTRIBUTING.md 或 README.md，包含环境搭建、常用命令和开发流程。"
+        }
+      ]
+    }
+  ],
+  "topPriorities": [
+    {
+      "rank": 1,
+      "findingId": "D1",
+      "action": "立即轮换 .env.example 中的 API Key，替换为占位符"
+    },
+    {
+      "rank": 2,
+      "findingId": "A1",
+      "action": "创建根级 AGENTS.md，统一跨工具约定"
+    },
+    {
+      "rank": 3,
+      "findingId": "A2",
+      "action": "为 backend/ 添加 Agent 指令文件"
+    },
+    {
+      "rank": 4,
+      "findingId": "C3",
+      "action": "建立后端测试体系"
+    },
+    {
+      "rank": 5,
+      "findingId": "C4",
+      "action": "添加 ESLint 配置统一代码规范"
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+.wb-layout[data-v-a5ad9c7a] { background: var(--figma-color-bg-page,#fff); flex-direction: column; width: 100%; height: 100%; min-height: 0px; display: flex; overflow: hidden; }
+.wb-layout[data-v-a5ad9c7a] > * { flex: 1 1 0%; width: 100%; height: 100%; min-height: 0px; }
+.empty-files[data-v-92475b9e] { object-fit: contain; flex-shrink: 0; display: block; }
+.sys-entry[data-v-332fa1a2] { background: rgb(255, 255, 255); width: 100%; height: 100%; overflow: auto; }
+.sys-entry__inner[data-v-332fa1a2] { box-sizing: border-box; max-width: 1118px; margin: 0px auto; padding: 24px 24px 40px; position: relative; }
+.sys-entry__header[data-v-332fa1a2] { justify-content: space-between; align-items: flex-start; gap: 16px; min-height: 54px; margin-bottom: 24px; display: flex; }
+.sys-entry__titles[data-v-332fa1a2] { flex-direction: column; gap: 6px; min-width: 0px; display: flex; }
+.sys-entry__title[data-v-332fa1a2] { font-family: var(--figma-font-body-family); color: rgb(17, 17, 17); margin: 0px; font-size: 24px; font-weight: 600; line-height: 32px; }
+.sys-entry__subtitle[data-v-332fa1a2] { font-family: var(--figma-font-body-family); color: rgb(153, 153, 153); margin: 0px; font-size: 13px; font-weight: 400; line-height: 22px; }
+.sys-entry__search[data-v-332fa1a2] { box-sizing: border-box; background: rgb(255, 255, 255); border: 1px solid rgb(234, 234, 234); border-radius: 16px; flex-shrink: 0; align-items: center; gap: 8px; width: 300px; height: 32px; margin-top: 4px; padding: 5px 12px; display: flex; }
+.sys-entry__search[data-v-332fa1a2]:focus-within { border-color: rgb(17, 17, 17); }
+.sys-entry__search-icon[data-v-332fa1a2] { flex-shrink: 0; }
+.sys-entry__search-input[data-v-332fa1a2] { min-width: 0px; height: 22px; font-family: var(--figma-font-body-family); color: rgb(17, 17, 17); background: 0px 0px; border-width: medium; border-style: none; border-color: currentcolor; border-image: none; outline: none; flex: 1 1 0%; font-size: 14px; line-height: 22px; }
+.sys-entry__search-input[data-v-332fa1a2]::placeholder { color: rgb(190, 190, 190); }
+.sys-entry__search-input[data-v-332fa1a2]::-webkit-search-cancel-button { appearance: none; }
+.sys-entry__search-clear[data-v-332fa1a2] { cursor: pointer; background: 0px 0px; border-width: medium; border-style: none; border-color: currentcolor; border-image: none; flex-shrink: 0; justify-content: center; align-items: center; width: 16px; height: 16px; padding: 0px; display: inline-flex; }
+.sys-entry__search-clear[data-v-332fa1a2]:hover .figma-icon-mask { opacity: 0.75; }
+.sys-entry__body[data-v-332fa1a2] { position: relative; }
+.sys-entry__glow[data-v-332fa1a2] { pointer-events: none; filter: blur(12px); z-index: 0; background: radial-gradient(45% 70% at 18% center, rgba(180, 200, 255, 0.28) 0%, rgba(0, 0, 0, 0) 70%), radial-gradient(40% 65% at 48% 40%, rgba(210, 180, 255, 0.18) 0%, rgba(0, 0, 0, 0) 70%), radial-gradient(35% 60% at 72% 55%, rgba(255, 210, 230, 0.14) 0%, rgba(0, 0, 0, 0) 70%); width: min(600px, 100%); height: 80px; position: absolute; top: -8px; left: 0px; }
+.sys-entry__grid[data-v-332fa1a2] { z-index: 1; grid-template-columns: repeat(3, minmax(0px, 1fr)); gap: 16px; display: grid; position: relative; }
+.sys-card[data-v-332fa1a2] { box-sizing: border-box; text-align: left; cursor: pointer; background: linear-gradient(114deg, rgb(246, 246, 246) 0%, rgba(255, 255, 255, 0) 33.84%); border: 1px solid rgb(234, 234, 234); border-radius: 12px; align-items: center; gap: 12px; width: 100%; height: 80px; min-height: 80px; padding: 17px 16px; transition: box-shadow 0.18s; display: flex; position: relative; overflow: hidden; }
+.sys-card[data-v-332fa1a2]:hover { box-shadow: rgba(0, 0, 0, 0.16) 0px 24px 20px -28px; }
+.sys-card:hover .sys-card__launch[data-v-332fa1a2] { opacity: 1; }
+.sys-card[data-v-332fa1a2]:focus-visible { outline-offset: 2px; outline: rgb(0, 102, 255) solid 2px; }
+.sys-card--disabled[data-v-332fa1a2] { opacity: 0.72; }
+.sys-card--skeleton[data-v-332fa1a2] { pointer-events: none; cursor: default; }
+.sys-card__icon[data-v-332fa1a2] { box-sizing: border-box; background: rgb(0, 127, 255); border-radius: 10px; flex-shrink: 0; justify-content: center; align-items: center; width: 40px; height: 40px; display: flex; overflow: hidden; }
+.sys-card__icon--img[data-v-332fa1a2] { background: 0px 0px; }
+.sys-card__icon-img[data-v-332fa1a2] { object-fit: contain; border-radius: 10px; width: 40px; height: 40px; display: block; }
+.sys-card__icon-text[data-v-332fa1a2] { font-family: var(--figma-font-body-family); color: rgb(255, 255, 255); white-space: nowrap; font-size: 14px; font-weight: 500; line-height: 22px; }
+.sys-card__body[data-v-332fa1a2] { flex-direction: column; flex: 1 1 0%; align-items: flex-start; gap: 2px; min-width: 0px; display: flex; }
+.sys-card__title-row[data-v-332fa1a2] { align-items: center; gap: 4px; min-width: 0px; max-width: 100%; display: flex; }
+.sys-card__title[data-v-332fa1a2] { text-overflow: ellipsis; white-space: nowrap; min-width: 0px; font-family: var(--figma-font-body-family); color: rgb(17, 17, 17); font-size: 16px; font-weight: 500; line-height: 24px; overflow: hidden; }
+.sys-card__highlight[data-v-332fa1a2] { color: rgb(0, 102, 255); font-weight: 500; }
+.sys-card__badge[data-v-332fa1a2] { color: rgb(0, 102, 255); font-family: var(--figma-font-body-family); white-space: nowrap; background: rgb(239, 246, 255); border-radius: 4px; flex-shrink: 0; justify-content: center; align-items: center; padding: 3px 5px; font-size: 12px; font-weight: 400; line-height: 12px; display: inline-flex; }
+.sys-card__desc[data-v-332fa1a2] { text-overflow: ellipsis; white-space: nowrap; max-width: 100%; font-family: var(--figma-font-body-family); color: rgb(102, 102, 102); font-size: 12px; font-weight: 400; line-height: 20px; display: block; overflow: hidden; }
+.sys-card__launch[data-v-332fa1a2] { opacity: 0; pointer-events: none; transition: opacity 0.15s; display: flex; position: absolute; top: 12px; right: 12px; }
+.sys-card__skeleton-box[data-v-332fa1a2] { background: linear-gradient(90deg, rgb(240, 240, 240) 25%, rgb(247, 247, 247) 50%, rgb(240, 240, 240) 75%) 0px 0px / 200% 100%; border-width: medium; border-style: none; border-color: currentcolor; border-image: none; animation: 1.2s ease-in-out 0s infinite normal none running sys-shimmer-332fa1a2; }
+.sys-card__skeleton-line[data-v-332fa1a2] { background: linear-gradient(90deg, rgb(240, 240, 240) 25%, rgb(247, 247, 247) 50%, rgb(240, 240, 240) 75%) 0px 0px / 200% 100%; border-radius: 4px; width: 72%; height: 12px; margin-top: 8px; animation: 1.2s ease-in-out 0s infinite normal none running sys-shimmer-332fa1a2; }
+.sys-card__skeleton-line--title[data-v-332fa1a2] { width: 48%; height: 14px; margin-top: 0px; }
+@keyframes sys-shimmer-332fa1a2 { 
+  0% { background-position: 100% 0px; }
+  100% { background-position: -100% 0px; }
+}
+.sys-entry__state[data-v-332fa1a2] { z-index: 1; text-align: center; flex-direction: column; justify-content: center; align-items: center; gap: 8px; min-height: 280px; padding: 48px 16px; display: flex; position: relative; }
+.sys-entry__state-title[data-v-332fa1a2] { font-family: var(--figma-font-body-family); color: rgb(17, 17, 17); margin: 0px; font-size: 14px; font-weight: 500; line-height: 22px; }
+.sys-entry__state-desc[data-v-332fa1a2] { font-family: var(--figma-font-body-family); color: rgb(153, 153, 153); max-width: 320px; margin: 0px; font-size: 12px; font-weight: 400; line-height: 20px; }
+.sys-entry__retry[data-v-332fa1a2] { height: 32px; font-family: var(--figma-font-body-family); color: rgb(17, 17, 17); cursor: pointer; background: rgb(255, 255, 255); border: 1px solid rgb(211, 211, 211); border-radius: 8px; margin-top: 8px; padding: 0px 16px; font-size: 14px; font-weight: 500; line-height: 22px; }
+.sys-entry__retry[data-v-332fa1a2]:hover { border-color: rgb(185, 185, 185); }
+.sys-entry__retry[data-v-332fa1a2]:focus-visible { outline-offset: 2px; outline: rgb(0, 102, 255) solid 2px; }
+@media (width <= 1100px) {
+  .sys-entry__grid[data-v-332fa1a2] { grid-template-columns: repeat(2, minmax(0px, 1fr)); }
+}
+@media (width <= 720px) {
+  .sys-entry__header[data-v-332fa1a2] { flex-direction: column; align-items: stretch; }
+  .sys-entry__search[data-v-332fa1a2] { width: 100%; margin-top: 0px; }
+  .sys-entry__grid[data-v-332fa1a2] { grid-template-columns: 1fr; }
+  .sys-card[data-v-332fa1a2] { height: auto; min-height: 80px; }
+}
