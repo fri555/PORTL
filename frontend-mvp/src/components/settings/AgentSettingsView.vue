@@ -731,33 +731,6 @@ function toggleLimited(list: string[], value: string, limit: number) {
           </div>
 
           <div v-else class="min-h-[450px]">
-            <!-- 耶虎专属配置：图标和标识 -->
-            <div v-if="draft.name === '耶虎'" class="mb-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
-              <h3 class="text-sm font-semibold text-zinc-700">快捷提示词配置</h3>
-              <div class="mt-3 grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label class="block text-sm font-medium">图标 <b class="text-red-500">*</b><span class="ml-1 inline-flex cursor-help items-center text-zinc-400 transition-colors hover:text-zinc-600" title="用于侧边栏、收藏等场景的小尺寸图标"><CircleHelp :size="12" /></span></label>
-                  <div class="mt-2 flex items-center gap-3">
-                    <button type="button" class="grid h-[44px] w-[44px] place-items-center overflow-hidden rounded-lg border border-dashed border-zinc-300 bg-white text-zinc-400 hover:border-zinc-400" aria-label="上传图标" @click="iconInput?.click()">
-                      <img v-if="draft.icon" :src="draft.icon" alt="图标" class="h-full w-full object-cover" />
-                      <span v-else class="flex items-center gap-1 text-xs"><ImageIcon :size="14" />图标</span>
-                    </button>
-                    <input ref="iconInput" class="hidden" type="file" accept=".jpg,.jpeg,.png,.svg,.webp" @change="handleIcon" />
-                  </div>
-                  <p class="mt-1 text-[11px] text-zinc-400">支持 JPG、PNG、SVG，1:1 正方形，≥128px，≤2MB</p>
-                </div>
-                <div>
-                  <label class="block text-sm font-medium">标识<span class="ml-1 inline-flex cursor-help items-center text-zinc-400 transition-colors hover:text-zinc-600" title="聊天界面顶部展示的品牌标识"><CircleHelp :size="12" /></span></label>
-                  <div class="mt-2">
-                    <el-select v-model="draft.logo" placeholder="请选择标识" allow-create default-first-option filterable clearable style="width: 100%">
-                      <el-option v-for="opt in logoOptions" :key="opt" :label="opt" :value="opt" />
-                    </el-select>
-                  </div>
-                  <p class="mt-1 text-[11px] text-zinc-400">单选，可自定义选项</p>
-                </div>
-              </div>
-            </div>
-
             <div class="flex items-center justify-between">
               <div>
                 <h2 class="text-lg font-semibold">快捷提示词</h2>
@@ -872,6 +845,29 @@ function toggleLimited(list: string[], value: string, limit: number) {
                 <small class="absolute bottom-3 right-3 text-zinc-300">{{ scriptFormContent.length }}/500</small>
               </span>
             </label>
+            <!-- 耶虎专属：图标和标识 -->
+            <div v-if="draft.name === '耶虎'" class="grid gap-4 sm:grid-cols-2 border-t border-zinc-100 pt-5">
+              <div>
+                <label class="block text-sm font-medium">图标 <b class="text-red-500">*</b><span class="ml-1 inline-flex cursor-help items-center text-zinc-400 transition-colors hover:text-zinc-600" title="用于侧边栏、收藏等场景的小尺寸图标"><CircleHelp :size="12" /></span></label>
+                <div class="mt-2 flex items-center gap-3">
+                  <button type="button" class="grid h-[44px] w-[44px] place-items-center overflow-hidden rounded-lg border border-dashed border-zinc-300 bg-white text-zinc-400 hover:border-zinc-400" aria-label="上传图标" @click="iconInput?.click()">
+                    <img v-if="draft.icon" :src="draft.icon" alt="图标" class="h-full w-full object-cover" />
+                    <span v-else class="flex items-center gap-1 text-xs"><ImageIcon :size="14" />图标</span>
+                  </button>
+                  <input ref="iconInput" class="hidden" type="file" accept=".jpg,.jpeg,.png,.svg,.webp" @change="handleIcon" />
+                </div>
+                <p class="mt-1 text-[11px] text-zinc-400">JPG/PNG/SVG，1:1，≥128px，≤2MB</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium">标识<span class="ml-1 inline-flex cursor-help items-center text-zinc-400 transition-colors hover:text-zinc-600" title="聊天界面顶部展示的品牌标识"><CircleHelp :size="12" /></span></label>
+                <div class="mt-2">
+                  <el-select v-model="draft.logo" placeholder="请选择标识" allow-create default-first-option filterable clearable style="width: 100%">
+                    <el-option v-for="opt in logoOptions" :key="opt" :label="opt" :value="opt" />
+                  </el-select>
+                </div>
+                <p class="mt-1 text-[11px] text-zinc-400">单选，可自定义选项</p>
+              </div>
+            </div>
           </div>
           <div class="flex items-center justify-end gap-3 border-t border-zinc-100 px-6 py-4">
             <button type="button" class="h-9 rounded-lg border border-zinc-200 px-5 text-sm font-medium hover:bg-zinc-50" @click="closeScriptModal">取消</button>
