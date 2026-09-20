@@ -65,7 +65,9 @@ const importInput = ref<HTMLInputElement | null>(null)
 let toastTimer: ReturnType<typeof setTimeout> | undefined
 
 type QuickPromptDraft = { id: string; title: string; content: string }
+type UserScriptDraft = { id: string; name: string; description: string; content: string }
 let qpIdSeq = 1
+let usIdSeq = 1
 
 const steps = ['基础设定', '角色设定', '能力扩展', '用户剧本']
 const categories = ['日常办公', '通用助手', '数据与洞察', '供应链与商品', '营销与增长']
@@ -102,6 +104,7 @@ const draft = reactive({
     { id: 'qp-3', title: '建日程', content: '跟「花名」约钉钉会议：「时间」开「主题」会' },
     { id: 'qp-4', title: '查知识库', content: '知识库中查下关于「关键词」的内容，并输出一份报告' },
   ] as QuickPromptDraft[],
+  userScripts: [] as UserScriptDraft[],
 })
 
 const knowledgeDocs = [
@@ -349,6 +352,54 @@ function confirmPrompt() {
 function removeQuickPrompt(id: string) {
   const idx = draft.dailyQuickPrompts.findIndex(qp => qp.id === id)
   if (idx >= 0) draft.dailyQuickPrompts.splice(idx, 1)
+}
+
+// ── 用户剧本弹窗 
+const scriptModalOpen = ref(false)
+const scriptModalMode = ref<'add' | 'edit'>('add')
+const scriptEditId = ref('')
+const scriptFormName = ref('')
+const scriptFormDesc = ref('')
+const scriptFormContent = ref('')
+
+function openAddScript() {
+  scriptModalMode.value = 'add'
+  scriptEditId.value = ''
+  scriptFormName.value = ''
+  scriptFormDesc.value = ''
+  scriptFormContent.value = ''
+  scriptModalOpen.value = true
+}
+function openEditScript(id: string) {
+  const s = draft.userScripts.find(s => s.id === id)
+  if (!s) return
+  scriptModalMode.value = 'edit'
+  scriptEditId.value = id
+  scriptFormName.value = s.name
+  scriptFormDesc.value = s.description
+  scriptFormContent.value = s.content
+  scriptModalOpen.value = true
+}
+function closeScriptModal() {
+  scriptModalOpen.value = false
+}
+function confirmScript() {
+  const name = scriptFormName.value.trim()
+  const desc = scriptFormDesc.value.trim()
+  const content = scriptFormContent.value.trim()
+  if (!name) { notify('请输入剧本名称'); return }
+  if (!content) { notify('请输入剧本内容'); return }
+  if (scriptModalMode.value === 'edit') {
+    const s = draft.userScripts.find(s => s.id === scriptEditId.value)
+    if (s) { s.name = name; s.description = desc; s.content = content }
+  } else {
+    draft.userScripts.push({ id: `us-${++usIdSeq}`, name, description: desc, content })
+  }
+  scriptModalOpen.value = false
+}
+function removeScript(id: string) {
+  const idx = draft.userScripts.findIndex(s => s.id === id)
+  if (idx >= 0) draft.userScripts.splice(idx, 1)
 }
 
 function exportConfig() {
@@ -666,8 +717,33 @@ function toggleLimited(list: string[], value: string, limit: number) {
           </div>
 
           <div v-else class="min-h-[450px]">
-            <div class="flex items-center justify-between"><div><h2 class="text-lg font-semibold">用户剧本</h2><p class="mt-1 text-xs text-zinc-400">编排复杂的对话流程</p></div><button type="button" class="inline-flex h-9 items-center gap-2 rounded-lg border border-zinc-200 px-3 text-sm font-medium" @click="notify('已新建空白剧本')"><CirclePlus class="h-4 w-4" />新建剧本</button></div>
-            <div class="grid min-h-[320px] place-items-center text-center"><div><FileText class="mx-auto h-12 w-12 text-zinc-500" /><p class="mt-4 text-sm font-semibold">暂无预设剧本</p><p class="mt-1 text-xs text-zinc-400">点击右上角“新建剧本”开始添加</p></div></div>
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-lg font-semibold">用户剧本</h2>
+                <p class="mt-1 text-xs text-zinc-400">编排复杂的对话流程</p>
+              </div>
+              <button type="button" class="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#171717] px-3 text-xs font-medium text-white hover:bg-black" @click="openAddScript">
+                <Plus class="h-3.5 w-3.5" />新建剧本
+              </button>
+            </div>
+            <div class="mt-4 space-y-2">
+              <div v-for="s in draft.userScripts" :key="s.id" class="flex items-center justify-between rounded-lg border border-zinc-200 px-4 py-3 hover:bg-zinc-50">
+                <div class="min-w-0 flex-1">
+                  <div class="text-sm font-medium text-zinc-900">{{ s.name }}</div>
+                  <div class="mt-0.5 truncate text-xs text-zinc-400">{{ s.description || '暂无描述' }}</div>
+                </div>
+                <div class="flex items-center gap-1">
+                  <button type="button" class="grid h-7 w-7 place-items-center rounded text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600" aria-label="编辑剧本" @click="openEditScript(s.id)"><Copy class="h-3.5 w-3.5" /></button>
+                  <button type="button" class="grid h-7 w-7 place-items-center rounded text-zinc-400 hover:bg-red-50 hover:text-red-500" aria-label="删除剧本" @click="removeScript(s.id)"><Trash2 class="h-3.5 w-3.5" /></button>
+                </div>
+              </div>
+              <div v-if="!draft.userScripts.length" class="grid min-h-[280px] place-items-center text-center">
+                <div>
+                  <FileText class="mx-auto h-12 w-12 text-zinc-300" />
+                  <p class="mt-4 text-sm text-zinc-400">暂无预设剧本，点击上方按钮添加</p>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -727,6 +803,45 @@ function toggleLimited(list: string[], value: string, limit: number) {
           <div class="flex items-center justify-end gap-3 border-t border-zinc-100 px-6 py-4">
             <button type="button" class="h-9 rounded-lg border border-zinc-200 px-5 text-sm font-medium hover:bg-zinc-50" @click="closePromptModal">取消</button>
             <button type="button" class="h-9 rounded-lg bg-[#171717] px-5 text-sm font-medium text-white hover:bg-black" @click="confirmPrompt">确定</button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- 用户剧本弹窗 -->
+    <Transition enter-active-class="transition duration-200" enter-from-class="opacity-0" leave-active-class="transition duration-150" leave-to-class="opacity-0">
+      <div v-if="scriptModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30" @mousedown.self="closeScriptModal">
+        <div class="w-full max-w-[480px] rounded-xl border border-zinc-200 bg-white shadow-2xl">
+          <div class="flex items-center justify-between border-b border-zinc-100 px-6 py-4">
+            <h3 class="text-base font-semibold">{{ scriptModalMode === 'add' ? '新建' : '编辑' }}剧本</h3>
+            <button type="button" class="grid h-8 w-8 place-items-center rounded-lg text-zinc-400 hover:bg-zinc-100" @click="closeScriptModal"><X class="h-4 w-4" /></button>
+          </div>
+          <div class="px-6 py-5 space-y-5">
+            <label class="block">
+              <span class="text-sm font-medium">剧本名称 <b class="text-red-500">*</b></span>
+              <span class="relative mt-2 block">
+                <input v-model="scriptFormName" maxlength="30" class="h-10 w-full rounded-lg border border-zinc-200 px-3 pr-14 text-sm outline-none focus:border-zinc-400" placeholder="用于在列表中快速识别该剧本" />
+                <small class="absolute right-3 top-3 text-zinc-300">{{ scriptFormName.length }}/30</small>
+              </span>
+            </label>
+            <label class="block">
+              <span class="text-sm font-medium">剧本描述</span>
+              <span class="relative mt-2 block">
+                <input v-model="scriptFormDesc" maxlength="100" class="h-10 w-full rounded-lg border border-zinc-200 px-3 pr-14 text-sm outline-none focus:border-zinc-400" placeholder="简要描述剧本用途" />
+                <small class="absolute right-3 top-3 text-zinc-300">{{ scriptFormDesc.length }}/100</small>
+              </span>
+            </label>
+            <label class="block">
+              <span class="text-sm font-medium">剧本内容 <b class="text-red-500">*</b></span>
+              <span class="relative mt-2 block">
+                <textarea v-model="scriptFormContent" maxlength="2000" rows="8" class="w-full resize-none rounded-lg border border-zinc-200 p-3 pb-8 text-sm outline-none focus:border-zinc-400" placeholder="详细的剧本流程内容..." />
+                <small class="absolute bottom-3 right-3 text-zinc-300">{{ scriptFormContent.length }}/2000</small>
+              </span>
+            </label>
+          </div>
+          <div class="flex items-center justify-end gap-3 border-t border-zinc-100 px-6 py-4">
+            <button type="button" class="h-9 rounded-lg border border-zinc-200 px-5 text-sm font-medium hover:bg-zinc-50" @click="closeScriptModal">取消</button>
+            <button type="button" class="h-9 rounded-lg bg-[#171717] px-5 text-sm font-medium text-white hover:bg-black" @click="confirmScript">确定</button>
           </div>
         </div>
       </div>
