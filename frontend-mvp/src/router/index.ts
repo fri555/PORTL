@@ -15,7 +15,8 @@ const routes = [
   { path: '/portals', name: 'portals', component: () => import('@/views/SystemPortalsView.vue'), meta: { title: '工作台' } },
   { path: '/dashboards', name: 'dashboards', component: () => import('@/views/DashboardView.vue'), meta: { title: '仪表盘' } },
   { path: '/knowledge', name: 'knowledge', component: () => import('@/views/KnowledgeBaseView.vue'), meta: { title: '知识中心' } },
-  { path: '/settings', name: 'settings', redirect: '/settings/usage', meta: { title: '设置' } },
+  { path: '/agent-square', name: 'agent-square', component: () => import('@/views/AgentSquareView.vue'), meta: { title: '专家市场' } },
+  { path: '/settings', name: 'settings', redirect: '/settings/agents', meta: { title: '设置' } },
   { path: '/settings/usage', name: 'settings-usage', component: SettingsInsightsView, meta: { title: '用量管理' } },
   { path: '/settings/audit', name: 'settings-audit', component: SettingsInsightsView, meta: { title: '日志管理' } },
   { path: '/settings/quota', name: 'settings-quota', redirect: '/settings/agents', meta: { title: '智能体管理' } },
@@ -23,6 +24,7 @@ const routes = [
   { path: '/settings/tools', name: 'settings-tools', redirect: '/settings/agents', meta: { title: '智能体管理' } },
   { path: '/settings/agents', name: 'settings-agents', component: SettingsManagementView, meta: { title: '智能体管理' } },
   { path: '/admin/feedback', name: 'admin-feedback', component: () => import('@/views/FeedbackAdminView.vue'), meta: { title: '建议箱' } },
+  { path: '/automation', name: 'automation', component: () => import('@/views/AutomationView.vue'), meta: { title: '自动化' } },
   { path: '/:pathMatch(.*)*', redirect: '/chat' },
 ]
 
