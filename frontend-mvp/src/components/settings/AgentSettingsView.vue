@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import {
   Check,
   ChevronDown,
@@ -14,13 +14,17 @@ import {
   MoreHorizontal,
   Plus,
   Search,
-  Send,
   Settings2,
   Trash2,
   Upload,
   WandSparkles,
   X,
 } from 'lucide-vue-next'
+import { createUsageForm, usageContentFromForm, usageFormFromContent, validateUsageForm, validateUsageInstructions, normalizeSystemTags, stripAutomaticSystemTags, USAGE_TEXT_MAX_LENGTH, USAGE_TEMPLATE } from '@/utils/agentUsage'
+import { expertDrafts, getExpertDraft, publishExpertDraft, setExpertStatus, deleteExpert, isExpertDeleted } from '@/utils/expertPrototypeStore'
+import { AGENT_CATEGORY_META, type Agent } from '@/types/agent'
+import { ElInputTag } from 'element-plus'
+import { dailyAssistant } from '@/mock/agents'
 import ResourcePermissionDialog, { type PermissionMember } from '@/components/common/ResourcePermissionDialog.vue'
 
 type AgentStatus = 'active' | 'disabled'
@@ -33,21 +37,44 @@ type AgentRow = {
   status: AgentStatus
   updatedAt: string
   avatar: string
+  usageInstructions?: string
 }
 
 type FormMode = 'create' | 'edit' | null
 
 const assetBase = `${import.meta.env.BASE_URL}assets/agents-online`
 
-const agents = reactive<AgentRow[]>([
-  { id: 'assistant', name: '耶虎', category: '日常办公', description: '耶虎智能助手，日常办公模式默认智能体，支持发消息、建待办、查日程、知识库查询等', status: 'active', updatedAt: '2026-09-17 10:00', avatar: `${assetBase}/tianma-assistant.png` },
-  { id: 'data', name: '大表姐', category: '数据与洞察', description: '输出经营报表、诊断异常指标、提供数据洞察', status: 'active', updatedAt: '2026-08-09 23:48', avatar: `${assetBase}/data-analysis.png` },
-  { id: 'assortment', name: '组货专家', category: '供应链与商品', description: '根据预算、人数、性别比例和品类需求，匹配知识库方案与商品信息，生成可执行的组货方案', status: 'active', updatedAt: '2026-08-07 20:54', avatar: `${assetBase}/assortment-expert.png` },
-  { id: 'review', name: '评价分析师', category: '数据与洞察', description: '专注于淘天京东平台店铺评价数据的智能分析与报告生成', status: 'active', updatedAt: '2026-08-09 23:28', avatar: `${assetBase}/review-analyst.png` },
-  { id: 'inspiration', name: '灵感大王', category: '营销与增长', description: '根据商品货号和平台，生成社媒种草营销文案和配图', status: 'active', updatedAt: '2026-08-07 20:55', avatar: `${assetBase}/inspiration-king.png` },
-])
+const agents = reactive<AgentRow[]>([{
+  id: dailyAssistant.id, name: dailyAssistant.name, category: '日常办公',
+  description: dailyAssistant.description, status: 'active', updatedAt: dailyAssistant.updatedAt,
+  avatar: dailyAssistant.avatarUrl, usageInstructions: dailyAssistant.usageInstructions,
+}])
 
 const formMode = ref<FormMode>(null)
+const usageError = ref('')
+const checkedUsage = ref(false)
+const checkedPublication = ref(false)
+const checkedName = ref(false)
+const checkedVersion = ref(false)
+const formRoot = ref<HTMLElement | null>(null)
+const nameInvalid = computed(() => checkedName.value && !draft.name.trim())
+const descriptionInvalid = computed(() => checkedPublication.value && (!draft.description.trim() || draft.description.length > USAGE_TEXT_MAX_LENGTH))
+const versionInvalid = computed(() => checkedVersion.value && formMode.value === 'create' && (!Number.isInteger(Number(draft.version)) || Number(draft.version) < 1))
+const usageInvalid = computed(() => {
+  const systems = normalizeSystemTags(usageForm.systems)
+  return {
+    systems: checkedUsage.value && (systems.length < 1 || systems.length > 8 || systems.some(value => value.length < 2 || value.length > 20)),
+    input: checkedUsage.value && usageForm.input.length > USAGE_TEXT_MAX_LENGTH,
+    output: checkedUsage.value && usageForm.output.length > USAGE_TEXT_MAX_LENGTH,
+    limits: checkedUsage.value && (usageForm.limits.length > USAGE_TEXT_MAX_LENGTH || (checkedPublication.value && !usageForm.limits.trim())),
+  }
+})
+async function focusInvalidField() {
+  await nextTick()
+  const field = formRoot.value?.querySelector<HTMLElement>('[aria-invalid="true"]')
+  const target = field?.matches('input,textarea,button') ? field : field?.querySelector<HTMLElement>('input,textarea,button')
+  target?.focus()
+}
 const activeStep = ref(1)
 const editingId = ref('')
 const searchInput = ref('')
@@ -74,18 +101,42 @@ type UserScriptDraft = { id: string; name: string; description: string; content:
 let qpIdSeq = 1
 let usIdSeq = 1
 
-const steps = ['基础设定', '角色设定', '能力扩展', '快捷提示词']
-const categories = ['日常办公', '通用助手', '数据与洞察', '供应链与商品', '营销与增长']
+const steps = ['基础设定', '角色设定', '能力扩展', '快捷提示词', '使用说明']
+const categories = ['通用', '商品', '直播', 'B2B', 'B2C', '门店']
+const categoryByLabel: Record<string, Agent['category']> = {
+  通用: 'finance_admin', 商品: 'supply_chain', 直播: 'marketing', B2B: 'tech_dev', B2C: 'customer_service', 门店: 'retail_ops',
+}
 const models = ['deepseek-v4-flash（deepseek-v4-flash）', 'Qwen3 企业主模型', 'DeepSeek 推理模型']
 const departmentOptions = ['通用', '商品部', '平台部', 'B2C线上', 'B2C线下']
-const systemOptions = ['DWS', '知识库', '联网', '文档', '数据平台']
+const systemOptions = ['DWS', '文档', '数据平台']
+
+const usageForm = reactive(createUsageForm())
+watch(usageForm, () => {
+  if (!checkedUsage.value) return
+  const error = validateUsageForm(usageForm, checkedPublication.value)
+  usageError.value = error?.startsWith('请至少填写') || error === '请填写「使用限制」' ? '' : error ?? ''
+}, { deep: true })
+const systemTagDelimiter = /[,，]/
+const manualUsageSystems = computed({
+  get: () => usageForm.systems,
+  set: (values: string[] | undefined) => { usageForm.systems = normalizeSystemTags(values) },
+})
+function loadUsageForm(content: string, agent?: Agent) {
+  const form = usageFormFromContent(content)
+  form.systems = stripAutomaticSystemTags(form.systems, {
+    connectedSystems: agent?.capabilities?.connectedSystems ?? draft.connectedSystems,
+    hasKnowledge: Boolean(agent?.knowledgeBaseIds.length || agent?.capabilities?.knowledgeBases?.length || agent?.capabilities?.knowledgeDocuments?.length || draft.selectedDocs.length),
+    internetEnabled: agent?.capabilities?.internetEnabled === true || draft.selectedTools.includes('Brave网络搜索'),
+  })
+  Object.assign(usageForm, form)
+}
 
 const draft = reactive({
   name: '',
-  version: 1,
-  category: '通用助手',
+  version: 1 as number | string,
+  category: '通用',
   applicableDepartments: ['通用'] as string[],
-  connectedSystems: ['知识库'] as string[],
+  connectedSystems: [] as string[],
   description: '',
   avatar: '',
   logo: '',
@@ -110,7 +161,9 @@ const draft = reactive({
     { id: 'qp-4', title: '查知识库', content: '知识库中查下关于「关键词」的内容，并输出一份报告' },
   ] as QuickPromptDraft[],
   userScripts: [] as UserScriptDraft[],
+  usageInstructions: '',
 })
+
 
 const knowledgeDocs = [
   { name: 'AM-014-天马集团车辆管理制度20260324.docx', size: '0.04', scope: '个人空间', kind: 'W' },
@@ -141,7 +194,8 @@ const defaultPrompt = `# 天马智擎 · 系统提示词
 4. **交付完整**：输出应可直接使用，不留待补全的半成品。
 5. **用户主权**：涉及取舍的决策点交还用户。`
 
-const filteredAgents = computed(() => agents.filter((agent) => {
+const allSettingsAgents = computed<AgentRow[]>(() => [...agents.filter(a => !isExpertDeleted(a.id) && !expertDrafts.value.some(e => e.id === a.id)), ...expertDrafts.value.map(a => ({ id:a.id, name:a.name, category:a.id === dailyAssistant.id ? '日常办公' : AGENT_CATEGORY_META[a.category].label, description:a.description, status: a.status === 'online' ? 'active' as const : 'disabled' as const, updatedAt:a.updatedAt.slice(0,16), avatar:a.avatarUrl, usageInstructions:a.usageInstructions }))])
+const filteredAgents = computed(() => allSettingsAgents.value.filter((agent) => {
   const keyword = appliedSearch.value.trim().toLowerCase()
   const keywordMatched = !keyword || agent.name.toLowerCase().includes(keyword)
   const categoryMatched = !categoryFilter.value || agent.category === categoryFilter.value
@@ -158,10 +212,15 @@ function notify(message: string) {
 }
 
 function resetDraft() {
+  usageError.value = ''
+  checkedUsage.value = false
+  checkedPublication.value = false
+  checkedName.value = false
+  checkedVersion.value = false
   Object.assign(draft, {
-    name: '', version: 1, category: '通用助手', description: '', avatar: '', logo: '', icon: '',
+    name: '', version: 1, category: '通用', description: '', avatar: '', logo: '', icon: '',
     publishTemplate: false,
-    applicableDepartments: ['通用'], connectedSystems: ['知识库'],
+    applicableDepartments: ['通用'], connectedSystems: [],
     model: '', react: true, chainOfThought: false, historyTurns: 20, compressionThreshold: 3000,
     longTermMemory: false, markdown: true, rolePrompt: defaultPrompt, strictKnowledge: false,
     monitoring: true, selectedDocs: [], selectedTools: [],
@@ -171,7 +230,9 @@ function resetDraft() {
       { id: `qp-${++qpIdSeq}`, title: '建日程', content: '跟「花名」约钉钉会议：「时间」开「主题」会' },
       { id: `qp-${++qpIdSeq}`, title: '查知识库', content: '知识库中查下关于「关键词」的内容，并输出一份报告' },
     ],
+    usageInstructions: USAGE_TEMPLATE,
   })
+  Object.assign(usageForm, createUsageForm())
 }
 
 function openCreate() {
@@ -183,17 +244,24 @@ function openCreate() {
 
 function openEdit(agent: AgentRow) {
   resetDraft()
+  const existingDraft = getExpertDraft(agent.id)
   Object.assign(draft, {
+    version: existingDraft?.version ?? 1,
     name: agent.name,
     category: agent.category,
     description: agent.description,
     avatar: agent.avatar,
-    model: models[0],
+    model: existingDraft?.defaultModel ?? '',
+    rolePrompt: existingDraft?.systemPrompt ?? '',
+    dailyQuickPrompts: (existingDraft?.quickPromptDefinitions ?? existingDraft?.quickCommands.map(content => ({ title: content.slice(0, 20), content })) ?? []).map(prompt => ({ ...prompt, id: `qp-${++qpIdSeq}` })),
     chainOfThought: true,
     historyTurns: 10,
     compressionThreshold: 128000,
     longTermMemory: true,
+    usageInstructions: getExpertDraft(agent.id)?.usageInstructions ?? agent.usageInstructions ?? USAGE_TEMPLATE,
   })
+  Object.assign(draft, { applicableDepartments: existingDraft?.useDepartments ?? [], connectedSystems: existingDraft?.capabilities?.connectedSystems ?? [], selectedDocs: existingDraft?.capabilities?.selectedDocumentNames ?? [], selectedTools: existingDraft?.capabilities?.selectedToolNames ?? [] })
+  loadUsageForm(draft.usageInstructions, existingDraft ?? undefined)
   formMode.value = 'edit'
   activeStep.value = 1
   editingId.value = agent.id
@@ -231,39 +299,82 @@ function applyFilters() {
 
 function nextStep() {
   if (activeStep.value === 1 && !draft.name.trim()) {
-    notify('请输入智能体名称')
+    checkedName.value = true
+    void focusInvalidField()
     return
   }
-  activeStep.value = Math.min(4, activeStep.value + 1)
+  activeStep.value = Math.min(5, activeStep.value + 1)
 }
 
 function saveAgent() {
-  if (!draft.name.trim()) {
+  checkedName.value = true
+  checkedVersion.value = true
+  checkedPublication.value = true
+  if (!draft.name.trim() || versionInvalid.value || descriptionInvalid.value) {
     activeStep.value = 1
-    notify('请输入智能体名称')
+    void focusInvalidField()
     return
   }
-  if (draft.name === '耶虎' && !draft.icon) {
-    activeStep.value = 4
-    notify('耶虎需要上传图标')
+  checkedUsage.value = true
+  draft.usageInstructions = usageContentFromForm(usageForm, {
+    id: editingId.value || undefined,
+    name: draft.name,
+    version: draft.version,
+  })
+  const validationError = validateUsageForm(usageForm) ?? validateUsageInstructions(draft.usageInstructions) ?? ''
+  const missingRequired = validationError.startsWith('请至少填写') || validationError === '请填写「使用限制」'
+  usageError.value = missingRequired ? '' : validationError
+  if (validationError) {
+    activeStep.value = 5
+    void focusInvalidField()
     return
   }
-  const wasEditing = formMode.value === 'edit'
   const existing = agents.find((agent) => agent.id === editingId.value)
   const payload = {
     name: draft.name.trim(),
     category: draft.category,
-    description: draft.description.trim() || '默认智能体',
+    description: draft.description.trim(),
+    usageInstructions: draft.usageInstructions.trim(),
     avatar: draft.avatar || `${assetBase}/tianma-assistant.png`,
     updatedAt: '2026-08-11 现在',
   }
+  const id = editingId.value || `agent-${Date.now()}`
+  const previous = getExpertDraft(id)
+  const snapshot: Agent = {
+    id, name:payload.name, description:payload.description, avatarUrl:payload.avatar,
+    category: categoryByLabel[payload.category] ?? previous?.category ?? 'finance_admin', capabilityLevel:1, developerId:'', developerName:'', developerDepartment:'',
+    status:'online', reviewStatus:'draft', systemPrompt:'', defaultModel:draft.model, welcomeMessage:'', quickCommands:[], knowledgeBaseIds:[], toolIds:[], skillIds:[], skillCount:0, toolCount:0,
+    isPublished:false, version:'1.0', totalCalls:0, avgRating:0, favoriteCount:0, createdAt:new Date().toISOString(), updatedAt:new Date().toISOString(),
+    ...previous, usageInstructions:payload.usageInstructions,
+  }
+  Object.assign(snapshot, {
+    name: payload.name, description: payload.description, avatarUrl: payload.avatar,
+    category: categoryByLabel[payload.category] ?? snapshot.category,
+    useDepartments: [...draft.applicableDepartments],
+    version: String(draft.version), updatedAt: new Date().toISOString(),
+    defaultModel: draft.model, systemPrompt: draft.rolePrompt,
+    quickCommands: draft.dailyQuickPrompts.map(prompt => prompt.content),
+    quickPromptDefinitions: draft.dailyQuickPrompts.map(({ title, content }) => ({ title, content })),
+    capabilities: {
+      ...previous?.capabilities,
+      connectedSystems: [...draft.connectedSystems],
+      selectedDocumentNames: [...draft.selectedDocs],
+      selectedToolNames: [...draft.selectedTools],
+      internetEnabled: previous && JSON.stringify(normalizeSystemTags(draft.selectedTools).sort()) === JSON.stringify(normalizeSystemTags(previous.capabilities?.selectedToolNames ?? []).sort())
+        ? previous.capabilities?.internetEnabled
+        : draft.selectedTools.includes('Brave网络搜索'),
+    },
+  })
+  const error = publishExpertDraft(snapshot)
+  if (error) { usageError.value = error; notify(error); return }
   if (existing) Object.assign(existing, payload)
-  else agents.unshift({ id: `agent-${Date.now()}`, status: 'active', ...payload })
   closeForm()
-  notify(wasEditing ? '智能体配置已保存' : '智能体已创建')
+  notify('智能体已保存，专家中心信息已更新')
 }
 
 function deleteAgent(agent: AgentRow) {
+  const error = deleteExpert(agent.id)
+  if (error) { notify(error); return }
   const index = agents.findIndex((item) => item.id === agent.id)
   if (index >= 0) agents.splice(index, 1)
   menuId.value = ''
@@ -271,11 +382,16 @@ function deleteAgent(agent: AgentRow) {
 }
 
 function toggleAgentStatus(agent: AgentRow) {
-  agent.status = agent.status === 'active' ? 'disabled' : 'active'
-  agent.updatedAt = '刚刚'
-  notify(agent.status === 'active' ? `${agent.name}已启用` : `${agent.name}已停用`)
+  const nextStatus = agent.status === 'active' ? 'disabled' : 'active'
+  if (getExpertDraft(agent.id)) {
+    const error = setExpertStatus(agent.id, nextStatus === 'active' ? 'online' : 'offline')
+    if (error) { notify(error); return }
+  } else {
+    agent.status = nextStatus
+    agent.updatedAt = '刚刚'
+  }
+  notify(agent.name + (nextStatus === 'active' ? '已启用' : '已停用'))
 }
-
 function handleAvatar(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]
   if (!file) return
@@ -458,8 +574,23 @@ function importConfig(event: Event) {
   const reader = new FileReader()
   reader.onload = () => {
     try {
-      Object.assign(draft, JSON.parse(String(reader.result)))
-      notify('配置已导入')
+      const data: unknown = JSON.parse(String(reader.result))
+      if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('invalid config')
+      const imported = data as Record<string, unknown>
+      for (const key of Object.keys(draft) as (keyof typeof draft)[]) {
+        const value = imported[key]
+        const current = draft[key]
+        if (Array.isArray(current)) {
+          if (!Array.isArray(value)) continue
+          if (['connectedSystems', 'applicableDepartments', 'selectedDocs', 'selectedTools'].includes(key) && !value.every(item => typeof item === 'string')) throw new Error('invalid list')
+          ;(draft as Record<string, unknown>)[key] = value
+        } else if (typeof value === typeof current && (typeof value !== 'number' || Number.isFinite(value))) {
+          ;(draft as Record<string, unknown>)[key] = value
+        }
+      }
+      loadUsageForm(draft.usageInstructions)
+      usageError.value = validateUsageForm(usageForm, false) ?? ''
+      notify(usageError.value || '配置已导入')
     } catch {
       notify('配置文件格式不正确')
     }
@@ -490,8 +621,8 @@ function toggleLimited(list: string[], value: string, limit: number) {
 <template>
   <div data-testid="settings-production-shell" class="h-[calc(100vh-57px)] overflow-hidden bg-[#f5f5f6] p-2 text-[#171717]">
     <template v-if="!formMode">
-      <main data-testid="settings-production-card" class="relative mx-auto h-full w-full overflow-hidden rounded-lg border border-[#ececef] bg-white px-5 pb-5 pt-5 sm:px-8">
-        <div class="flex flex-wrap items-center justify-between gap-4">
+      <main data-testid="settings-production-card" class="relative mx-auto flex h-full w-full flex-col overflow-hidden rounded-lg border border-[#ececef] bg-white px-5 pb-5 pt-5 sm:px-8">
+        <div class="flex shrink-0 flex-wrap items-center justify-between gap-4">
           <div class="flex items-center gap-4">
             <button type="button" class="grid h-5 w-5 place-items-center text-zinc-500" aria-label="展开导航">
               <ChevronLeft class="h-4 w-4 rounded-sm border border-zinc-400" />
@@ -509,7 +640,7 @@ function toggleLimited(list: string[], value: string, limit: number) {
           </div>
         </div>
 
-        <section class="mt-3 grid max-w-[684px] grid-cols-1 gap-3 sm:grid-cols-[240px_240px_60px_60px] sm:items-end sm:gap-x-6">
+        <section class="mt-3 grid shrink-0 max-w-[684px] grid-cols-1 gap-3 sm:grid-cols-[240px_240px_60px_60px] sm:items-end sm:gap-x-6">
           <label class="block text-sm font-medium">
             分类
             <span class="relative mt-2 block">
@@ -535,7 +666,7 @@ function toggleLimited(list: string[], value: string, limit: number) {
           <button type="button" class="-ml-3 h-8 rounded-lg bg-[#171717] text-sm font-medium text-white hover:bg-black" aria-label="查询智能体" @click="applyFilters">查询</button>
         </section>
 
-        <div class="mt-4 overflow-x-auto">
+        <div data-testid="settings-agent-scroll" class="mt-4 min-h-0 flex-1 overflow-auto">
           <table class="w-full min-w-[820px] table-fixed border-collapse text-left">
             <thead class="bg-[#f7f7f8] text-sm font-medium text-zinc-500">
               <tr data-testid="settings-list-head" class="h-10">
@@ -588,7 +719,7 @@ function toggleLimited(list: string[], value: string, limit: number) {
           </table>
         </div>
 
-        <div class="absolute bottom-20 left-5 right-5 flex items-center justify-between text-sm text-zinc-400 sm:left-8 sm:right-8 md:bottom-5">
+        <div class="flex shrink-0 items-center justify-between pt-4 text-sm text-zinc-400">
           <span>共 {{ filteredAgents.length }} 项，1/1</span>
           <div class="flex items-center gap-2">
             <button disabled class="grid h-8 w-8 place-items-center rounded-lg border border-zinc-100 text-zinc-300"><ChevronLeft class="h-4 w-4" /></button>
@@ -619,14 +750,14 @@ function toggleLimited(list: string[], value: string, limit: number) {
           </template>
         </div>
 
-        <section class="mx-auto mt-6 max-w-[800px]">
+        <section ref="formRoot" class="mx-auto mt-6 max-w-[800px]">
           <div v-if="activeStep === 1" class="space-y-7">
             <section>
               <h2 class="text-lg font-semibold">基础信息</h2>
               <label class="mt-3 block text-sm font-medium">智能体图标 <b class="text-red-500">*</b></label>
               <div class="mt-2 flex items-center gap-3">
                 <button type="button" class="grid h-[52px] w-[52px] place-items-center overflow-hidden rounded-xl bg-[#4aa3ff] text-white" aria-label="上传图标" @click="avatarInput?.click()">
-                  <img v-if="draft.avatar" :src="draft.avatar" alt="智能体图标" class="h-full w-full object-cover" /><Send v-else class="h-7 w-7" />
+                  <img :src="draft.avatar || `${assetBase}/tianma-assistant.png`" alt="智能体图标" class="h-full w-full object-cover" />
                 </button>
                 <p class="max-w-[510px] text-xs leading-5 text-zinc-400">支持 JPG、PNG、SVG 格式，建议1:1正方形比例，分辨率不低于128x128px，文件大小不超过2MB</p>
                 <input ref="avatarInput" class="hidden" type="file" accept=".jpg,.jpeg,.png,.svg,.webp" @change="handleAvatar" />
@@ -634,10 +765,10 @@ function toggleLimited(list: string[], value: string, limit: number) {
 
               <div class="mt-5 grid gap-4 sm:grid-cols-[1fr_80px]">
                 <label class="block text-sm font-medium">名称 <b class="text-red-500">*</b>
-                  <span class="relative mt-2 block"><input v-model="draft.name" maxlength="50" class="h-10 w-full rounded-lg border border-zinc-200 px-3 pr-14 text-sm outline-none focus:border-zinc-400" placeholder="请输入智能体名称" /><small class="absolute right-3 top-3 text-zinc-300">{{ draft.name.length }}/50</small></span>
+                  <span class="relative mt-2 block"><input v-model="draft.name" :aria-invalid="nameInvalid || undefined" :class="{ 'usage-invalid': nameInvalid }" maxlength="50" class="h-10 w-full rounded-lg border border-zinc-200 px-3 pr-14 text-sm outline-none focus:border-zinc-400" placeholder="请输入智能体名称" /><small class="absolute right-3 top-3 text-zinc-300">{{ draft.name.length }}/50</small></span>
                 </label>
                 <label class="block text-sm font-medium">版本
-                  <input v-model.number="draft.version" type="number" min="1" class="mt-2 h-10 w-full rounded-lg border border-zinc-200 px-3 text-sm outline-none" />
+                  <input v-model="draft.version" :type="formMode === 'edit' ? 'text' : 'number'" :aria-invalid="versionInvalid || undefined" :class="{ 'usage-invalid': versionInvalid }" aria-label="版本" min="1" class="mt-2 h-10 w-full rounded-lg border border-zinc-200 px-3 text-sm outline-none" />
                 </label>
               </div>
 
@@ -662,7 +793,7 @@ function toggleLimited(list: string[], value: string, limit: number) {
                 </fieldset>
               </div>
               <label class="mt-5 block text-sm font-medium">简介 <b class="text-red-500">*</b>
-                <span class="relative mt-2 block"><textarea v-model="draft.description" maxlength="200" rows="4" class="w-full resize-none rounded-lg border border-zinc-200 p-3 pb-8 text-sm outline-none focus:border-zinc-400" placeholder="简短描述它的功能..." /><small class="absolute bottom-3 right-3 text-zinc-300">{{ draft.description.length }} / 200</small></span>
+                <span class="relative mt-2 block"><textarea v-model="draft.description" :aria-invalid="descriptionInvalid || undefined" :class="{ 'usage-invalid': descriptionInvalid }" maxlength="500" rows="4" class="w-full resize-none rounded-lg border border-zinc-200 p-3 pb-8 text-sm outline-none focus:border-zinc-400" placeholder="简短描述它的功能..." /><small class="absolute bottom-3 right-3 text-zinc-300">{{ draft.description.length }} / 500</small></span>
               </label>
             </section>
 
@@ -730,7 +861,7 @@ function toggleLimited(list: string[], value: string, limit: number) {
             </section>
           </div>
 
-          <div v-else class="min-h-[450px]">
+          <div v-else-if="activeStep === 4" class="min-h-[450px]">
             <div class="flex items-center justify-between">
               <div>
                 <h2 class="text-lg font-semibold">快捷提示词</h2>
@@ -759,6 +890,23 @@ function toggleLimited(list: string[], value: string, limit: number) {
               </div>
             </div>
           </div>
+
+          <div v-else-if="activeStep === 5" class="min-h-[450px]">
+            <div class="mb-5">
+              <h2 class="text-lg font-semibold">使用说明</h2>
+            </div>
+            <div class="usage-form-fields space-y-6">
+                <div class="space-y-6">
+                  <label class="block text-sm font-medium text-zinc-700">接入系统 <span class="font-normal text-red-400">必填</span>
+                    <ElInputTag v-model="manualUsageSystems" data-testid="usage-field-systems" :aria-invalid="usageInvalid.systems || undefined" :class="{ 'usage-invalid': usageInvalid.systems }" :max="8" maxlength="20" :delimiter="systemTagDelimiter" clearable class="mt-2 w-full" placeholder="输入业务系统名称，最多 8 个" aria-label="接入系统" />
+                  </label>
+                  <label class="block text-sm font-medium text-zinc-700">输入要求 <span class="font-normal text-zinc-400">选填</span><textarea v-model="usageForm.input" data-testid="usage-field-input" :aria-invalid="usageInvalid.input || undefined" :class="{ 'usage-invalid': usageInvalid.input }" maxlength="500" rows="3" class="mt-2 w-full resize-none rounded-lg border border-zinc-200 p-3 text-sm outline-none focus:border-blue-400" placeholder="例如：需提供商品链接、日期范围和已授权文件" /><span class="mt-1 block text-right text-xs font-normal text-zinc-400">{{ usageForm.input.length }}/500</span></label>
+                  <label class="block text-sm font-medium text-zinc-700">输出形式 <span class="font-normal text-zinc-400">选填</span><textarea v-model="usageForm.output" data-testid="usage-field-output" :aria-invalid="usageInvalid.output || undefined" :class="{ 'usage-invalid': usageInvalid.output }" maxlength="500" rows="3" class="mt-2 w-full resize-none rounded-lg border border-zinc-200 p-3 text-sm outline-none focus:border-blue-400" placeholder="例如：表格、报告、清单或文件" /><span class="mt-1 block text-right text-xs font-normal text-zinc-400">{{ usageForm.output.length }}/500</span></label>
+                </div>
+                <label class="block text-sm font-medium text-zinc-700">使用限制 <b class="text-red-500">*</b><textarea v-model="usageForm.limits" data-testid="usage-field-limits" :aria-invalid="usageInvalid.limits || undefined" :class="{ 'usage-invalid': usageInvalid.limits }" maxlength="500" rows="5" class="mt-2 w-full resize-none rounded-lg border border-zinc-200 p-3 text-sm outline-none focus:border-blue-400" placeholder="请说明不支持的任务、查询维度、数据范围及使用限制。例如：不支持按链接维度查询数据；不支持未授权部门数据；不适用于实时库存决策。" /><span class="mt-1 block text-right text-xs font-normal text-zinc-400">{{ usageForm.limits.length }}/500</span></label>
+            </div>
+            <div v-if="usageError" role="alert" class="mt-3 text-xs text-red-500">{{ usageError }}</div>
+          </div>
         </section>
 
         <footer class="fixed bottom-16 left-0 right-0 z-10 mx-auto flex min-h-20 items-center justify-between bg-white/95 px-5 backdrop-blur sm:px-8 md:bottom-0">
@@ -770,8 +918,8 @@ function toggleLimited(list: string[], value: string, limit: number) {
           </div>
           <div class="flex gap-3">
             <button v-if="activeStep > 1" type="button" class="h-10 rounded-lg border border-zinc-200 px-5 text-sm font-medium hover:bg-zinc-50" @click="activeStep--">上一步</button>
-            <button v-if="activeStep < 4" type="button" class="h-10 rounded-lg bg-[#171717] px-5 text-sm font-medium text-white hover:bg-black" @click="nextStep">下一步：{{ steps[activeStep] }}</button>
-            <button v-else type="button" class="h-10 rounded-lg bg-[#171717] px-5 text-sm font-medium text-white hover:bg-black" @click="saveAgent">保存配置</button>
+            <button v-if="activeStep < 5" type="button" class="h-10 rounded-lg bg-[#171717] px-5 text-sm font-medium text-white hover:bg-black" @click="nextStep">下一步：{{ steps[activeStep] }}</button>
+            <button v-else type="button" class="h-10 rounded-lg bg-[#171717] px-5 text-sm font-medium text-white hover:bg-black" @click="saveAgent">保存</button>
           </div>
           </div>
         </footer>
@@ -878,3 +1026,16 @@ function toggleLimited(list: string[], value: string, limit: number) {
     </Transition>
   </div>
 </template>
+
+
+
+
+
+
+
+
+
+<style scoped>
+.usage-invalid { border-color: #ef4444 !important; box-shadow: 0 0 0 1px #ef4444 !important; }
+.usage-invalid:deep(.el-input-tag__wrapper) { box-shadow: 0 0 0 1px #ef4444 inset !important; }
+</style>
