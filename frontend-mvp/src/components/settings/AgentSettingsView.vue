@@ -738,7 +738,7 @@ function toggleLimited(list: string[], value: string, limit: number) {
           <strong class="font-semibold text-zinc-900">{{ pageTitle }}</strong>
         </div>
 
-        <div role="tablist" aria-label="创建步骤" class="mx-auto mt-8 flex max-w-[620px] items-center overflow-x-auto pb-1">
+        <div role="tablist" aria-label="创建步骤" class="mx-auto mt-8 flex max-w-[620px] items-center pb-1">
           <template v-for="(step, index) in steps" :key="step">
             <button role="tab" type="button" :aria-selected="activeStep === index + 1" class="flex shrink-0 items-center gap-2 text-sm" :class="activeStep === index + 1 ? 'font-semibold text-zinc-900' : index + 1 < activeStep ? 'text-zinc-600' : 'text-zinc-400'" @click="activeStep = index + 1">
               <span class="grid h-6 w-6 place-items-center rounded-full text-xs" :class="index + 1 <= activeStep ? 'bg-[#2d7bf0] text-white' : 'bg-zinc-100 text-zinc-500'">
@@ -897,7 +897,7 @@ function toggleLimited(list: string[], value: string, limit: number) {
             </div>
             <div class="usage-form-fields space-y-6">
                 <div class="space-y-6">
-                  <label class="block text-sm font-medium text-zinc-700">接入系统 <span class="font-normal text-red-400">必填</span>
+                  <label class="block text-sm font-medium text-zinc-700">接入系统 <b class="text-red-500">*</b>
                     <ElInputTag v-model="manualUsageSystems" data-testid="usage-field-systems" :aria-invalid="usageInvalid.systems || undefined" :class="{ 'usage-invalid': usageInvalid.systems }" :max="8" maxlength="20" :delimiter="systemTagDelimiter" clearable class="mt-2 w-full" placeholder="输入业务系统名称，最多 8 个" aria-label="接入系统" />
                   </label>
                   <label class="block text-sm font-medium text-zinc-700">输入要求 <span class="font-normal text-zinc-400">选填</span><textarea v-model="usageForm.input" data-testid="usage-field-input" :aria-invalid="usageInvalid.input || undefined" :class="{ 'usage-invalid': usageInvalid.input }" maxlength="500" rows="3" class="mt-2 w-full resize-none rounded-lg border border-zinc-200 p-3 text-sm outline-none focus:border-blue-400" placeholder="例如：需提供商品链接、日期范围和已授权文件" /><span class="mt-1 block text-right text-xs font-normal text-zinc-400">{{ usageForm.input.length }}/500</span></label>
@@ -912,9 +912,6 @@ function toggleLimited(list: string[], value: string, limit: number) {
         <footer class="fixed bottom-16 left-0 right-0 z-10 mx-auto flex min-h-20 items-center justify-between bg-white/95 px-5 backdrop-blur sm:px-8 md:bottom-0">
           <div class="mx-auto flex w-full max-w-[800px] items-center justify-between">
           <div class="flex items-center gap-3">
-            <button type="button" class="grid h-8 w-8 place-items-center text-zinc-600" aria-label="导出" @click="exportConfig"><Upload class="h-4 w-4" /></button>
-            <button type="button" class="grid h-8 w-8 place-items-center text-zinc-600" aria-label="导入" @click="importInput?.click()"><Download class="h-4 w-4" /></button>
-            <input ref="importInput" class="hidden" type="file" accept="application/json" @change="importConfig" />
           </div>
           <div class="flex gap-3">
             <button v-if="activeStep > 1" type="button" class="h-10 rounded-lg border border-zinc-200 px-5 text-sm font-medium hover:bg-zinc-50" @click="activeStep--">上一步</button>

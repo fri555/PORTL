@@ -10,6 +10,7 @@ import {
   Image,
   Plug,
   Wrench,
+  Zap,
   ChevronDown,
   CheckCircle2,
   Heart,
@@ -177,14 +178,6 @@ function formatIcon(format: string) {
         <Search :size="28" />
         <h3>没有找到匹配的专家</h3>
         <p>尝试更换关键词或分类。</p>
-        <button
-          @click="
-            searchQuery = '';
-            activeCategory = 'all';
-          "
-        >
-          清除筛选
-        </button>
       </div>
       </section>
     </section>
@@ -214,7 +207,6 @@ function formatIcon(format: string) {
               <img v-if="detailAgent.avatarUrl" :src="detailAgent.avatarUrl" alt="" /><span v-else>{{ detailAgent.name.slice(0, 1) }}</span>
             </div>
             <div>
-              <span>{{ AGENT_CATEGORY_META[detailAgent.category]?.label }}</span>
               <h2>{{ detailAgent.name }} <CheckCircle2 :size="17" /></h2>
               <div class="modal-meta"><span class="online" :class="{ unavailable: detailAgent.status !== 'online' }"><i />{{ detailAgent.status === 'online' ? '在线' : detailAgent.status === 'maintenance' ? '维护中' : '已下线' }}</span></div>
             </div>
@@ -246,16 +238,22 @@ function formatIcon(format: string) {
                 </div>
               </div>
               <p v-else class="detail-empty">{{ fileFormats === undefined ? '未提供' : '未配置' }}</p>
+              <template v-if="detailAgent.capabilities?.tools?.length">
+                <div class="capability-heading">工具</div>
+                <div class="capability-cards" data-testid="expert-capability-tools">
+                  <article v-for="item in detailAgent.capabilities.tools" :key="item.id" class="capability-card"><span class="capability-icon capability-icon-tool"><Wrench :size="18" /></span><div class="capability-card-body"><strong>{{ item.name?.trim() || '未提供名称' }}</strong><p v-if="item.description">{{ item.description }}</p></div><button class="capability-delete" aria-label="删除工具"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button></article>
+                </div>
+              </template>
               <template v-if="detailAgent.capabilities?.connectors?.length">
                 <div class="capability-heading">连接器</div>
                 <div class="capability-cards" data-testid="expert-capability-connectors">
-                  <article v-for="item in detailAgent.capabilities.connectors" :key="item.id" class="capability-card"><span class="capability-icon"><Plug :size="18" /></span><div><strong>{{ item.name?.trim() || '未提供名称' }}</strong><span v-if="item.protocol" class="capability-badge">{{ item.protocol }}</span><p v-if="item.description">{{ item.description }}</p></div></article>
+                  <article v-for="item in detailAgent.capabilities.connectors" :key="item.id" class="capability-card"><span class="capability-icon capability-icon-connector"><Zap :size="18" /></span><div class="capability-card-body"><strong>{{ item.name?.trim() || '未提供名称' }}</strong><span v-if="item.protocol" class="capability-badge">{{ item.protocol }}</span></div><button class="capability-delete" aria-label="删除连接器"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button></article>
                 </div>
               </template>
               <template v-if="detailAgent.capabilities?.skills?.length">
                 <div class="capability-heading">技能</div>
                 <div class="capability-cards" data-testid="expert-capability-skills">
-                  <article v-for="item in detailAgent.capabilities.skills" :key="item.id" class="capability-card"><span class="capability-icon"><Wrench :size="18" /></span><div><strong>{{ item.name?.trim() || '未提供名称' }}</strong><span v-if="item.identifier" class="capability-badge">{{ item.identifier }}</span><p v-if="item.description">{{ item.description }}</p></div></article>
+                  <article v-for="item in detailAgent.capabilities.skills" :key="item.id" class="capability-card"><span class="capability-icon capability-icon-skill"><Zap :size="18" /></span><div class="capability-card-body"><strong>{{ item.name?.trim() || '未提供名称' }}</strong><span v-if="item.identifier" class="capability-badge">{{ item.identifier }}</span></div><button class="capability-delete" aria-label="删除技能"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button></article>
                 </div>
               </template>
             </section>
@@ -273,7 +271,9 @@ function formatIcon(format: string) {
 
             </section>
             <section class="usage-section" data-testid="expert-boundary">
-              <h3>能力边界与使用约束</h3><p class="detail-text">{{ detailUsage.limits || '暂未配置' }}</p><p class="detail-text usage-notice-text">{{ FIXED_USAGE_NOTICE }}</p>
+              <h3>使用约束</h3>
+              <div class="constraint-subsection"><div class="constraint-subtitle">能力边界</div><p class="detail-text">{{ detailUsage.limits || '暂未配置' }}</p></div>
+              <div class="constraint-subsection"><div class="constraint-subtitle">注意事项</div><p class="detail-text">{{ FIXED_USAGE_NOTICE }}</p></div>
             </section>
             <section v-if="quickStarts.length" class="usage-section"><h3><MessageSquareText :size="16" />快捷开始</h3><div class="prompt-list"><button v-for="(command, index) in quickStarts" :key="index" :title="command" :disabled="!isExpertAvailable(detailAgent)" @click="useAgent(detailAgent, command)">{{ detailAgent.quickPromptDefinitions?.find(item => item.content === command)?.title || command }}<ArrowRight :size="14" /></button></div></section>
           </div>
@@ -396,6 +396,7 @@ function formatIcon(format: string) {
 .capability-cards { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
 .capability-card { display:flex; gap:10px; align-items:flex-start; min-width:0; border:1px solid #e5eaf0; border-radius:9px; padding:12px; background:#fbfcfe; }
 .capability-icon { display:grid; flex:0 0 32px; height:32px; place-items:center; border-radius:8px; color:#67778b; background:#edf1f6; }
+.capability-icon-tool { color:#7c6fa0; background:#f3f0fa; }
 .capability-card > div { min-width:0; flex:1; }
 .capability-card strong { display:block; color:#364458; font-size:12px; line-height:1.55; overflow-wrap:anywhere; }
 .capability-badge { display:inline-block; max-width:100%; margin-top:5px; padding:2px 5px; border-radius:3px; background:#eaf2ff; color:#487ccb; font-size:9px; overflow-wrap:anywhere; }
@@ -416,6 +417,9 @@ function formatIcon(format: string) {
 .internet-pill { margin-left:auto; padding:3px 8px; border-radius:12px; background:#f0f2f5; color:#8d98a7; font-size:11px; }
 .internet-pill.enabled { background:#e9f5ef; color:#4b9674; }
 .detail-text { margin:0; color:#5d6a7b; font-size:12px; white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.75; }
+.constraint-subsection { margin-bottom:14px; }
+.constraint-subsection:last-child { margin-bottom:0; }
+.constraint-subtitle { color:#6f7d8e; font-size:12px; font-weight:600; margin-bottom:6px; padding-left:8px; border-left:3px solid #1677e8; }
 .usage-notice-text { margin-top:8px; padding-top:8px; border-top:1px dashed #e5e7eb; color:#8b95a3; font-size:11px; }
 .usage-notice { background:#fafbfd; }
 @media (max-width:620px) { .basic-grid,.capability-cards { grid-template-columns:1fr; } }
