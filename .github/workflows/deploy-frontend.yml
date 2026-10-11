@@ -48,7 +48,7 @@ jobs:
           cache-dependency-path: './frontend-mvp/pnpm-lock.yaml'
 
       - name: 安装依赖
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
 
       - name: 构建
         run: pnpm build
