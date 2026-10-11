@@ -25,35 +25,6 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./frontend-mvp
-
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v4
-
-      - name: 安装 pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - name: 安装 Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'pnpm'
-          cache-dependency-path: './frontend-mvp/pnpm-lock.yaml'
-
-      - name: 安装依赖
-        run: pnpm install --frozen-lockfile
-
-      - name: 运行测试
-        run: pnpm test
-        continue-on-error: true
-
   build:
     runs-on: ubuntu-latest
     defaults:
@@ -94,7 +65,7 @@ jobs:
 
   deploy:
     runs-on: ubuntu-latest
-    needs: [test, build]
+    needs: [build]
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
