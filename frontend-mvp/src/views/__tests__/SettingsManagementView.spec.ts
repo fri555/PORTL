@@ -35,21 +35,21 @@ describe('SettingsManagementView', () => {
     const wrapper = await mountSettings('/settings/agents')
 
     expect(wrapper.get('[data-testid="settings-list-head"]').classes()).toContain('h-10')
-    expect(wrapper.get('[data-testid="settings-agent-row-assistant"]').classes()).toContain('h-14')
+    expect(wrapper.get('[data-testid="settings-agent-row-daily-assistant"]').classes()).toContain('h-14')
 
-    const statusSwitch = wrapper.get('[data-testid="settings-agent-switch-assistant"]')
+    const statusSwitch = wrapper.get('[data-testid="settings-agent-switch-daily-assistant"]')
     expect(statusSwitch.attributes('aria-checked')).toBe('true')
     await statusSwitch.trigger('click')
     expect(statusSwitch.attributes('aria-checked')).toBe('false')
-    expect(wrapper.get('[data-testid="settings-agent-row-assistant"]').text()).toContain('已停用')
+    expect(wrapper.get('[data-testid="settings-agent-row-daily-assistant"]').text()).toContain('已停用')
 
     await wrapper.get('input[placeholder="搜索智能体名称..."]').setValue('组货专家')
     await wrapper.get('button[aria-label="查询智能体"]').trigger('click')
-    expect(wrapper.find('[data-testid="settings-agent-row-assistant"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="settings-agent-row-assortment"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="settings-agent-row-daily-assistant"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="settings-agent-row-biz-02"]').exists()).toBe(true)
 
     await wrapper.get('button[aria-label="清空智能体筛选"]').trigger('click')
-    expect(wrapper.find('[data-testid="settings-agent-row-assistant"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="settings-agent-row-daily-assistant"]').exists()).toBe(true)
   })
 
   it('opens the production-aligned four-step agent editor', async () => {
@@ -62,11 +62,36 @@ describe('SettingsManagementView', () => {
     expect(wrapper.text()).toContain('基础设定')
     expect(wrapper.text()).toContain('角色设定')
     expect(wrapper.text()).toContain('能力扩展')
-    expect(wrapper.text()).toContain('用户剧本')
+    expect(wrapper.text()).toContain('快捷提示词')
     expect(wrapper.text()).toContain('模型配置')
     expect(wrapper.text()).toContain('适用部门')
     expect(wrapper.text()).toContain('接入系统标签')
     expect(wrapper.text()).toContain('最多选择 3 个')
+  })
+
+  it('edits usage instructions as four plain labeled fields without grouped cards', async () => {
+    const wrapper = await mountSettings('/settings/agents')
+    const createButton = wrapper.findAll('button').find((button) => button.text().includes('创建智能体'))
+    await createButton!.trigger('click')
+    const usageTab = wrapper.findAll('[role="tab"]').find((button) => button.text().includes('使用说明'))
+    await usageTab!.trigger('click')
+
+    expect(wrapper.find('textarea[aria-label="使用说明"]').exists()).toBe(false)
+    const usageForm = wrapper.get('.usage-form-fields')
+    expect(usageForm.findAll('[data-testid^="usage-field-"]')).toHaveLength(4)
+    const labels = [
+      ['systems', '接入系统'],
+      ['input', '输入要求'],
+      ['output', '输出形式'],
+      ['limits', '使用限制'],
+    ]
+    for (const [field, label] of labels) {
+      const control = usageForm.get('[data-testid="usage-field-' + field + '"]')
+      expect(control.element.closest('label')?.textContent).toContain(label)
+    }
+    expect(usageForm.findAll('section, fieldset, h3')).toHaveLength(0)
+    expect(wrapper.findAll('h3').map(node => node.text())).not.toContain('能力范围')
+    expect(wrapper.findAll('h3').map(node => node.text())).not.toContain('能力边界')
   })
 
   it('keeps the sidebar selection synced with settings sub-routes', async () => {
@@ -79,3 +104,7 @@ describe('SettingsManagementView', () => {
     expect(wrapper.text()).toContain('品牌营销部月度额度')
   })
 })
+
+
+
+

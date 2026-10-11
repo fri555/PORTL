@@ -47,7 +47,8 @@ function pickCase(expert: Expert, prompt: string) {
                 class="flex h-12 w-12 items-center justify-center rounded-full text-2xl"
                 :class="expert.avatarColor"
               >
-                {{ expert.avatarEmoji }}
+                <img v-if="expert.avatarUrl" :src="expert.avatarUrl" :alt="expert.name" class="h-full w-full object-contain" />
+                <span v-else>{{ expert.avatarEmoji }}</span>
               </div>
               <span
                 class="absolute -bottom-1.5 -right-2.5 whitespace-nowrap rounded-full border px-1.5 py-px text-[10px] font-medium leading-tight"
@@ -77,7 +78,8 @@ function pickCase(expert: Expert, prompt: string) {
                   class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl"
                   :class="expert.avatarColor"
                 >
-                  {{ expert.avatarEmoji }}
+                  <img v-if="expert.avatarUrl" :src="expert.avatarUrl" :alt="expert.name" class="h-full w-full object-contain" />
+                  <span v-else>{{ expert.avatarEmoji }}</span>
                 </div>
                 <div>
                   <div class="text-sm font-semibold text-zinc-900">{{ expert.nickname }}</div>
@@ -141,7 +143,8 @@ function pickCase(expert: Expert, prompt: string) {
           class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-2xl"
           :class="activeExpert.avatarColor"
         >
-          {{ activeExpert.avatarEmoji }}
+          <img v-if="activeExpert.avatarUrl" :src="activeExpert.avatarUrl" :alt="activeExpert.name" class="h-full w-full object-contain" />
+          <span v-else>{{ activeExpert.avatarEmoji }}</span>
         </div>
         <div class="min-w-0">
           <div class="flex items-center gap-2">

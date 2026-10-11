@@ -5,6 +5,7 @@ import {
   ArrowLeft, ThumbsUp, Share2, MessageSquare, Send, Clock, User, Tag,
   Paperclip, ExternalLink, Loader2, Check, Image, FileText,
 } from 'lucide-vue-next'
+import WorkspaceBackButton from '@/components/common/WorkspaceBackButton.vue'
 import { demands, demandComments, getDemand } from '@/mock/demands'
 import { DEMAND_STATUS_META, type DemandStatus, type DemandComment } from '@/types/demand'
 import { Button } from '@/components/ui/button'
@@ -60,6 +61,7 @@ function statusColor(s: DemandStatus) { return DEMAND_STATUS_META[s]?.color ?? '
 
 <template>
   <div class="mx-auto max-w-7xl px-6 py-6">
+    <WorkspaceBackButton class="mb-3" />
     <button
       class="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-primary"
       @click="router.push({ name: 'demands' })"

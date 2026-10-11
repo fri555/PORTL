@@ -4,6 +4,7 @@ import { useRoute, RouterLink } from 'vue-router'
 import {
   ThumbsUp, Bookmark, Share2, Eye, Clock, ExternalLink, ArrowLeft, MessageSquare, Check,
 } from 'lucide-vue-next'
+import WorkspaceBackButton from '@/components/common/WorkspaceBackButton.vue'
 import { useArticle } from '@/composables/useArticle'
 import { useAppStore } from '@/stores/app'
 import { THREAT_META } from '@/lib/constants'
@@ -49,6 +50,7 @@ const likeCount = computed(() =>
 
 <template>
   <div class="container py-4 md:py-6">
+    <WorkspaceBackButton class="mb-4" />
     <div class="mx-auto max-w-3xl">
       <RouterLink
         :to="{ name: 'news' }"

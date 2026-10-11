@@ -3,6 +3,22 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import SourceChatView from '@/views/SourceChatView.vue'
 import TaskFilesView from '@/views/TaskFilesView.vue'
+import { favoritesStorageKey } from '@/composables/useExpertCatalog'
+import { homeDraft } from '@/composables/useHomeDraft'
+import { agents } from '@/mock/agents'
+
+const wrappers: ReturnType<typeof mount>[] = []
+const favoriteStorage = favoritesStorageKey('prototype')
+function seedFavorites(ids = ['biz-04']) { localStorage.setItem(favoriteStorage, JSON.stringify({ initialized: true, ids })) }
+async function openCreatePrompt(wrapper: ReturnType<typeof mount>) {
+  await wrapper.get('button[aria-label="快捷提示语"]').trigger('click')
+  const list = wrapper.get('[role="dialog"][aria-label="快捷提示语列表"]')
+  await list.get('button.create-btn').trigger('click')
+  return wrapper.get('[role="dialog"][aria-label="新建快捷提示语"]')
+}
+async function closeQuickPromptList(wrapper: ReturnType<typeof mount>) {
+  await wrapper.get('[role="dialog"][aria-label="快捷提示语列表"] button.close-btn').trigger('click')
+}
 
 function makeRouter() {
   return createRouter({
@@ -26,16 +42,25 @@ async function mountAt(path: string) {
       global: { plugins: [router], stubs: { Teleport: true } },
     },
   )
+  wrappers.push(wrapper)
   await flushPromises()
   return { wrapper, router }
 }
 
 describe('authenticated source chat flows', () => {
   beforeEach(() => {
+    localStorage.clear()
+    seedFavorites([])
+    homeDraft.value = ''
     document.body.innerHTML = ''
+    window.history.replaceState({}, '', '/')
   })
   afterEach(() => {
+    wrappers.splice(0).forEach(wrapper => wrapper.unmount())
     vi.restoreAllMocks()
+    localStorage.clear()
+    seedFavorites([])
+    homeDraft.value = ''
   })
 
   it('navigates histories, task files, and new conversation as distinct routes', async () => {
@@ -53,54 +78,58 @@ describe('authenticated source chat flows', () => {
     expect(router.currentRoute.value.path).toBe('/chat')
   })
 
-  it('renders the M12 experts from the approved information table in a three-row card', async () => {
+  it('opens the existing conversation search when forwarded from expert center', async () => {
+    const { wrapper } = await mountAt('/chat?sidebar=1&action=search')
+    expect(wrapper.find('[role="dialog"][aria-label="搜索会话"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="source-chat-sidebar"]').isVisible()).toBe(true)
+  })
+
+  it('forwards rename and deletion to confirmations without deleting the session', async () => {
+    const { wrapper, router } = await mountAt('/chat/daily-auth?sidebar=1&action=rename&target=daily-auth')
+    expect(wrapper.find('[role="dialog"][aria-label="重命名会话"]').exists()).toBe(true)
+    await router.push('/chat/daily-auth?sidebar=1&action=delete&target=daily-auth')
+    await flushPromises()
+    expect(wrapper.find('[role="alertdialog"][aria-label="删除会话"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="session-daily-auth"]').exists()).toBe(true)
+    const confirmation = wrapper.get('[role="alertdialog"][aria-label="删除会话"]')
+    await confirmation.findAll('button').find(button => button.text() === '取消')!.trigger('click')
+    expect(wrapper.find('[data-testid="session-daily-auth"]').exists()).toBe(true)
+    expect(router.currentRoute.value.path).toBe('/chat/daily-auth')
+  })
+
+  it('shows only favorite experts on the home page, filters their business groups, and selects a compact card', async () => {
     const { wrapper } = await mountAt('/chat')
     const modeSwitcher = wrapper.get('[data-testid="mode-switcher"]')
-    expect(modeSwitcher.findAll('button').map((button) => button.text())).toEqual([
-      '日常办公',
-      '业务专家',
-    ])
+    expect(modeSwitcher.findAll('button').map(button => button.text())).toEqual(['日常办公', '业务专家'])
     await wrapper.get('button[data-mode="expert"]').trigger('click')
-    expect(wrapper.findAll('[data-testid="expert-card"]')).toHaveLength(9)
+    expect(wrapper.findAll('[data-testid="expert-card"]')).toHaveLength(0)
+    expect(wrapper.text()).toContain('还没有收藏专家')
 
-    const firstExpertCard = wrapper.findAll('[data-testid="expert-card"]')[0]
-    expect(firstExpertCard.get('[data-testid="expert-name-row"]').text()).toBe('天马智擎助手')
-    expect(firstExpertCard.get('[data-testid="expert-name-row"]').find('small').exists()).toBe(
-      false,
-    )
-    expect(firstExpertCard.get('[data-testid="expert-description-row"]').text()).toBe('暂无简介')
-    expect(firstExpertCard.get('[data-testid="expert-description-row"]').attributes('title')).toBe(
-      '暂无简介',
-    )
-    const readonlyTags = firstExpertCard.get('[data-testid="readonly-expert-tags"]')
-    expect(readonlyTags.attributes('aria-label')).toBe('专家标签')
-    expect(readonlyTags.find('input').exists()).toBe(false)
-    expect(readonlyTags.find('button').exists()).toBe(false)
-    expect(readonlyTags.text()).toContain('钉钉')
-    expect(readonlyTags.text()).toContain('商品信息')
-    expect(readonlyTags.text()).toContain('日常办公')
+    seedFavorites(['biz-04', 'biz-01', 'biz-09'])
+    window.dispatchEvent(new StorageEvent('storage', { key: favoriteStorage }))
+    await flushPromises()
+    expect(wrapper.findAll('[data-testid="expert-card"]')).toHaveLength(3)
+    const first = agents.find(agent => agent.id === 'biz-04')!
+    const firstExpertCard = wrapper.get('[data-testid="expert-card"]')
+    expect(firstExpertCard.get('[data-testid="expert-name-row"]').text()).toBe(first.name)
+    expect(firstExpertCard.get('[data-testid="expert-description-row"]').text()).toBe(first.description)
+    expect(firstExpertCard.get('[data-testid="expert-description-row"]').attributes('title')).toBe(first.description)
+    expect(firstExpertCard.find('[data-testid="readonly-expert-tags"]').exists()).toBe(false)
+    expect(firstExpertCard.find('.source-chat-home__expert-arrow').exists()).toBe(true)
+    expect(firstExpertCard.get('.source-chat-home__unfavorite').attributes('aria-label')).toBe('取消收藏' + first.name)
 
-    const toolbar = wrapper.get('[data-testid="expert-toolbar"]')
-    expect(toolbar.get('[data-testid="expert-department-tabs"]').element).toBeTruthy()
-    expect(toolbar.get('input[aria-label="搜索专家"]').element).toBeTruthy()
-    expect(
-      wrapper
-        .get('[data-testid="expert-department-tabs"]')
-        .findAll('button')
-        .map((tab) => tab.text()),
-    ).toEqual(['全部', '通用', '商品', '直播', 'B2B', 'B2C', '门店'])
-    await wrapper.get('button[data-department="商品"]').trigger('click')
+    expect(wrapper.get('[data-testid="expert-department-tabs"]').findAll('button').map(tab => tab.text()))
+      .toEqual(['收藏', '通用', '直播', '门店'])
+    await wrapper.get('button[data-department="通用"]').trigger('click')
     expect(wrapper.findAll('[data-testid="expert-card"]')).toHaveLength(1)
-    expect(wrapper.get('[data-testid="expert-card"]').text()).toContain('现货销售分析师')
-
-    await wrapper.get('button[data-department="全部"]').trigger('click')
-    await wrapper.get('input[aria-label="搜索专家"]').setValue('CRM订单')
+    expect(wrapper.get('[data-testid="expert-card"]').text()).toContain('数据分析师')
+    await wrapper.get('button[data-department="收藏"]').trigger('click')
+    await wrapper.get('input[aria-label="搜索专家"]').setValue('视频脚本')
     expect(wrapper.findAll('[data-testid="expert-card"]')).toHaveLength(1)
-    expect(wrapper.get('[data-testid="expert-card"]').text()).toContain('销售订单分析师')
-
-    await wrapper.get('input[aria-label="搜索专家"]').setValue('评论分析师')
-    await wrapper.findAll('[data-testid="expert-card"]')[0].trigger('click')
-    expect(wrapper.get('[data-testid="selected-expert-chip"]').text()).toContain('评论分析师')
+    expect(wrapper.get('[data-testid="expert-card"]').text()).toContain('视频脚本大师')
+    await wrapper.get('input[aria-label="搜索专家"]').setValue('营销图文')
+    await wrapper.get('[data-testid="expert-card"]').trigger('click')
+    expect(wrapper.get('[data-testid="selected-expert-chip"]').text()).toContain(first.name)
   })
 
   it('shows the M10 DingTalk authorization and write-confirmation flow in the conversation', async () => {
@@ -121,10 +150,10 @@ describe('authenticated source chat flows', () => {
 
     await authorizedButton.trigger('click')
     expect(wrapper.get('[data-testid="dws-auth-success"]').text()).toContain(
-      '授权成功，正在继续执行',
+      '账号授权成功，操作仍需你确认',
     )
     const confirmCard = wrapper.get('[data-testid="dws-confirm-card"]')
-    expect(confirmCard.text()).toContain('将对钉钉产生实际操作')
+    expect(confirmCard.text()).toContain('确认后才会创建待办')
     expect(confirmCard.text()).toContain('创建待办')
 
     await confirmCard.get('button[aria-label="确认执行钉钉操作"]').trigger('click')
@@ -179,27 +208,46 @@ describe('authenticated source chat flows', () => {
     expect(wrapper.get('[role="alertdialog"][aria-label="删除会话"]').text()).toContain('无法恢复')
   })
 
-  it('searches messages with role and conversation-mode filters and highlights contextual matches', async () => {
+  it('searches message content with cascading conversation filters, loads older results, and opens the matching message', async () => {
     const { wrapper, router } = await mountAt('/chat')
     await wrapper.get('button[aria-label="搜索会话"]').trigger('click')
     const dialog = wrapper.get('[role="dialog"][aria-label="搜索会话"]')
-    expect(dialog.get('[role="tablist"][aria-label="消息角色筛选"]').element).toBeTruthy()
-    expect(dialog.get('select[aria-label="对话模式筛选"]').element).toBeTruthy()
-    expect(dialog.find('.source-chip').exists()).toBe(false)
+    expect(dialog.get('.cascade-trigger').text()).toContain('全部会话')
     expect(dialog.findAll('[data-testid="search-result-message"]')).toHaveLength(20)
     expect(dialog.find('button[aria-label="查看3个月前的消息"]').exists()).toBe(false)
     await dialog.get('.results').trigger('scroll')
     expect(dialog.findAll('[data-testid="search-result-message"]')).toHaveLength(24)
-    expect(dialog.get('button[aria-label="查看3个月前的消息"]').text()).toContain('3 个月前')
-    expect(dialog.text()).toContain('全部')
-    await dialog.get('button[role="tab"]:nth-child(3)').trigger('click')
-    expect(dialog.text()).toContain('AI 回复')
-    await dialog.get('input[aria-label="搜索会话关键词"]').setValue('会议')
-    expect(dialog.get('mark').text()).toBe('会议')
-    expect(dialog.text()).toContain('…')
+    await dialog.get('button[aria-label="查看3个月前的消息"]').trigger('click')
+    expect(dialog.findAll('[data-testid="search-result-message"]')).toHaveLength(44)
+
+    await dialog.get('.cascade-trigger').trigger('click')
+    await dialog.findAll('.cascade-col button').find(button => button.text() === '业务专家')!.trigger('click')
+    expect(dialog.findAll('[data-testid="search-result-message"]')).toHaveLength(12)
+    expect(dialog.findAll('[data-testid="search-result-message"]').every(row => !row.text().includes('主对话') && !row.text().includes('工作日志'))).toBe(true)
+    expect(dialog.findAll('.cascade-col')[1]!.findAll('button').map(button => button.text())).toEqual([
+      '数据分析师', '组货专家', '评论分析师', '营销图文设计师', '销售订单分析师', '现货销售分析师',
+      '全网比价助手', 'TOP款分析师', '视频脚本大师', '企微沟通分析师', '跟进记录分析师', '商品问数/分货专家',
+      '商品信息查询助手', '运动健康专家', '门店经营分析师', '综合画像分析师', 'AI标题大师', '链接分析师',
+    ])
+    await dialog.findAll('.cascade-col button').find(button => button.text() === '数据分析师')!.trigger('click')
+    expect(dialog.findAll('[data-testid="search-result-message"]')).toHaveLength(12)
+    await dialog.get('.cascade-trigger').trigger('click')
+    await dialog.findAll('.cascade-col button').find(button => button.text() === '组货专家')!.trigger('click')
+    expect(dialog.text()).toContain('没有找到符合筛选条件的消息')
+    await dialog.get('.cascade-trigger').trigger('click')
+    await dialog.findAll('.cascade-col button').find(button => button.text() === '全部')!.trigger('click')
+
+    await dialog.get('input[aria-label="搜索会话关键词"]').setValue('预约下周二')
+    expect(dialog.findAll('[data-testid="search-result-message"]')).toHaveLength(6)
+    expect(dialog.get('[data-testid="search-result-message"]').text()).toContain('工作日志')
+    const matchedExcerpt = dialog.get('[data-testid="search-result-message"] .result-excerpt')
+    expect(matchedExcerpt.text()).toContain('预约下周二专项培训会议')
+    expect(matchedExcerpt.get('mark').text()).toBe('预约下周二')
     await dialog.get('[data-testid="search-result-message"]').trigger('click')
     await flushPromises()
+    expect(router.currentRoute.value.params.sessionId).toBe('daily-auth')
     expect(router.currentRoute.value.query.message).toBeTruthy()
+    expect(wrapper.find('[role="dialog"][aria-label="搜索会话"]').exists()).toBe(false)
   })
 
   it('opens a create dialog and places the saved quick prompt before system cards', async () => {
@@ -213,13 +261,13 @@ describe('authenticated source chat flows', () => {
     expect(
       quickEntry.compareDocumentPosition(cards) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
-    await wrapper.get('button[aria-label="快捷提示语"]').trigger('click')
-    const dialog = wrapper.get('[role="dialog"][aria-label="新建快捷提示语"]')
+    const dialog = await openCreatePrompt(wrapper)
     expect(wrapper.find('[data-testid="quick-prompt-popover"]').exists()).toBe(false)
     expect(wrapper.find('[role="dialog"][aria-label="管理快捷提示语"]').exists()).toBe(false)
     await dialog.get('input[aria-label="提示语名称"]').setValue('晨会速记')
     await dialog.get('textarea[aria-label="提示语内容"]').setValue('整理今天晨会的结论与待办。')
     await dialog.trigger('submit')
+    await closeQuickPromptList(wrapper)
 
     const customCards = wrapper.findAll('[data-testid="user-quick-prompt-card"]')
     expect(customCards).toHaveLength(1)
@@ -242,11 +290,11 @@ describe('authenticated source chat flows', () => {
       ['第一条', '第一条内容'],
       ['第二条', '第二条内容'],
     ]) {
-      await wrapper.get('button[aria-label="快捷提示语"]').trigger('click')
-      const dialog = wrapper.get('[role="dialog"][aria-label="新建快捷提示语"]')
+      const dialog = await openCreatePrompt(wrapper)
       await dialog.get('input[aria-label="提示语名称"]').setValue(title)
       await dialog.get('textarea[aria-label="提示语内容"]').setValue(content)
       await dialog.trigger('submit')
+    await closeQuickPromptList(wrapper)
     }
     expect(
       wrapper.findAll('[data-testid="user-quick-prompt-card"]').map((item) => item.text()),
@@ -274,7 +322,8 @@ describe('authenticated source chat flows', () => {
     ).toContain('商品')
   })
 
-  it('starts an expert conversation after choosing an expert', async () => {
+  it('starts a separate expert conversation after choosing a favorite expert', async () => {
+    seedFavorites()
     const { wrapper, router } = await mountAt('/chat')
     await wrapper.get('button[data-mode="expert"]').trigger('click')
     await wrapper.findAll('[data-testid="expert-card"]')[0].trigger('click')
@@ -282,49 +331,40 @@ describe('authenticated source chat flows', () => {
     await wrapper.get('button[aria-label="发送"]').trigger('click')
     await flushPromises()
 
-    expect(router.currentRoute.value.path).toBe('/chat/expert-plan')
+    expect(router.currentRoute.value.path).toMatch(/^\/chat\/expert-plan-/)
+    expect(wrapper.get('.answer-agent strong').text()).toBe('营销图文设计师')
   })
 
-  it('shows expert shortcuts below the composer and prepends expert-owned quick prompts', async () => {
+  it('shows the selected favorite expert shortcuts and prepends its own quick prompts', async () => {
+    seedFavorites()
     const { wrapper } = await mountAt('/chat')
     await wrapper.get('button[data-mode="expert"]').trigger('click')
-    const dataAnalyst = wrapper
-      .findAll('[data-testid="expert-card"]')
-      .find((card) => card.text().includes('数据分析师'))!
-    await dataAnalyst.trigger('click')
+    await wrapper.get('[data-testid="expert-card"]').trigger('click')
+    const chosen = agents.find(agent => agent.id === 'biz-04')!
+    expect(wrapper.get('[data-testid="selected-expert-chip"]').text()).toContain(chosen.name)
+    expect(wrapper.get('[data-testid="quick-prompt-entry"]').text()).toContain(chosen.name + '专属')
+    expect(wrapper.get('[data-testid="expert-shortcut-grid"]').findAll('button').map(button => button.text())).toEqual(chosen.quickCommands)
 
-    expect(wrapper.get('[data-testid="selected-expert-chip"]').text()).toContain('数据分析师')
-    expect(wrapper.get('[data-testid="quick-prompt-entry"]').text()).toContain('数据分析师专属')
-    const shortcutGrid = wrapper.get('[data-testid="expert-shortcut-grid"]')
-    expect(shortcutGrid.findAll('button').map((button) => button.text())).toEqual([
-      expect.stringContaining('需求池分析'),
-      expect.stringContaining('商品池分析'),
-      expect.stringContaining('经营数据分析'),
-    ])
-
-    await wrapper.get('button[aria-label="快捷提示语"]').trigger('click')
-    const dialog = wrapper.get('[role="dialog"][aria-label="新建快捷提示语"]')
+    const dialog = await openCreatePrompt(wrapper)
     await dialog.get('input[aria-label="提示语名称"]').setValue('周经营复盘')
     await dialog.get('textarea[aria-label="提示语内容"]').setValue('分析本周经营指标和异常原因')
     await dialog.trigger('submit')
+    await closeQuickPromptList(wrapper)
 
     const expertButtons = wrapper.get('[data-testid="expert-shortcut-grid"]').findAll('button')
     expect(expertButtons[0].attributes('data-testid')).toBe('user-quick-prompt-card')
     expect(expertButtons[0].text()).toContain('周经营复盘')
-    expect(expertButtons[0].text()).not.toContain('我的')
     await expertButtons[0].trigger('click')
-    expect(
-      (wrapper.get('textarea[aria-label="向小马提问"]').element as HTMLTextAreaElement).value,
-    ).toBe('分析本周经营指标和异常原因')
+    expect((wrapper.get('textarea[aria-label="向小马提问"]').element as HTMLTextAreaElement).value).toBe('分析本周经营指标和异常原因')
   })
 
   it('isolates newly created quick prompts by mode', async () => {
     const { wrapper } = await mountAt('/chat')
-    await wrapper.get('button[aria-label="快捷提示语"]').trigger('click')
-    const dialog = wrapper.get('[role="dialog"][aria-label="新建快捷提示语"]')
+    const dialog = await openCreatePrompt(wrapper)
     await dialog.get('input[aria-label="提示语名称"]').setValue('仅日常可见')
     await dialog.get('textarea[aria-label="提示语内容"]').setValue('日常提示语内容')
     await dialog.trigger('submit')
+    await closeQuickPromptList(wrapper)
     expect(wrapper.text()).toContain('仅日常可见')
     await wrapper.get('button[data-mode="expert"]').trigger('click')
     expect(wrapper.text()).not.toContain('仅日常可见')
@@ -342,3 +382,5 @@ describe('authenticated source chat flows', () => {
     expect(wrapper.get('[data-testid="sent-follow-up"]').text()).toContain(selected)
   })
 })
+
+

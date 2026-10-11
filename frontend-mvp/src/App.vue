@@ -10,7 +10,7 @@ const showLayout = computed(() => !route.path.startsWith('/auth'))
 
 <template>
   <Toaster richColors closeButton position="top-right" />
-  <div v-if="showLayout" class="flex min-h-screen flex-col bg-muted/30">
+  <div v-if="showLayout" class="flex min-h-screen flex-col bg-white">
     <AppHeader />
     <main class="flex-1">
       <router-view />

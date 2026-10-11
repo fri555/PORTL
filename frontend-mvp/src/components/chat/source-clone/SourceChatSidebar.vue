@@ -1,16 +1,22 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import {
+  Bot,
   Coffee,
   FolderPlus,
   MoreHorizontal,
   PanelLeftClose,
+  Pin,
+  PinOff,
   Pencil,
   Search,
   Share2,
   SquarePen,
   Trash2,
 } from 'lucide-vue-next'
+
+const router = useRouter()
 
 export interface SourceChatSession {
   id: string
@@ -24,10 +30,10 @@ const props = withDefaults(defineProps<{
   activeSessionId?: string
   dailySessions?: SourceChatSession[]
   expertSessions?: SourceChatSession[]
+  additionalSessions?: SourceChatSession[]
 }>(), {
   activeSessionId: '',
-  dailySessions: () => [],
-  expertSessions: () => [],
+  additionalSessions: () => [],
 })
 
 const emit = defineEmits<{
@@ -49,6 +55,8 @@ const capturedDaily: SourceChatSession[] = [
   { id: 'daily-document', title: '看下这个文档和附件 你觉得有什么需要优化的地方', timestamp: '2026-08-26 15:28', mode: 'daily' },
   { id: 'daily-message', title: '给赵伟朝发消息', timestamp: '2026-08-25 17:34', mode: 'daily' },
   { id: 'daily-calendar', title: '给我跟清晖建一个11：30的日程 但是不要提醒', timestamp: '2026-08-24 11:24', mode: 'daily' },
+  { id: 'daily-weekly', title: '整理本周工作安排', timestamp: '2026-08-23 10:00', mode: 'daily' },
+  { id: 'daily-summary', title: '汇总会议待办事项', timestamp: '2026-08-22 09:00', mode: 'daily' },
 ]
 
 const capturedExpert: SourceChatSession[] = [
@@ -57,10 +65,32 @@ const capturedExpert: SourceChatSession[] = [
   { id: 'expert-capability', title: '你能做什么', timestamp: '2026-08-26 10:58', mode: 'expert', avatar: `${assetBase}assets/expert-analysis.png` },
   { id: 'expert-profit', title: '看下这个店铺的利润情况，进行分析，并给出整改建议', timestamp: '2026-08-25 18:22', mode: 'expert', avatar: `${assetBase}assets/expert-analysis.png` },
   { id: 'expert-time', title: '当前是什么时间', timestamp: '2026-08-25 14:32', mode: 'expert', avatar: `${assetBase}assets/agents-online/data-analysis.png` },
+  { id: 'expert-stock', title: '核对本周库存周转情况', timestamp: '2026-08-24 10:00', mode: 'expert' },
+  { id: 'expert-weekly', title: '整理经营周报', timestamp: '2026-08-23 09:00', mode: 'expert' },
 ]
 
-const dailyItems = computed(() => props.dailySessions.length ? props.dailySessions : capturedDaily)
-const expertItems = computed(() => props.expertSessions.length ? props.expertSessions : capturedExpert)
+const removedIds = ref(new Set<string>())
+function combinedSessions(mode: 'daily' | 'expert', captured: SourceChatSession[]) {
+  const local = props.additionalSessions.filter(item => item.mode === mode)
+  const localIds = new Set(local.map(item => item.id))
+  return [...local, ...captured.filter(item => !localIds.has(item.id))].filter(item => !removedIds.value.has(item.id))
+}
+const dailyItems = computed(() => combinedSessions('daily', props.dailySessions ?? capturedDaily))
+const expertItems = computed(() => combinedSessions('expert', props.expertSessions ?? capturedExpert))
+const pinnedOrder = ref<string[]>(['expert-top-status', 'daily-auth'])
+const allItems = computed(() => [...dailyItems.value, ...expertItems.value])
+watch(allItems, items => { const present = new Set(items.map(item=>item.id)); pinnedOrder.value = pinnedOrder.value.filter(id=>present.has(id)) }, { immediate: true })
+const dailyExpanded = ref(false)
+const expertExpanded = ref(false)
+function orderSessions(items: SourceChatSession[]) {
+  return [...items].sort((a, b) => {
+    const aPin = pinnedOrder.value.indexOf(a.id), bPin = pinnedOrder.value.indexOf(b.id)
+    if (aPin >= 0 || bPin >= 0) return aPin < 0 ? 1 : bPin < 0 ? -1 : aPin - bPin
+    return b.timestamp.localeCompare(a.timestamp) || a.id.localeCompare(b.id)
+  })
+}
+const visibleDailyItems = computed(() => orderSessions(dailyItems.value).slice(0, dailyExpanded.value ? undefined : 5))
+const visibleExpertItems = computed(() => orderSessions(expertItems.value).slice(0, expertExpanded.value ? undefined : 5))
 const openMenuId = ref<string | null>(null)
 
 function toggleMenu(event: MouseEvent, sessionId: string) {
@@ -76,9 +106,19 @@ function runMenuAction(event: MouseEvent, action: 'rename-session' | 'share-sess
   openMenuId.value = null
 }
 
+function togglePin(event: MouseEvent, sessionId: string) {
+  event.stopPropagation()
+  pinnedOrder.value = pinnedOrder.value.includes(sessionId)
+    ? pinnedOrder.value.filter(id => id !== sessionId)
+    : [sessionId, ...pinnedOrder.value]
+  openMenuId.value = null
+}
+
 function closeMenu() {
   openMenuId.value = null
 }
+function removeSession(id:string) { removedIds.value.add(id); pinnedOrder.value=pinnedOrder.value.filter(item=>item!==id) }
+defineExpose({ removeSession })
 
 onMounted(() => document.addEventListener('click', closeMenu))
 onBeforeUnmount(() => document.removeEventListener('click', closeMenu))
@@ -104,15 +144,19 @@ onBeforeUnmount(() => document.removeEventListener('click', closeMenu))
       <span class="source-chat-sidebar__files-label"><FolderPlus :size="16" :stroke-width="1.7" />任务文件</span>
     </button>
 
+    <button class="source-chat-sidebar__files" type="button" title="专家中心" @click="router.push('/agent-square')">
+      <span class="source-chat-sidebar__files-label"><Bot :size="16" :stroke-width="1.7" />专家中心</span>
+    </button>
+
     <div class="source-chat-sidebar__scroll">
       <section class="source-chat-sidebar__section" aria-labelledby="daily-session-heading">
         <div class="source-chat-sidebar__heading" id="daily-session-heading">
           <span>日常办公</span>
-          <span>查看更多</span>
+          <button v-if="dailyItems.length > 5" type="button" class="session-expand" :aria-expanded="dailyExpanded" @click="dailyExpanded = !dailyExpanded">{{ dailyExpanded ? '收起' : '查看更多' }}</button>
         </div>
         <div class="source-chat-sidebar__list">
           <article
-            v-for="session in dailyItems"
+            v-for="session in visibleDailyItems"
             :key="session.id"
             class="source-chat-sidebar__session"
             :class="{ 'source-chat-sidebar__session--active': session.id === activeSessionId }"
@@ -124,10 +168,11 @@ onBeforeUnmount(() => document.removeEventListener('click', closeMenu))
                 <i />
               </span>
               <span class="source-chat-sidebar__session-copy">
-                <strong>{{ session.title }}</strong>
+                <strong><Pin v-if="pinnedOrder.includes(session.id)" :size="11" aria-label="已置顶" />{{ session.title }}</strong>
                 <time>{{ session.timestamp }}</time>
               </span>
             </button>
+            <button class="source-chat-sidebar__pin" type="button" :aria-label="pinnedOrder.includes(session.id) ? '取消置顶' : '置顶'" :title="pinnedOrder.includes(session.id) ? '取消置顶' : '置顶'" :aria-pressed="pinnedOrder.includes(session.id)" @click="togglePin($event, session.id)"><component :is="pinnedOrder.includes(session.id) ? PinOff : Pin" :size="15" /></button>
             <button class="source-chat-sidebar__more" type="button" aria-label="更多操作" title="更多操作" @click="toggleMenu($event, session.id)">
               <MoreHorizontal :size="17" />
             </button>
@@ -143,11 +188,11 @@ onBeforeUnmount(() => document.removeEventListener('click', closeMenu))
       <section class="source-chat-sidebar__section" aria-labelledby="expert-session-heading">
         <div class="source-chat-sidebar__heading" id="expert-session-heading">
           <span>专家模式</span>
-          <span>查看更多</span>
+          <button v-if="expertItems.length > 5" type="button" class="session-expand" :aria-expanded="expertExpanded" @click="expertExpanded = !expertExpanded">{{ expertExpanded ? '收起' : '查看更多' }}</button>
         </div>
         <div class="source-chat-sidebar__list">
           <article
-            v-for="session in expertItems"
+            v-for="session in visibleExpertItems"
             :key="session.id"
             class="source-chat-sidebar__session"
             :class="{ 'source-chat-sidebar__session--active': session.id === activeSessionId }"
@@ -158,10 +203,11 @@ onBeforeUnmount(() => document.removeEventListener('click', closeMenu))
                 <img :src="session.avatar || `${assetBase}assets/agents-online/data-analysis.png`" alt="" />
               </span>
               <span class="source-chat-sidebar__session-copy">
-                <strong>{{ session.title }}</strong>
+                <strong><Pin v-if="pinnedOrder.includes(session.id)" :size="11" aria-label="已置顶" />{{ session.title }}</strong>
                 <time>{{ session.timestamp }}</time>
               </span>
             </button>
+            <button class="source-chat-sidebar__pin" type="button" :aria-label="pinnedOrder.includes(session.id) ? '取消置顶' : '置顶'" :title="pinnedOrder.includes(session.id) ? '取消置顶' : '置顶'" :aria-pressed="pinnedOrder.includes(session.id)" @click="togglePin($event, session.id)"><component :is="pinnedOrder.includes(session.id) ? PinOff : Pin" :size="15" /></button>
             <button class="source-chat-sidebar__more" type="button" aria-label="更多操作" title="更多操作" @click="toggleMenu($event, session.id)">
               <MoreHorizontal :size="17" />
             </button>
@@ -178,6 +224,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closeMenu))
 </template>
 
 <style scoped>
+.session-expand { border: 0; padding: 0; background: transparent; color: #64748b; cursor: pointer; font-size: 12px; }
 .source-chat-sidebar {
   box-sizing: border-box;
   display: flex;
@@ -334,7 +381,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closeMenu))
   height: 64px;
   align-items: center;
   gap: 10px;
-  padding: 0 34px 0 10px;
+  padding: 0 58px 0 10px;
   border: 0;
   color: #111;
   background: transparent;
@@ -391,6 +438,9 @@ onBeforeUnmount(() => document.removeEventListener('click', closeMenu))
 }
 
 .source-chat-sidebar__session-copy strong {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   overflow: hidden;
   color: #222;
   font-size: 14px;
@@ -407,6 +457,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closeMenu))
   line-height: 18px;
 }
 
+.source-chat-sidebar__pin,
 .source-chat-sidebar__more {
   position: absolute;
   z-index: 2;
@@ -427,12 +478,18 @@ onBeforeUnmount(() => document.removeEventListener('click', closeMenu))
   transition: opacity 0.15s ease, background-color 0.15s ease;
 }
 
+.source-chat-sidebar__pin { right: 32px; }
+
+.source-chat-sidebar__session:hover .source-chat-sidebar__pin,
+.source-chat-sidebar__session:focus-within .source-chat-sidebar__pin,
+.source-chat-sidebar__session:focus-within .source-chat-sidebar__more,
 .source-chat-sidebar__session:hover .source-chat-sidebar__more,
 .source-chat-sidebar__more:focus-visible,
 .source-chat-sidebar__session:has(.source-chat-sidebar__menu) .source-chat-sidebar__more {
   opacity: 1;
 }
 
+.source-chat-sidebar__pin:hover,
 .source-chat-sidebar__more:hover {
   background: #eaeaea;
 }

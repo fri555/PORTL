@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import { ArrowLeft, Clock, Users, Play, Download, Bookmark, Share2 } from 'lucide-vue-next'
+import WorkspaceBackButton from '@/components/common/WorkspaceBackButton.vue'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useAppStore } from '@/stores/app'
@@ -26,6 +27,7 @@ onMounted(() => {
 
 <template>
   <div class="container py-6">
+    <WorkspaceBackButton class="mb-4" />
     <div class="mx-auto max-w-4xl">
       <RouterLink to="/courses" class="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-primary">
         <ArrowLeft class="h-4 w-4" /> 返回培训中心

@@ -5,7 +5,8 @@ import { ArrowLeft } from 'lucide-vue-next'
 const router = useRouter()
 
 function goBackToWorkspace() {
-  router.push({ name: 'workspace' })
+  // 优先返回工作区对话页，如果没有则返回首页
+  router.push({ name: 'workspace-chat' })
 }
 </script>
 

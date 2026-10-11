@@ -1,23 +1,154 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { BarChart3, LockKeyhole, RefreshCw, Settings2 } from 'lucide-vue-next'
-import { useAppStore } from '@/stores/app'
-const store = useAppStore()
-const active = ref('guandata')
-const isAdmin = computed(() => store.user?.role === 'admin')
+import { ref } from 'vue'
+import { Calendar, ChevronDown, HelpCircle, LayoutList } from 'lucide-vue-next'
+
+const timePeriod = ref('本月')
+const privacyMode = ref(false)
+
+const metrics = [
+  { name: '利润额', category: '利润指标', value: '-￥398.22万', yoy: '139.2%', yoyDir: 'up' as const, mom: '-29.0%', momDir: 'down' as const },
+  { name: '利润率%', category: '利润指标', value: '-2.3%', yoy: '46.2%', yoyDir: 'up' as const, mom: '-37.0%', momDir: 'down' as const },
+  { name: '销售额', category: '销售规模', value: '￥17446.03万', yoy: '63.8%', yoyDir: 'up' as const, mom: '12.7%', momDir: 'up' as const },
+  { name: '当月目标', category: '销售规模', value: '￥26621.40万', yoy: '31.8%', yoyDir: 'up' as const, mom: '-15.7%', momDir: 'down' as const },
+  { name: '完成率%', category: '销售规模', value: '65.5%', yoy: '24.3%', yoyDir: 'up' as const, mom: '33.7%', momDir: 'up' as const },
+  { name: '毛利额', category: '利润指标', value: '￥3262.26万', yoy: '70.3%', yoyDir: 'up' as const, mom: '9.0%', momDir: 'up' as const },
+  { name: '毛利率%', category: '利润指标', value: '18.7%', yoy: '4.0%', yoyDir: 'up' as const, mom: '-3.3%', momDir: 'down' as const },
+  { name: '费用额', category: '成本控制', value: '￥3657.65万', yoy: '75.5%', yoyDir: 'up' as const, mom: '3.0%', momDir: 'up' as const },
+  { name: '费用率%', category: '成本控制', value: '21.0%', yoy: '7.2%', yoyDir: 'up' as const, mom: '-8.6%', momDir: 'down' as const },
+  { name: '平台费用', category: '成本控制', value: '￥1313.86万', yoy: '42.2%', yoyDir: 'up' as const, mom: '18.5%', momDir: 'up' as const },
+  { name: '营销费用', category: '成本控制', value: '￥509.58万', yoy: '28.6%', yoyDir: 'up' as const, mom: '-4.2%', momDir: 'down' as const },
+  { name: '其他费用', category: '成本控制', value: '￥1287.70万', yoy: '35.8%', yoyDir: 'up' as const, mom: '12.3%', momDir: 'up' as const },
+  { name: '人工成本', category: '成本控制', value: '￥520.40万', yoy: '22.1%', yoyDir: 'up' as const, mom: '6.7%', momDir: 'up' as const },
+  { name: '退货率%', category: '服务质量', value: '35.9%', yoy: '-15.3%', yoyDir: 'down' as const, mom: '-6.1%', momDir: 'down' as const },
+  { name: '客单价', category: '销售规模', value: '￥289.36', yoy: '18.5%', yoyDir: 'up' as const, mom: '5.2%', momDir: 'up' as const },
+]
+
+const categoryColors: Record<string, string> = {
+  '利润指标': 'bg-[#e6f4ff] text-[#0066ff]',
+  '销售规模': 'bg-[#e6f4ff] text-[#0066ff]',
+  '成本控制': 'bg-[#e6f4ff] text-[#0066ff]',
+  '服务质量': 'bg-[#e6f4ff] text-[#0066ff]',
+}
+
+const timePeriods = ['今日', '昨日', '本月', '上月']
 </script>
 
 <template>
-  <main class="dashboard-shell">
-    <aside class="dashboard-nav"><h1>仪表盘</h1><button type="button" :class="{ active: active === 'guandata' }" @click="active = 'guandata'"><BarChart3 :size="17" /><span>观远运营看板</span><small>权限菜单</small></button></aside>
-    <section class="dashboard-content">
-      <header><div><h2>观远运营看板</h2><p>数据每小时刷新，次日完成前一日口径校准；查看与导出权限由观远控制</p></div><div class="actions"><span><RefreshCw :size="14" />最近更新 09:00</span><button v-if="isAdmin" type="button"><Settings2 :size="15" />观远权限配置</button></div></header>
-      <div v-if="isAdmin" class="guandata-frame"><div class="frame-head"><strong>AI 工作台运营总览</strong><span>观远 BI 安全内嵌 · 短时凭证</span></div><div class="cards"><article><span>活跃用户</span><b>2,418</b><small>环比 +12.8%</small></article><article><span>会话请求</span><b>36,920</b><small>环比 +8.6%</small></article><article><span>Token 消耗</span><b>84.6M</b><small>次日重算</small></article><article><span>金额消耗</span><b>¥68,425</b><small>人民币</small></article></div><div class="chart"><i v-for="height in [34,48,42,65,58,76,68,82,74,91,86,96]" :key="height" :style="{height:`${height}%`}" /></div></div>
-      <div v-else class="no-access"><LockKeyhole :size="38" /><h2>暂无查看权限</h2><p>入口当前仅对超级管理员开放；进入后仍由观远按登录身份、角色和看板授权判断可见范围。</p></div>
-    </section>
-  </main>
-</template>
+  <div class="flex h-[calc(100vh-56px)] bg-white">
+    <!-- 左侧导航 -->
+    <aside class="shrink-0 border-r border-[#eaeaea] bg-[#fafbfc] p-4" style="width: 270px">
+      <button class="flex w-full items-center gap-2 text-sm font-medium text-[#111]" style="background: #edeef1; border-radius: 8px; padding: 0 12px; height: 36px; font-size: 14px; font-weight: 500;">
+        <LayoutList class="h-4 w-4" />
+        财务指标
+      </button>
+    </aside>
 
-<style scoped>
-.dashboard-shell{display:flex;min-height:calc(100vh - 57px);gap:8px;background:#f5f5f6;padding:8px;font-family:system-ui,"PingFang SC",sans-serif}.dashboard-nav{width:220px;border:1px solid #ececef;border-radius:8px;background:#fff;padding:22px 14px}.dashboard-nav h1{margin:0 10px 20px;font-size:18px}.dashboard-nav button{display:grid;width:100%;grid-template-columns:22px 1fr auto;align-items:center;border:0;border-radius:8px;padding:12px;background:#18181b;color:#fff;text-align:left}.dashboard-nav small{font-size:9px;color:#ccc}.dashboard-content{min-width:0;flex:1;border:1px solid #ececef;border-radius:8px;background:#fff;padding:24px}.dashboard-content>header{display:flex;align-items:center;justify-content:space-between}.dashboard-content h2{margin:0;font-size:18px}.dashboard-content header p{margin:5px 0 0;color:#888;font-size:12px}.actions{display:flex;align-items:center;gap:12px}.actions span,.actions button{display:flex;align-items:center;gap:6px;font-size:12px}.actions button{height:34px;border:1px solid #ddd;border-radius:7px;background:#fff;padding:0 12px}.guandata-frame{margin-top:20px;border:1px solid #e5e7eb;border-radius:10px;padding:18px}.frame-head{display:flex;justify-content:space-between}.frame-head span{color:#999;font-size:11px}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}.cards article{border:1px solid #eee;border-radius:9px;padding:15px}.cards span,.cards small{display:block;color:#888;font-size:11px}.cards b{display:block;margin:9px 0;font-size:22px}.chart{display:flex;height:320px;align-items:end;gap:16px;margin-top:18px;border-radius:10px;background:linear-gradient(#fafafa 1px,transparent 1px);background-size:100% 20%;padding:24px}.chart i{flex:1;border-radius:5px 5px 0 0;background:linear-gradient(#65a1f4,#236fd5)}.no-access{display:grid;min-height:480px;place-items:center;align-content:center;color:#999}.no-access h2{margin:16px 0 6px;color:#333}.no-access p{max-width:480px;text-align:center;font-size:13px}
-</style>
+    <!-- 主内容区 -->
+    <main class="flex-1 overflow-y-auto bg-white p-6">
+      <!-- 标题 -->
+      <div class="mb-4">
+        <h1 style="font-size: 16px; font-weight: 500; color: #111; margin: 0;">财务指标</h1>
+        <p style="font-size: 12px; color: #666; margin: 4px 0 0;">利润、成本、费用等财务核心指标</p>
+      </div>
+
+      <!-- 筛选栏 -->
+      <div class="mb-6 flex flex-wrap items-center gap-3">
+        <!-- 事业部下拉 -->
+        <button style="background: #fff; border-radius: 8px; padding: 6px 12px; border: 1px solid #e5e5e5; height: 32px; display: flex; align-items: center; gap: 6px; font-size: 13px; color: #333;">
+          全部事业部
+          <ChevronDown class="h-3.5 w-3.5 text-[#999]" />
+        </button>
+
+        <!-- Tab风格时间分段控件 -->
+        <div class="flex items-center" style="padding: 3px;">
+          <button
+            v-for="p in timePeriods"
+            :key="p"
+            role="tab"
+            style="border-radius: 5px; padding: 0 12px; height: 28px; font-size: 14px; transition: all 0.15s;"
+            :style="timePeriod === p ? { background: '#f4f4f7', color: '#111' } : { background: 'transparent', color: '#666' }"
+            @click="timePeriod = p"
+          >
+            {{ p }}
+          </button>
+        </div>
+
+        <!-- 日期选择器 -->
+        <button style="background: #fff; border-radius: 8px; padding: 6px 12px; border: 1px solid #e5e5e5; height: 32px; display: flex; align-items: center; gap: 6px; font-size: 13px; color: #333;">
+          <Calendar class="h-3.5 w-3.5 text-[#999]" />
+          2026-08-26
+        </button>
+
+        <!-- 隐私模式Switch -->
+        <div class="flex items-center gap-2">
+          <span style="font-size: 14px; color: #111;">隐私模式</span>
+          <button
+            type="button"
+            role="switch"
+            :aria-checked="privacyMode"
+            style="position: relative; height: 20px; width: 40px; border-radius: 16px; transition: background 0.2s;"
+            :style="{ background: privacyMode ? '#111' : '#d6d6d6' }"
+            @click="privacyMode = !privacyMode"
+          >
+            <i
+              class="absolute top-0.5 rounded-full bg-white transition-all"
+              style="width: 16px; height: 16px;"
+              :style="{ left: privacyMode ? '21px' : '2px' }"
+            />
+          </button>
+        </div>
+
+        <!-- 指标配置按钮 -->
+        <button style="background: #fff; border-radius: 8px; padding: 6px 16px; border: 1px solid #e5e5e5; height: 32px; display: flex; align-items: center; gap: 6px; font-size: 13px; color: #333;">
+          <LayoutList class="h-3.5 w-3.5" />
+          指标配置
+        </button>
+      </div>
+
+      <!-- 指标卡片网格 -->
+      <div class="grid grid-cols-2" style="gap: 16px;">
+        <div
+          v-for="m in metrics"
+          :key="m.name"
+          style="border-radius: 12px; box-shadow: rgb(234,234,234) 0px 0px 0px 1px inset; padding: 4px 0 0; transition: box-shadow 0.15s;"
+        >
+          <div class="flex items-center gap-2 px-3 pt-2">
+            <span style="font-size: 12px; font-weight: 600; color: #666;">{{ m.name }}</span>
+            <span
+              class="rounded px-1 py-0"
+              style="font-size: 10px; font-weight: 500; color: #0066ff; background: #e6f4ff;"
+            >
+              {{ m.category }}
+            </span>
+            <HelpCircle class="ml-auto h-3.5 w-3.5 text-[#ccc]" />
+          </div>
+
+          <div class="px-3" style="margin-top: 6px; font-size: 18px; font-weight: 700; line-height: 26px; color: #111;">
+            {{ privacyMode ? '***' : m.value }}
+          </div>
+
+          <div class="flex items-center gap-4 px-3 pb-3" style="margin-top: 8px; border-top: 1px dashed #eaeaea; padding-top: 8px; font-size: 12px;">
+            <span class="flex items-center gap-1">
+              <span style="font-weight: 400; color: #999;">同比</span>
+              <span
+                style="font-weight: 500;"
+                :style="{ color: m.yoyDir === 'up' ? '#ff6a6a' : '#0fbc31' }"
+              >
+                {{ m.yoyDir === 'up' ? '↑' : '↓' }} {{ m.yoy }}
+              </span>
+            </span>
+            <span class="flex items-center gap-1">
+              <span style="font-weight: 400; color: #999;">环比</span>
+              <span
+                style="font-weight: 500;"
+                :style="{ color: m.momDir === 'up' ? '#ff6a6a' : '#0fbc31' }"
+              >
+                {{ m.momDir === 'up' ? '↑' : '↓' }} {{ m.mom }}
+              </span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</template>

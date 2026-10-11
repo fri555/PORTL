@@ -8,6 +8,7 @@ import {
   LockKeyhole,
   PanelLeftClose,
   Plus,
+  Cable,
   Search,
 } from 'lucide-vue-next'
 import type {
@@ -22,10 +23,13 @@ const props = defineProps<{
   items: SourceKnowledgeBase[]
   selectedId?: string
   lockedIds?: Set<string>
+  accessActive?: boolean
+  canManageAccess?: boolean
 }>()
 
 const emit = defineEmits<{
   close: []
+  access: []
   create: []
   select: [id: string]
   navigate: [payload: SourceKnowledgeNavigation]
@@ -124,6 +128,10 @@ function navigate(row: SidebarTreeRow) {
       <span>新建知识库</span>
     </button>
 
+    <button v-if="canManageAccess" class="knowledge-sidebar__access" :class="{ 'is-active': accessActive }" :aria-current="accessActive ? 'page' : undefined" type="button" @click="emit('access')">
+      <Cable :size="17" /><span>知识接入</span>
+    </button>
+
     <div class="knowledge-sidebar__spaces" role="tablist" aria-label="知识库空间">
       <button
         class="knowledge-sidebar__space"
@@ -192,6 +200,8 @@ function navigate(row: SidebarTreeRow) {
 </template>
 
 <style scoped>
+.knowledge-sidebar__access { display: flex; align-items: center; gap: 10px; margin: 8px 16px 16px; padding: 11px 14px; border: 0; border-radius: 8px; background: transparent; color: #555; text-align: left; cursor: pointer; font-size: 14px; }
+.knowledge-sidebar__access:hover, .knowledge-sidebar__access.is-active { background: #eef4ff; color: #2563eb; }
 .knowledge-sidebar {
   box-sizing: border-box;
   display: flex;

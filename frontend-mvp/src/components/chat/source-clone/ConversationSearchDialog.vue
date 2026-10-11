@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { ChevronDown, MessageSquareText, Search, X } from 'lucide-vue-next'
+import { expertAgents } from '@/utils/expertPrototypeStore'
+import { dailyAssistant } from '@/mock/agents'
 
 type SearchItem = {
   id: string
@@ -24,16 +26,12 @@ const filterCategory = ref('')
 const filterAgent = ref('')
 const agentCascadeOpen = ref(false)
 
-const agentTree = [
-  { label: '日常办公', agents: [{ value: '耶虎', label: '耶虎' }] },
-  { label: '业务专家', agents: [
-    { value: '大表姐', label: '大表姐' },
-    { value: '组货专家', label: '组货专家' },
-    { value: '评价分析师', label: '评价分析师' },
-    { value: '灵感大王', label: '灵感大王' },
-  ]},
-]
-const currentCategory = computed(() => agentTree.find(c => c.label === filterCategory.value))
+const agentTree = computed(() => [
+  { label: '日常办公', agents: [{ value: dailyAssistant.name, label: dailyAssistant.name }] },
+  { label: '业务专家', agents: expertAgents.filter(agent => agent.isPublished && agent.reviewStatus === 'approved').map(agent => ({ value: agent.name, label: agent.name })) },
+])
+
+const currentCategory = computed(() => agentTree.value.find(c => c.label === filterCategory.value))
 function selectCategory(label: string) {
   filterCategory.value = filterCategory.value === label ? '' : label
   filterAgent.value = ''
@@ -61,7 +59,7 @@ const baseResults: SearchItem[] = [
     mode: 'daily',
     role: 'assistant',
     title: '主对话',
-    sender: '小智',
+    sender: dailyAssistant.name,
     excerpt:
       '电脑、文件、夜虎辅助人物布局：中间场景插画，上方标题，下方功能区。会议相关内容需要整理成清晰结论和后续行动。',
     date: '9月15日 23:05',
@@ -117,7 +115,7 @@ const filtered = computed(() => {
   return results.value.filter((item) => {
     if (keyword && !`${item.title}${item.excerpt}`.toLowerCase().includes(keyword)) return false
     if (filterCategory.value) {
-      const cat = agentTree.find(c => c.label === filterCategory.value)
+      const cat = agentTree.value.find(c => c.label === filterCategory.value)
       if (cat) {
         const agentValues = cat.agents.map(a => a.value)
         if (!agentValues.includes(item.sender) && !agentValues.includes(item.title)) {
@@ -242,6 +240,9 @@ function excerptData(text: string) {
               ><b>{{ item.title }}</b
               ><time>{{ item.date }}</time></span
             >
+            <span class="result-excerpt">
+              <span v-if="excerptData(item.excerpt).leading">…</span><template v-for="(segment, index) in excerptData(item.excerpt).segments" :key="index"><mark v-if="segment.matched">{{ segment.text }}</mark><span v-else>{{ segment.text }}</span></template><span v-if="excerptData(item.excerpt).trailing">…</span>
+            </span>
           </span>
         </button>
         <p v-if="!filtered.length" class="empty">没有找到符合筛选条件的消息</p>
@@ -414,6 +415,22 @@ function excerptData(text: string) {
   flex: none;
   color: #aaadb2;
   font-size: 12px;
+}
+.result-excerpt {
+  display: block;
+  overflow: hidden;
+  margin-top: 4px;
+  color: #858c96;
+  font-size: 12px;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.result-excerpt mark {
+  border-radius: 2px;
+  background: #fff0b5;
+  color: #3d4552;
+  padding: 0 1px;
 }
 .empty {
   padding: 70px;
