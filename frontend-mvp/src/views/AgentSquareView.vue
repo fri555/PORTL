@@ -263,7 +263,7 @@ function formatIcon(format: string) {
               <div v-if="knowledgeEntries.length" class="knowledge-list" :class="{ expanded: knowledgeExpanded }" data-testid="expert-knowledge-content">
                 <article v-for="item in visibleKnowledgeEntries" :key="item.id" class="knowledge-entry" data-testid="knowledge-entry" :data-kind="item.kind">
                   <component :is="item.kind === 'library' ? BookOpen : FileText" :size="18" />
-                  <div><strong :title="item.name">{{ item.name }}</strong><span>{{ item.kind === 'library' ? '知识库' : '文档' }} · 更新时间 {{ expertDateLabel(item.lastSuccessfulSyncAt) }}</span></div>
+                  <div><strong :title="item.name">{{ item.name }}</strong><span>所有人 · 上传时间 {{ expertDateLabel(item.lastSuccessfulSyncAt) }}</span></div>
                 </article>
               </div>
               <p v-else class="detail-empty">未引用知识内容</p>
