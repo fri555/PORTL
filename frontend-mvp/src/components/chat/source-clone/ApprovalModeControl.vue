@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Check, ChevronDown, Hand, LockKeyhole, Sparkles } from 'lucide-vue-next'
+import { Check, ChevronDown, Hand, Sparkles } from 'lucide-vue-next'
 
 export type ApprovalMode = 'default' | 'autonomous'
 
@@ -37,13 +37,12 @@ const modes: { value: ApprovalMode; label: string; description: string; icon: un
   {
     value: 'autonomous',
     label: '自主执行',
-    description: '完整计划直接执行；跳过非必填澄清；所有授权仍需人工确认',
+    description: '自动执行计划、跳过非必填澄清并同意可代办的执行审批；必填信息及本人授权仍需处理',
     icon: Sparkles,
   },
 ]
 
 function select(value: ApprovalMode) {
-  if (props.readonly) return
   emit('update:modelValue', value)
   open.value = false
 }
@@ -51,51 +50,47 @@ function select(value: ApprovalMode) {
 
 <template>
   <div ref="root" class="approval-mode" :class="{ 'is-readonly': readonly }" @keydown="escape">
-    <span v-if="readonly" class="approval-mode__fixed" data-testid="conversation-approval-mode" :title="modelValue === 'autonomous' ? '完整计划直接执行；跳过非必填澄清；所有授权仍需人工确认' : '本会话按现有规则逐项确认'">
-      <LockKeyhole :size="14" />{{ modelValue === 'autonomous' ? '自主执行' : '默认权限' }}
-    </span>
-    <template v-else>
+    <button
+      type="button"
+      ref="trigger"
+      class="approval-mode__trigger"
+      :class="{ 'approval-mode__trigger--readonly': readonly }"
+      data-testid="approval-mode-trigger"
+      aria-haspopup="menu"
+      :aria-expanded="open"
+      :title="modelValue === 'autonomous' ? '自动执行计划、跳过非必填澄清并同意可代办的执行审批；必填信息及本人授权仍需处理' : '本会话按现有规则逐项确认'"
+      @click="open = !open"
+      @keydown.esc="open = false"
+    >
+      <component :is="modelValue === 'autonomous' ? Sparkles : Hand" :size="14" />
+      {{ modelValue === 'autonomous' ? '自主执行' : '默认权限' }}
+      <ChevronDown :size="13" />
+    </button>
+    <section v-if="open" class="approval-mode__menu" role="menu" aria-label="选择执行方式">
+      <header>
+        <strong>权限控制</strong>
+        <small>切换后对当前会话立即生效</small>
+      </header>
       <button
+        v-for="item in modes"
+        :key="item.value"
         type="button"
-        ref="trigger"
-        class="approval-mode__trigger"
-        data-testid="approval-mode-trigger"
-        aria-haspopup="menu"
-        :aria-expanded="open"
-        @click="open = !open"
-        @keydown.esc="open = false"
+        role="menuitemradio"
+        :aria-checked="modelValue === item.value"
+        :data-testid="'approval-mode-' + item.value"
+        @click="select(item.value)"
       >
-        <component :is="modelValue === 'autonomous' ? Sparkles : Hand" :size="14" />
-        {{ modelValue === 'autonomous' ? '自主执行' : '默认权限' }}
-        <ChevronDown :size="13" />
+        <span class="approval-mode__icon"><component :is="item.icon" :size="16" /></span>
+        <span><strong>{{ item.label }}</strong><small>{{ item.description }}</small></span>
+        <Check v-if="modelValue === item.value" :size="16" />
       </button>
-      <section v-if="open" class="approval-mode__menu" role="menu" aria-label="选择执行方式">
-        <header>
-          <strong>执行方式</strong>
-          <small>创建会话后不可切换，新会话默认权限</small>
-        </header>
-        <button
-          v-for="item in modes"
-          :key="item.value"
-          type="button"
-          role="menuitemradio"
-          :aria-checked="modelValue === item.value"
-          :data-testid="'approval-mode-' + item.value"
-          @click="select(item.value)"
-        >
-          <span class="approval-mode__icon"><component :is="item.icon" :size="16" /></span>
-          <span><strong>{{ item.label }}</strong><small>{{ item.description }}</small></span>
-          <Check v-if="modelValue === item.value" :size="16" />
-        </button>
-      </section>
-    </template>
+    </section>
   </div>
 </template>
 
 <style scoped>
 .approval-mode { position: relative; }
-.approval-mode__trigger,
-.approval-mode__fixed {
+.approval-mode__trigger {
   display: inline-flex;
   height: 32px;
   align-items: center;
@@ -114,7 +109,7 @@ function select(value: ApprovalMode) {
 }
 .approval-mode__trigger:hover,
 .approval-mode__trigger[aria-expanded='true'] { background: #f3f5f7; color: #202631; }
-.approval-mode__fixed { background: #f3f5f7; color: #677180; }
+.approval-mode__trigger--readonly { background: #f3f5f7; }
 .approval-mode__menu {
   position: absolute;
   z-index: 80;

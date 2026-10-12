@@ -39,3 +39,35 @@ export interface QaPanelMessage {
   content: string
   citation?: string
 }
+
+/** A single writable knowledge-base or first-level folder destination. */
+export interface KnowledgeDestination {
+  id: string
+  name: string
+  kind?: 'kb' | 'folder'
+  parentId?: string
+  path?: string
+}
+
+export type DingTalkSyncFrequency = '不自动同步' | '每天' | '每周'
+export interface DingTalkDocumentMapping {
+  sourceDocumentId: string
+  sourceName: string
+  localFileId: string
+  status: '成功' | '失败'
+  failureReason?: string
+}
+export interface DingTalkImportTask {
+  importTaskId: string
+  platformUserId: string
+  userAlias: string
+  destinationId: string
+  destinationPath: string
+  frequency: DingTalkSyncFrequency
+  schedule: string
+  latestSyncAt: string
+  executedAt?: string
+  status: '同步成功' | '同步中' | '部分失败' | '同步失败'
+  failureReason?: string
+  documentMappings: DingTalkDocumentMapping[]
+}

@@ -95,7 +95,7 @@ describe('production-aligned prototype smoke flows', () => {
     await wrapper.get('textarea[aria-label="向小马提问"]').setValue('生成一份直播复盘')
     await wrapper.get('button[aria-label="发送"]').trigger('click')
     await flushPromises()
-    expect(router.currentRoute.value.path).toBe('/chat/daily-auth')
+    expect(router.currentRoute.value.path).toMatch(/^\/chat\/daily-auth-/)
     expect(wrapper.text()).toContain('全部完成')
     await wrapper.get('[data-testid="header-brand-anchor"]').trigger('click')
     await flushPromises()

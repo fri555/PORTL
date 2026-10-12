@@ -5,18 +5,24 @@ import { businessExpertProfiles, dailyAssistantProfile, type BusinessExpertProfi
 
 const dailyAvatar = import.meta.env.BASE_URL + 'assets/agents-online/tianma-assistant.png'
 
+/** Prototype IDs that should render without permission (simulate no-access). */
+const noPermissionIds = new Set(['biz-03', 'biz-09', 'biz-12'])
+
 // Unknown source values remain empty; the IDs are local prototype identifiers.
 function toAgent(profile: BusinessExpertProfile): Agent {
   const firstPublishedAt = profile.firstPublishedAt ? profile.firstPublishedAt + 'T00:00:00+08:00' : undefined
+  const usePermission = noPermissionIds.has(profile.id) ? false : undefined
   return {
     id: profile.id, name: profile.name, description: profile.description,
     avatarUrl: getBusinessExpertAvatarUrl(profile.id) ?? dailyAvatar,
     category: profile.category, capabilityLevel: 1,
-    developerId: '', developerName: '', developerDepartment: '',
+    developerId: '', developerName: profile.developerName, developerDepartment: profile.developerDepartment,
+    useDepartments: [...profile.useDepartments],
+    ...(usePermission !== undefined ? { usePermission } : {}),
     status: 'online', reviewStatus: 'approved', isPublished: true,
     systemPrompt: '', defaultModel: '', welcomeMessage: '', quickCommands: [...profile.quickCommands],
     knowledgeBaseIds: [], toolIds: [], skillIds: [], skillCount: 0, toolCount: 0,
-    version: '', totalCalls: 0, avgRating: 0, favoriteCount: 0,
+    version: '', totalCalls: 0, avgRating: 0,
     usageInstructions: usageContentFromForm(profile),
     firstPublishedAt, createdAt: '', updatedAt: '',
     capabilities: {
@@ -26,6 +32,8 @@ function toAgent(profile: BusinessExpertProfile): Agent {
       selectedToolNames: [],
       knowledgeBases: profile.knowledgeNames.map((name, index) => ({
         id: 'prototype-source:' + profile.id + ':' + index, name,
+        ownerName: profile.developerName,
+        lastUploadedAt: '2026-09-' + String(10 + index).padStart(2, '0'),
       })),
       ...(profile.id === 'biz-02' ? {
         tools: [

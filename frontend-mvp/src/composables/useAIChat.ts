@@ -9,6 +9,10 @@ export interface ThinkingStep {
   icon: string
   elapsed?: number
   errorMsg?: string
+  module?: 'status' | 'plan' | 'todo' | 'reply'
+  kind?: 'summary' | 'plan' | 'tool' | 'todo' | 'reply'
+  toolName?: string
+  toolLabel?: string
 }
 
 export interface ChatMessage {
@@ -257,123 +261,213 @@ function createAIChat() {
       return [
         {
           id: 'greeting-intent',
-          label: '小马理解需求',
-          detail: '识别为寒暄闲聊，无需查知识库、联网搜索或调用工具。',
+          label: '理解用户输入',
+          detail: '识别为寒暄闲聊，无需调用工具。',
           status: 'pending',
-          icon: '💬',
+          icon: 'message',
+          module: 'status',
+          kind: 'summary',
         },
         {
           id: 'greeting-answer',
-          label: '小马直接回复',
-          detail: '工具必要性判断未命中任何工具，直接使用轻量对话链路回复。',
+          label: '生成最终回复',
+          detail: '使用轻量对话链路直接回复。',
           status: 'pending',
-          icon: '⚡',
+          icon: 'message',
+          module: 'reply',
+          kind: 'reply',
         },
       ]
     }
+
     if (intent.includes('[日常办公') || intent.includes('[快速模式')) {
       return [
         {
           id: 'intent',
-          label: '小马理解需求',
-          detail: '识别为日常办公任务，进入 RAG 路径...',
+          label: '理解任务',
+          detail: '正在确认任务目标和资料范围。',
           status: 'pending',
-          icon: '🔍',
+          icon: 'sparkles',
+          module: 'status',
+          kind: 'summary',
         },
         {
           id: 'rag',
-          label: '小马查阅资料',
-          detail: '检索知识库并按需补充网络搜索资料...',
+          label: '检索相关资料',
+          detail: '正在检索知识库，并按需补充网页资料。',
           status: 'pending',
-          icon: '📚',
+          icon: 'database',
+          module: 'status',
+          kind: 'tool',
+          toolName: 'knowledge_search',
+          toolLabel: '资料检索',
         },
         {
           id: 'answer',
-          label: '小马整理回答',
-          detail: '整合为可直接阅读的 Markdown 回答...',
+          label: '生成最终回复',
+          detail: '正在整理可直接阅读的回答。',
           status: 'pending',
-          icon: '⚡',
+          icon: 'message',
+          module: 'reply',
+          kind: 'reply',
         },
       ]
     }
-    const steps: ThinkingStep[] = [
+
+    return [
       {
         id: 'intent',
-        label: '小马理解需求',
-        detail: `分析用户输入，明确目标、约束和交付标准...`,
+        label: '理解任务',
+        detail: '正在确认目标、约束和交付标准。',
         status: 'pending',
-        icon: '🔍',
+        icon: 'sparkles',
+        module: 'status',
+        kind: 'summary',
       },
       {
         id: 'plan',
-        label: '小马制定计划',
-        detail: '按 P&E 拆解为需求校验、方案匹配、产物生成和最终整合...',
+        label: '制定执行计划',
+        detail: '需求校验 → 资料检索 → 方案匹配 → 预算计算 → 交付检查。',
         status: 'pending',
-        icon: '🧠',
+        icon: 'list',
+        module: 'plan',
+        kind: 'plan',
       },
       {
-        id: 'knowledge',
-        label: '小马查阅知识库',
-        detail: '匹配成功案例池、通用预算池、个性化方案池...',
+        id: 'todo-validate',
+        label: '校验需求字段',
+        detail: '确认客户类型、预算、场景及交付要求。',
         status: 'pending',
-        icon: '📚',
+        icon: 'check',
+        module: 'todo',
+        kind: 'todo',
       },
       {
-        id: 'expert',
-        label: '小马调用工具',
-        detail: '调用方案匹配、预算分档、产物生成等工具...',
+        id: 'knowledge-cases',
+        label: '查询成功案例',
+        detail: '正在读取当前用户有权限的成功案例。',
         status: 'pending',
-        icon: '🔧',
+        icon: 'database',
+        module: 'status',
+        kind: 'tool',
+        toolName: 'knowledge_search',
+        toolLabel: '知识库检索',
+      },
+      {
+        id: 'knowledge-template',
+        label: '查询方案模板',
+        detail: '正在补充查询可复用的方案与预算模板。',
+        status: 'pending',
+        icon: 'database',
+        module: 'status',
+        kind: 'tool',
+        toolName: 'knowledge_search',
+        toolLabel: '知识库检索',
+      },
+      {
+        id: 'todo-search',
+        label: '检索授权资料',
+        detail: '读取案例、模板及商品资料。',
+        status: 'pending',
+        icon: 'check',
+        module: 'todo',
+        kind: 'todo',
+      },
+      {
+        id: 'solution-match',
+        label: '匹配候选方案',
+        detail: '正在根据场景与预算筛选候选方案。',
+        status: 'pending',
+        icon: 'wrench',
+        module: 'status',
+        kind: 'tool',
+        toolName: 'solution_match',
+        toolLabel: '方案匹配',
+      },
+      {
+        id: 'todo-solution',
+        label: '生成候选方案',
+        detail: '组合商品与方案结构。',
+        status: 'pending',
+        icon: 'check',
+        module: 'todo',
+        kind: 'todo',
+      },
+      {
+        id: 'budget-calc',
+        label: '计算预算分档',
+        detail: '正在生成经济型、均衡型和品质型三档预算。',
+        status: 'pending',
+        icon: 'calculator',
+        module: 'status',
+        kind: 'tool',
+        toolName: 'budget_calculator',
+        toolLabel: '预算计算',
+      },
+      {
+        id: 'todo-files',
+        label: '检查交付文件',
+        detail: '检查 Markdown、Excel 与 PPT 产物。',
+        status: 'pending',
+        icon: 'check',
+        module: 'todo',
+        kind: 'todo',
+      },
+      {
+        id: 'todo-reply',
+        label: '整理最终回复',
+        detail: '汇总结论、引用来源和知识缺口。',
+        status: 'pending',
+        icon: 'check',
+        module: 'todo',
+        kind: 'todo',
       },
       {
         id: 'output',
-        label: '小马整理交付',
-        detail: '整理Markdown方案、Excel清单、PPT草稿、知识缺口检测...',
+        label: '生成最终回复',
+        detail: '正在整理结论、交付文件和需要确认的信息。',
         status: 'pending',
-        icon: '📄',
+        icon: 'message',
+        module: 'reply',
+        kind: 'reply',
       },
     ]
-    return steps
   }
 
   function sleep(ms: number) { return new Promise((r) => setTimeout(r, ms)) }
 
   async function runSimulatedThinking(steps: ThinkingStep[], intent: string): Promise<string> {
-    if (isPureGreeting(intent)) {
-      const details = ['小马识别到这是纯寒暄输入。', '已跳过 RAG、P&E、MCP 和所有工具调用。']
-      for (let i = 0; i < steps.length; i++) {
-        steps[i].status = 'running'
-        const startedAt = Date.now()
-        await sleep(300 + Math.random() * 120)
-        steps[i].status = 'completed'
-        steps[i].detail = details[i]
-        steps[i].elapsed = Date.now() - startedAt
-      }
-      return '你好，我是小马。有什么需要我帮你处理的，直接告诉我就行。'
+    const details: Record<string, string> = {
+      'greeting-intent': '已识别为寒暄输入，跳过知识库、联网搜索和工具调用。',
+      'greeting-answer': '已生成轻量回复。',
+      intent: '已确认任务目标、范围和交付要求。',
+      plan: '已生成执行计划：需求校验、资料检索、方案匹配、预算计算和交付检查。',
+      rag: '检索完成：内部知识库 4 条，网页资料 2 条。',
+      answer: '已整合资料并生成最终回答。',
+      'todo-validate': '需求字段校验完成。',
+      'knowledge-cases': '返回 3 个运动鞋团购成功案例。',
+      'knowledge-template': '返回 1 份通用预算模板和 1 份方案字段模板。',
+      'todo-search': '授权范围内的资料检索完成。',
+      'solution-match': '匹配到 6 个候选组合，已保留 3 个可执行方案。',
+      'todo-solution': '候选方案生成完成。',
+      'budget-calc': '已生成经济型、均衡型和品质型三档预算。',
+      'todo-files': 'Markdown、Excel 和 PPT 产物检查完成。',
+      'todo-reply': '最终回复与引用来源整理完成。',
+      output: '最终回复已生成，并标注需人工确认的库存与价格信息。',
     }
-    const isFast = intent.includes('[日常办公') || intent.includes('[快速模式')
-    const delays = isFast ? [900, 1200, 900] : [1800, 2200, 2600, 2800, 2000]
-    const details = isFast
-      ? [
-          `小马识别到这是日常办公任务：用户询问"${intent.slice(0, 30)}..."，采用 RAG 架构处理。`,
-          '小马正在查阅知识库，并按需搜索网络资料；优先使用内部知识库作为回答依据。',
-          '已整合知识库片段和网络资料；如需生成交付物或跨系统执行，可切换到专家模式。',
-        ]
-      : [
-          `小马识别到这是专家模式任务：用户询问"${intent.slice(0, 30)}..."，匹配到[方案中心]业务域，置信度 0.92。`,
-          `P&E计划已生成：1.需求校验 2.知识库检索 3.方案匹配 4.产物生成 5.最终整合。`,
-          `小马正在查阅知识库：运动鞋团购成功案例 ×3、通用预算池模板 ×1、方案中心字段模板 ×1。匹配度 78%。`,
-          `小马调用工具：search_solution 匹配候选方案，calculate_budget 生成三档预算，准备产物结构。`,
-          `✅ Markdown方案已生成\n✅ Excel组货清单已生成\n✅ PPT客户方案草稿已生成\n⚠️ 知识缺口：部分品牌最新库存及价格待确认`,
-        ]
 
-    for (let i = 0; i < steps.length; i++) {
-      steps[i].status = 'running'
+    for (const step of steps) {
+      step.status = 'running'
       const startedAt = Date.now()
-      await sleep(delays[i] + Math.random() * 400)
-      steps[i].status = 'completed'
-      steps[i].detail = details[i]
-      steps[i].elapsed = Date.now() - startedAt
+      const delay = step.kind === 'tool' ? 760 : step.kind === 'todo' ? 220 : 420
+      await sleep(delay + Math.random() * 160)
+      step.status = 'completed'
+      step.detail = details[step.id] ?? step.detail
+      step.elapsed = Date.now() - startedAt
+    }
+
+    if (isPureGreeting(intent)) {
+      return '你好，我是小马。有什么需要我帮你处理的，直接告诉我就行。'
     }
     return buildSimulatedResponse(intent)
   }
@@ -723,3 +817,4 @@ export function useAIChat() {
   if (!_instance) _instance = createAIChat()
   return _instance
 }
+

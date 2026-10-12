@@ -1,167 +1,189 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { FileText, ShieldCheck, UserRound } from 'lucide-vue-next'
-import { ElAlert, ElButton, ElCheckbox, ElDialog, ElForm, ElFormItem, ElInput, ElOption, ElRadio, ElRadioGroup, ElSelect } from 'element-plus'
-import { getPrototypeScenario, personalDingTalkDocuments, type BoundDingTalkIdentity, type ImportableDocument } from './dingtalkPrototype'
+import { AlertTriangle, ChevronRight, FileText, FolderOpen, Search, X } from 'lucide-vue-next'
+import { ElButton, ElDialog, ElInput, ElOption, ElSelect } from 'element-plus'
+import KnowledgeDestinationSelect from './KnowledgeDestinationSelect.vue'
+import type { KnowledgeDestination } from '@/types/knowledge-source'
+import { documents as documentHierarchy, getPrototypeScenario, personalDingTalkDocuments, type BoundDingTalkIdentity, type ImportableDocument } from './dingtalkPrototype'
 
-const props = withDefaults(defineProps<{
-  identity: BoundDingTalkIdentity
-  destinations: { id: string; name: string }[]
-  applicationAvailable?: boolean
-}>(), { applicationAvailable: true })
-const emit = defineEmits<{
-  close: []
-  authorize: []
-  complete: [record: { destinationId: string; newDestination?: string; documents: ImportableDocument[]; platformUserId: string }]
-}>()
-const scenario = getPrototypeScenario()
-const keyword = ref('')
-const selectedIds = ref<string[]>([])
-const destination = ref('')
-const destinationMode = ref<'existing' | 'new'>('existing')
-const newDestination = ref('')
-const importing = ref(false)
-const results = ref<{ document: ImportableDocument; status: 'pending' | 'success' | 'failed'; reason?: string }[]>([])
-const importedCount = computed(() => results.value.filter(result => result.status === 'success').length)
-const error = ref('')
-let importTimer: number | undefined
-const documents = computed(() => props.applicationAvailable ? personalDingTalkDocuments(props.identity, scenario) : [])
-const visibleDocuments = computed(() => documents.value.filter(document => document.name.includes(keyword.value.trim())))
-const selectableIds = computed(() => new Set(documents.value.filter(document => document.exportable).map(document => document.id)))
-const failedItems = computed(() => results.value.filter(result => result.status === 'failed'))
-const ready = computed(() => props.applicationAvailable && props.identity.status === 'bound')
-const hasValidTarget = computed(() => destinationMode.value === 'existing'
-  ? props.destinations.some(item => item.id === destination.value)
-  : newDestination.value.trim().length > 0 && newDestination.value.trim().length <= 60 && !props.destinations.some(item => item.name === newDestination.value.trim()))
-const canImport = computed(() => ready.value && selectedIds.value.length > 0 && hasValidTarget.value && !importing.value)
-const canRetry = computed(() => ready.value && !importing.value && hasValidTarget.value && failedItems.value.some(result => selectableIds.value.has(result.document.id)))
-watch(() => [props.identity.platformUserId, props.identity.dingUserId, props.identity.status, props.applicationAvailable], () => {
-  window.clearTimeout(importTimer)
-  selectedIds.value = []
-  importing.value = false
-  results.value = []
-  error.value = ''
-}, { flush: 'sync' })
-watch(() => props.destinations, () => {
-  if (!props.destinations.some(item => item.id === destination.value)) destination.value = ''
-}, { deep: true })
-onBeforeUnmount(() => window.clearTimeout(importTimer))
-function selectDocument(id: string, checked: unknown) {
-  if (!selectableIds.value.has(id) || importing.value) return
-  selectedIds.value = checked ? [...new Set([...selectedIds.value, id])] : selectedIds.value.filter(item => item !== id)
-  results.value = []
+type Frequency='不自动同步'|'每天'|'每周'
+const props=withDefaults(defineProps<{identity:BoundDingTalkIdentity;destinations:KnowledgeDestination[];applicationAvailable?:boolean;defaultDestinationId?:string}>(),{applicationAvailable:true,defaultDestinationId:''})
+const emit=defineEmits<{close:[];authorize:[];complete:[record:{destinationId:string;documents:ImportableDocument[];platformUserId:string;frequency:Frequency;schedule:string}]}>()
+const scenario=getPrototypeScenario(), destination=ref(props.defaultDestinationId), keyword=ref(''), selectedIds=ref<string[]>([]), pickerOpen=ref(false), importing=ref(false), error=ref('')
+const frequency=ref<Frequency>('每天'), schedule=ref('00:00')
+const documents=computed(()=>props.applicationAvailable?personalDingTalkDocuments(props.identity,scenario):[])
+interface SourceNode { id: string; label?: string; type: string; children?: SourceNode[] }
+interface PickerNode { id: string; name: string; document?: ImportableDocument; children: PickerNode[] }
+interface PickerRow { node: PickerNode; depth: number; expanded: boolean }
+const expandedIds = ref<string[]>([])
+const pickerSelectedIds = ref<string[]>([])
+const pickerTree = computed(() => {
+  const allowed = new Map(documents.value.map(document => [document.id, document]))
+  const build = (source: SourceNode): PickerNode | null => {
+    if (source.type === 'doc') {
+      const document = allowed.get(source.id)
+      return document ? { id: document.id, name: document.name, document, children: [] } : null
+    }
+    const sources = source.id === 'products'
+      ? [...(source.children ?? []), { id: 'native-table', type: 'doc' }]
+      : source.children ?? []
+    const children = sources.map(build).filter((node): node is PickerNode => node !== null)
+    return children.length ? { id: source.id, name: source.label ?? source.id, children } : null
+  }
+  return documentHierarchy.map(build).filter((node): node is PickerNode => node !== null)
+})
+const filteredTree = computed(() => {
+  const search = keyword.value.trim().toLocaleLowerCase()
+  const filter = (node: PickerNode): PickerNode | null => {
+    if (!search || node.name.toLocaleLowerCase().includes(search)) return node
+    const children = node.children.map(filter).filter((child): child is PickerNode => child !== null)
+    return children.length ? { ...node, children } : null
+  }
+  return pickerTree.value.map(filter).filter((node): node is PickerNode => node !== null)
+})
+const pickerRows = computed(() => {
+  const rows: PickerRow[] = []
+  const visit = (node: PickerNode, depth: number) => {
+    const expanded = !node.document && (!!keyword.value.trim() || expandedIds.value.includes(node.id))
+    rows.push({ node, depth, expanded })
+    if (expanded) node.children.forEach(child => visit(child, depth + 1))
+  }
+  filteredTree.value.forEach(node => visit(node, 0))
+  return rows
+})
+function documentIds(node: PickerNode): string[] {
+  return node.document ? [node.id] : node.children.flatMap(documentIds)
+}
+function completeNode(node: PickerNode): PickerNode {
+  const find = (nodes: PickerNode[]): PickerNode | undefined => {
+    for (const candidate of nodes) {
+      if (candidate.id === node.id) return candidate
+      const child = find(candidate.children)
+      if (child) return child
+    }
+  }
+  return find(pickerTree.value) ?? node
+}
+function selectionState(node: PickerNode): 'none' | 'some' | 'all' {
+  const ids = documentIds(completeNode(node))
+  const count = ids.filter(id => pickerSelectedIds.value.includes(id)).length
+  return count === 0 ? 'none' : count === ids.length ? 'all' : 'some'
+}
+function toggleNode(node: PickerNode) {
+  const ids = documentIds(completeNode(node))
+  pickerSelectedIds.value = selectionState(node) === 'all'
+    ? pickerSelectedIds.value.filter(id => !ids.includes(id))
+    : [...new Set([...pickerSelectedIds.value, ...ids])]
+}
+function toggleFolder(node: PickerNode) {
+  expandedIds.value = expandedIds.value.includes(node.id)
+    ? expandedIds.value.filter(id => id !== node.id) : [...expandedIds.value, node.id]
+}
+function openPicker() {
+  pickerSelectedIds.value = [...selectedIds.value]
+  pickerOpen.value = true
+}
+function confirmPicker() {
+  selectedIds.value = [...pickerSelectedIds.value]
+  pickerOpen.value = false
   error.value = ''
 }
-function importDocuments(retryFailed = false) {
-  if (importing.value) return
-  error.value = ''
-  if (!ready.value) { error.value = '请先完成当前账号的钉钉身份授权'; return }
-  if (!hasValidTarget.value) { error.value = '请选择有写入权限的目标知识库，或填写不重名的1–60字新库名称'; return }
-  const ids = retryFailed ? failedItems.value.filter(result => selectableIds.value.has(result.document.id)).map(result => result.document.id) : selectedIds.value
-  const selected = documents.value.filter(document => ids.includes(document.id) && document.exportable)
-  if (!selected.length || selected.length !== ids.length) { error.value = '文档权限或导出状态已变化，请重新选择'; return }
-  const identityKey = props.identity.platformUserId + ':' + props.identity.dingUserId
-  const targetMode = destinationMode.value
-  const targetId = targetMode === 'new' ? 'local-dingtalk-' + Date.now() : destination.value
-  const targetName = newDestination.value.trim()
-  if (retryFailed) results.value = results.value.map(result => ids.includes(result.document.id) ? { ...result, status: 'pending', reason: undefined } : result)
-  else results.value = selected.map(document => ({ document, status: 'pending' }))
+function rowKeydown(event: KeyboardEvent, row: PickerRow) {
+  if (event.target !== event.currentTarget) return
+  if (event.key === ' ') { event.preventDefault(); toggleNode(row.node) }
+  if (!row.node.document && !keyword.value.trim() && ((event.key === 'ArrowRight' && !row.expanded) || (event.key === 'ArrowLeft' && row.expanded))) {
+    event.preventDefault(); toggleFolder(row.node)
+  }
+}
+const selectedDocuments=computed(()=>selectedIds.value.map(id=>documents.value.find(item=>item.id===id)).filter(Boolean) as ImportableDocument[])
+const unsupportedCount=computed(()=>selectedDocuments.value.filter(item=>!item.exportable).length)
+const ready=computed(()=>props.applicationAvailable&&props.identity.status==='bound')
+const validSchedule=computed(()=>frequency.value==='不自动同步'||/^([01]\d|2[0-3]):[0-5]\d$/.test(schedule.value))
+const canImport=computed(()=>ready.value&&props.destinations.some(item=>item.id===destination.value)&&selectedDocuments.value.length>0&&!unsupportedCount.value&&validSchedule.value&&!importing.value)
+watch(()=>props.defaultDestinationId, id=>{if(id&&props.destinations.some(item=>item.id===id))destination.value=id})
+watch(()=>props.destinations,()=>{if(!props.destinations.some(item=>item.id===destination.value))destination.value=''},{deep:true})
+function removeDocument(id:string){selectedIds.value=selectedIds.value.filter(item=>item!==id)}
+let importTimer: number | undefined
+watch(() => [props.identity.platformUserId, props.identity.dingUserId, props.identity.status], () => {
+  if (importTimer) window.clearTimeout(importTimer)
+  importing.value = false
+  selectedIds.value = []
+  pickerSelectedIds.value = []
+  pickerOpen.value = false
+})
+onBeforeUnmount(() => { if (importTimer) window.clearTimeout(importTimer) })
+function submit() {
+  if (!canImport.value) return
+  const selected = [...selectedDocuments.value]
+  const platformUserId = props.identity.platformUserId
+  const destinationId = destination.value
+  const selectedFrequency = frequency.value
+  const selectedSchedule = selectedFrequency === '不自动同步' ? '—' : selectedFrequency === '每周' ? '周一 ' + schedule.value : schedule.value
   importing.value = true
   importTimer = window.setTimeout(() => {
     importing.value = false
-    const targetStillValid = targetMode === 'new'
-      ? !props.destinations.some(item => item.name === targetName)
-      : props.destinations.some(item => item.id === targetId)
-    if (!ready.value || identityKey !== props.identity.platformUserId + ':' + props.identity.dingUserId ||
-      !targetStillValid || selected.some(document => !selectableIds.value.has(document.id))) {
-      results.value = results.value.map(result => result.status === 'pending' ? { ...result, status: 'failed', reason: '身份、文档或目标权限已变化' } : result)
-      error.value = '身份、文档或目标权限已变化，本次未导入，请重新选择'
+    if (!ready.value || props.identity.platformUserId !== platformUserId
+      || !props.destinations.some(item => item.id === destinationId)
+      || selected.some(item => !documents.value.some(current => current.id === item.id && current.exportable))) {
+      error.value = '权限或连接已变更，本次未导入，请重新选择。'
       return
     }
-    const failId = scenario === 'personal-partial' && !retryFailed ? selected[0]?.id : undefined
-    const success = selected.filter(document => document.id !== failId)
-    results.value = results.value.map(result => {
-      if (!ids.includes(result.document.id)) return result
-      return result.document.id === failId
-        ? { ...result, status: 'failed', reason: '模拟导出超时，可单独重试' }
-        : { ...result, status: 'success', reason: undefined }
-    })
-    if (success.length) {
-      emit('complete', { destinationId: targetId, ...(targetMode === 'new' ? { newDestination: targetName } : {}), documents: success, platformUserId: props.identity.platformUserId })
-      destinationMode.value = 'existing'
-      destination.value = targetId
-      newDestination.value = ''
-    }
-    selectedIds.value = []
-  }, 700)
+    emit('complete', { destinationId, documents: selected, platformUserId, frequency: selectedFrequency, schedule: selectedSchedule })
+    emit('close')
+  }, 500)
 }
 </script>
 
 <template>
-  <ElDialog :model-value="true" title="从钉钉导入文档" width="min(760px, 95vw)" align-center :close-on-click-modal="false" @close="emit('close')">
-    <div class="personal-import" data-testid="dingtalk-personal-import">
-      <ElAlert title="交互原型 · 身份、文档和权限为演示数据，不会实际连接钉钉。" type="info" :closable="false" show-icon />
-      <div class="identity-card">
-        <span class="identity-icon"><UserRound :size="21" /></span>
-        <div><strong>我的钉钉身份</strong><p>{{ identity.displayName }} <span v-if="identity.status === 'bound'">· 已绑定当前账号</span></p></div>
-        <span class="identity-status" :class="identity.status">{{ identity.status === 'bound' ? '身份已绑定' : identity.status === 'expired' ? '授权已失效' : '尚未绑定' }}</span>
+<ElDialog :model-value="true" title="导入文件" width="min(760px,95vw)" align-center :close-on-click-modal="false" @close="emit('close')">
+  <div class="import-body" data-testid="dingtalk-personal-import">
+    <label class="field-label">上传至 <b>*</b></label>
+    <KnowledgeDestinationSelect v-model="destination" :destinations="destinations" label="上传至" :disabled="importing" />
+    <div v-if="!destinations.length" class="inline-warning"><AlertTriangle :size="15"/>暂无可写入位置，请先创建个人知识库或申请写入权限。</div>
+
+    <section class="choose-area" :class="{disabled:!ready}">
+      <FolderOpen :size="34"/><strong>{{selectedDocuments.length?`已选择 ${selectedDocuments.length} 篇钉钉文档`:'选择钉钉文档'}}</strong>
+      <span>{{ready?'仅展示当前登录用户有权限访问的文档':'当前钉钉身份暂不可用'}}</span>
+      <ElButton :disabled="!ready||importing" @click="openPicker">选择文件</ElButton>
+    </section>
+
+    <section class="selected-panel" aria-label="已选钉钉文档">
+      <header><strong>已选文件</strong><span>{{selectedDocuments.length}} 篇</span></header>
+      <div v-if="selectedDocuments.length" class="selected-grid">
+        <article v-for="document in selectedDocuments" :key="document.id" :class="{unsupported:!document.exportable}"><FileText :size="18"/><div><strong>{{document.name}}</strong><small>{{document.format}} · {{document.updatedAt}}</small><em v-if="!document.exportable">暂不支持：{{document.exportReason}}</em></div><button type="button" :aria-label="`移除${document.name}`" @click="removeDocument(document.id)"><X :size="14"/></button></article>
       </div>
-      <p class="permission-note"><ShieldCheck :size="16" />按当前账号绑定的钉钉身份展示文档，应用连接不会扩大你的文档权限。</p>
-      <ElAlert v-if="!applicationAvailable" title="钉钉应用连接不可用，请联系管理员恢复；当前不能导入。" type="warning" :closable="false" />
-      <div v-else-if="identity.status !== 'bound'" class="identity-recovery">
-        <ElAlert :title="identity.status === 'expired' ? '请重新完成当前账号的钉钉授权后导入。' : '请先完成当前账号的钉钉身份绑定后导入。'" type="warning" :closable="false" />
-        <ElButton style="margin-top: 10px" @click="emit('authorize')">模拟授权当前账号</ElButton>
-        <p class="import-rule">正式授权由钉钉确认当前账号，不支持填写或切换其他人的 User ID。</p>
+      <div v-else class="empty-selected">选择后的文档会显示在这里</div>
+    </section>
+
+    <div class="sync-row"><label><span>同步频率</span><ElSelect v-model="frequency" aria-label="同步频率"><ElOption label="不自动同步" value="不自动同步"/><ElOption label="每天" value="每天"/><ElOption label="每周" value="每周"/></ElSelect></label><label v-if="frequency!=='不自动同步'"><span>{{frequency==='每周'?'每周一执行时间':'每日执行时间'}}</span><ElInput v-model="schedule" type="time" aria-label="同步执行时间"/></label></div>
+    <p v-if="unsupportedCount" class="inline-warning"><AlertTriangle :size="15"/>有 {{unsupportedCount}} 个文件格式暂不支持，请移除后导入。</p>
+    <p v-if="error" class="inline-warning"><AlertTriangle :size="15"/>{{error}}</p>
+  </div>
+  <template #footer><ElButton @click="emit('close')">取消</ElButton><ElButton type="primary" :disabled="!canImport" :loading="importing" @click="submit">确认导入</ElButton></template>
+</ElDialog>
+
+<ElDialog v-model="pickerOpen" title="选择钉钉文档" width="min(680px,92vw)" align-center append-to-body>
+  <div class="picker">
+    <div class="picker-path">根目录 / 知识库</div>
+    <div class="picker-search"><Search :size="15"/><input v-model="keyword" placeholder="搜索有权限的文档" aria-label="搜索钉钉文档"/></div>
+    <div class="picker-tree" role="tree" aria-label="钉钉文档目录" aria-multiselectable="true">
+      <div v-for="row in pickerRows" :key="row.node.id" class="picker-tree-row" :class="{ selected: selectionState(row.node) === 'all' }" role="treeitem" :aria-level="row.depth + 1" :aria-expanded="row.node.document ? undefined : row.expanded" :aria-checked="selectionState(row.node) === 'some' ? 'mixed' : selectionState(row.node) === 'all'" :style="{ paddingLeft: (12 + row.depth * 24) + 'px' }" tabindex="0" @keydown="rowKeydown($event, row)">
+        <button v-if="!row.node.document" type="button" class="tree-expand" :aria-label="(row.expanded ? '收起' : '展开') + row.node.name" @click="toggleFolder(row.node)"><ChevronRight :size="15" :class="{ expanded: row.expanded }"/></button>
+        <span v-else class="tree-spacer"/>
+        <label class="tree-choice">
+          <input type="checkbox" :aria-label="'选择' + row.node.name" :checked="selectionState(row.node) === 'all'" :indeterminate="selectionState(row.node) === 'some'" @change="toggleNode(row.node)"/>
+          <FileText v-if="row.node.document" :size="17"/><FolderOpen v-else :size="18"/>
+          <span class="tree-name">{{ row.node.name }}<small v-if="row.node.document">{{ row.node.document.format }}</small></span>
+        </label>
+        <em v-if="row.node.document && !row.node.document.exportable" class="tree-unsupported">格式暂不支持</em>
       </div>
-      <template v-else>
-        <ElInput v-model="keyword" placeholder="搜索我能访问的钉钉文档" aria-label="搜索我的钉钉文档" maxlength="60" clearable :disabled="importing" />
-        <div class="document-list" aria-label="我能访问的钉钉文档">
-          <label v-for="document in visibleDocuments" :key="document.id" class="import-document" :class="{ unavailable: !document.exportable }">
-            <ElCheckbox :model-value="selectedIds.includes(document.id)" :disabled="!document.exportable || importing" :aria-label="document.name" @change="value => selectDocument(document.id, value)" />
-            <FileText :size="19" />
-            <span class="document-label"><strong>{{ document.name }}</strong><small>{{ document.format }} · 更新于 {{ document.updatedAt }}</small></span>
-            <span class="export-status">{{ document.exportable ? '可导入' : document.exportReason }}</span>
-          </label>
-          <p v-if="!visibleDocuments.length" class="empty-documents">{{ keyword ? '没有匹配的文档' : '暂无可访问文档' }}</p>
-        </div>
-        <ElForm label-position="top" @submit.prevent="importDocuments()">
-          <ElFormItem label="目标知识库" required>
-            <ElRadioGroup v-model="destinationMode" :disabled="importing" style="display:flex;width:100%;margin-bottom:8px"><ElRadio value="existing">选择已有知识库</ElRadio><ElRadio value="new">新建个人知识库</ElRadio></ElRadioGroup>
-            <ElSelect v-if="destinationMode === 'existing'" v-model="destination" aria-label="导入目标知识库" placeholder="选择有写入权限的知识库" style="width: 100%" :disabled="importing || !destinations.length">
-              <ElOption v-for="item in destinations" :key="item.id" :label="item.name" :value="item.id" />
-            </ElSelect>
-            <ElInput v-else v-model="newDestination" aria-label="导入新知识库名称" placeholder="输入个人知识库名称" maxlength="60" :disabled="importing" />
-          </ElFormItem>
-        </ElForm>
-        <p v-if="!destinations.length && destinationMode === 'existing'" class="destination-empty">暂无有写入权限的知识库，可新建个人知识库或申请写入权限。</p>
-        <p class="import-rule">仅转存可导出且天马支持的文档，原生多维表暂不支持。本次为单次导入，不自动跟随更新。</p>
-      </template>
-      <section v-if="results.length" class="import-results" data-testid="dingtalk-import-results">
-        <header><strong>本次导入结果 · 演示</strong><span>成功 {{ importedCount }} · 失败 {{ failedItems.length }}</span></header>
-        <div v-for="result in results" :key="result.document.id"><span>{{ result.document.name }}</span><b :class="result.status">{{ result.status === 'pending' ? '导入中' : result.status === 'success' ? '已导入' : result.reason }}</b></div>
-        <ElButton v-if="failedItems.length" :disabled="!canRetry" @click="importDocuments(true)">仅重试失败项</ElButton>
-      </section>
-      <ElAlert v-if="error" :title="error" type="error" :closable="false" />
+      <p v-if="!pickerRows.length" class="tree-empty">没有匹配的文档</p>
     </div>
-    <template #footer>
-      <span class="selected-count">已选 {{ selectedIds.length }} 篇</span>
-      <ElButton @click="emit('close')">{{ importedCount ? '完成' : '取消' }}</ElButton>
-      <ElButton type="primary" :disabled="!canImport" :loading="importing" @click="importDocuments()">{{ importing ? '正在模拟导入' : '导入文档' }}</ElButton>
-    </template>
-  </ElDialog>
+  </div>
+  <template #footer><ElButton data-testid="cancel-document-picker" @click="pickerOpen=false">取消</ElButton><ElButton type="primary" :disabled="!pickerSelectedIds.length" @click="confirmPicker">确认导入 {{ pickerSelectedIds.length }} 项</ElButton></template>
+</ElDialog>
 </template>
 
 <style scoped>
-.personal-import{display:grid;gap:14px;max-height:70vh;overflow:auto;padding:2px 4px;color:#273547;font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
-.identity-card{display:flex;gap:12px;align-items:center;border:1px solid #e5eaf0;border-radius:10px;padding:14px 16px;background:#fafbfd}
-.identity-icon{display:grid;place-items:center;width:38px;height:38px;border-radius:10px;background:#eaf3ff;color:#3175c9}
-.identity-card strong{font-size:14px}.identity-card p{margin:5px 0 0;color:#69788b;font-size:12px}.identity-status{margin-left:auto;color:#976c26;font-size:12px}.identity-status.bound{color:#228657}
-.permission-note{display:flex;align-items:flex-start;gap:7px;margin:0;color:#5a6a7e;font-size:12px;line-height:1.6}
-.document-list{max-height:276px;overflow:auto;border:1px solid #e7ebf0;border-radius:9px}
-.import-document{display:flex;align-items:center;gap:10px;padding:10px 13px;cursor:pointer;border-bottom:1px solid #f0f2f5}.import-document:last-child{border-bottom:0}.import-document>svg{color:#6b94c9;flex-shrink:0}
-.document-label{min-width:0;flex:1}.document-label strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:500}.document-label small{display:block;margin-top:4px;color:#95a0ae;font-size:11px}
-.export-status{max-width:190px;font-size:11px;color:#2e9065}.unavailable{background:#fafafa;cursor:default}.unavailable .export-status{color:#9b9b9b}.unavailable .document-label strong{color:#8b94a0}
-.import-results{border:1px solid #e7ebf0;border-radius:9px;padding:12px}.import-results header{display:flex;justify-content:space-between;gap:12px;margin-bottom:10px;font-size:12px}.import-results header>span{color:#8490a0}.import-results>div{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0;font-size:12px}.import-results b{font-size:11px;font-weight:400;color:#8190a0}.import-results .success{color:#27895b}.import-results .failed{color:#c65c4c}.import-results .el-button{margin-top:8px}
-.import-rule,.destination-empty{margin:0;color:#8490a0;font-size:12px;line-height:1.7}.destination-empty{color:#a16b27}.empty-documents{padding:30px;text-align:center;color:#9aa3ae;font-size:13px}.selected-count{float:left;line-height:32px;color:#8190a1;font-size:12px}
-@media(max-width:560px){.import-document{flex-wrap:wrap}.export-status{margin-left:46px;max-width:100%}.identity-status{max-width:65px}}
+.import-body{display:grid;gap:14px;color:#28313d}.field-label{font-size:13px}.field-label b{color:#e54d42}.choose-area{display:flex;min-height:134px;flex-direction:column;align-items:center;justify-content:center;gap:7px;border:1px dashed #d8dde5;border-radius:12px;background:#fbfcfd;color:#657181}.choose-area svg{color:#6f87a5}.choose-area strong{color:#303a47;font-size:14px}.choose-area span{font-size:11px}.choose-area :deep(.el-button){margin-top:4px}.choose-area.disabled{opacity:.55}.selected-panel{min-height:150px;border:1px solid #e4e8ed;border-radius:12px;padding:13px}.selected-panel>header{display:flex;justify-content:space-between;margin-bottom:10px;font-size:12px}.selected-panel>header span{color:#9099a5}.selected-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.selected-grid article{display:grid;grid-template-columns:22px minmax(0,1fr) 24px;gap:8px;align-items:start;border:1px solid #e9ecf0;border-radius:9px;padding:10px;background:#fff}.selected-grid article>svg{color:#4182cf}.selected-grid strong,.selected-grid small,.selected-grid em{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.selected-grid strong{font-size:12px}.selected-grid small{margin-top:3px;color:#949ca8;font-size:10px}.selected-grid em{margin-top:4px;color:#c26148;font-size:10px;font-style:normal}.selected-grid article.unsupported{border-color:#f0cfc7;background:#fff9f7}.selected-grid button{display:grid;width:22px;height:22px;place-items:center;border:0;border-radius:5px;background:transparent;color:#9199a4;cursor:pointer}.empty-selected{display:grid;min-height:100px;place-items:center;color:#a0a6ae;font-size:12px}.sync-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.sync-row label{display:grid;gap:6px;font-size:12px}.inline-warning{display:flex;align-items:flex-start;gap:7px;margin:0;border-radius:8px;background:#fff7ed;padding:9px 11px;color:#a86622;font-size:11px}.picker-path{margin-bottom:12px;color:#657181;font-size:12px}.picker-search{display:flex;height:36px;align-items:center;gap:7px;border:1px solid #dce1e7;border-radius:8px;padding:0 10px;color:#929aa5}.picker-search input{min-width:0;flex:1;border:0;outline:0;font:13px inherit}.picker-tree{min-height:350px;max-height:390px;overflow:auto;margin-top:12px;border:1px solid #e5e8ec;border-radius:10px;padding:7px 0}.picker-tree-row{display:flex;min-height:48px;align-items:center;gap:10px;padding:7px 14px 7px 12px;border-radius:5px;color:#374151}.picker-tree-row:hover,.picker-tree-row:focus-within{background:#f0f7fa}.picker-tree-row.selected{background:#f3f8fc}.tree-expand{display:grid;flex:none;width:20px;height:26px;place-items:center;border:0;background:transparent;color:#89939e;cursor:pointer}.tree-expand svg{transition:transform .15s}.tree-expand svg.expanded{transform:rotate(90deg)}.tree-spacer{flex:none;width:20px}.tree-choice{display:flex;min-width:0;flex:1;align-items:center;gap:10px;cursor:pointer}.tree-choice input{flex:none;width:16px;height:16px;margin:0;accent-color:#20252c;cursor:pointer}.tree-choice>svg{flex:none;color:#778391}.tree-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}.tree-name small{margin-left:10px;color:#9aa2ae;font-size:10px}.tree-unsupported{flex:none;color:#bc654f;font-size:10px;font-style:normal}.tree-empty{padding:80px 12px;text-align:center;color:#999;font-size:12px}@media(max-width:640px){.selected-grid,.sync-row{grid-template-columns:1fr}}
 </style>

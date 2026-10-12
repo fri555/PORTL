@@ -5,7 +5,7 @@ import type { SourceKnowledgeBase } from '@/types/knowledge-source'
 
 const destinations = [
   { id: 'kb-root', name: '集团制度知识库' },
-  { id: 'folder-hr', name: '集团制度知识库 / 人事制度' },
+  { id: 'folder-hr', name: '人事制度', parentId: 'kb-root', path: '集团制度知识库 / 人事制度' },
 ]
 
 function target(id: string, name: string): SourceKnowledgeBase {
@@ -29,7 +29,7 @@ describe('KnowledgeDialogs upload', () => {
 
     expect(wrapper.get('.dialog-surface--upload').attributes('data-upload-layout')).toBe('production')
     expect(wrapper.get('#upload-target').attributes('aria-required')).toBe('true')
-    expect((wrapper.get('#upload-target').element as HTMLSelectElement).value).toBe('')
+    expect(wrapper.get('#upload-target').text()).toContain('请选择知识库或文件夹')
     expect(wrapper.text()).toContain('请选择知识库或文件夹')
     expect(wrapper.text()).toContain('暂无本地文件')
     expect(wrapper.text()).toContain('请在上方点击、拖拽或粘贴文件')
@@ -38,7 +38,8 @@ describe('KnowledgeDialogs upload', () => {
     expect(wrapper.get('input[aria-label="按月报模式解析"]').attributes()).toHaveProperty('disabled')
     expect(wrapper.get('button[type="submit"]').attributes()).toHaveProperty('disabled')
 
-    await wrapper.get('#upload-target').setValue('kb-root')
+    await wrapper.get('#upload-target').trigger('click')
+    await wrapper.get('[aria-label="存放至集团制度知识库"]').trigger('click')
     expect(wrapper.get('button[type="submit"]').attributes()).toHaveProperty('disabled')
   })
 
@@ -81,7 +82,9 @@ describe('KnowledgeDialogs upload', () => {
 
   it('emits the selected destination together with pasted files', async () => {
     const wrapper = mountUpload()
-    await wrapper.get('#upload-target').setValue('folder-hr')
+    await wrapper.get('#upload-target').trigger('click')
+    await wrapper.get('[aria-label="展开集团制度知识库"]').trigger('click')
+    await wrapper.get('[aria-label="存放至集团制度知识库 / 人事制度"]').trigger('click')
     await wrapper.get('.dialog-surface--upload').trigger('paste', {
       clipboardData: { files: [file('制度.md')] },
     })

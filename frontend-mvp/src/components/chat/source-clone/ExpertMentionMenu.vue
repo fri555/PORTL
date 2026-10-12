@@ -3,7 +3,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { Agent } from '@/types/agent'
 
 const props = defineProps<{ experts: Agent[]; favoriteIds?: Set<string>; activeIndex: number; id: string; keyword?: string; page?: number; pageCount?: number; total?: number; hasMore?: boolean }>()
-const emit = defineEmits<{ select: [agent: Agent]; close: []; pageChange: [page: number]; loadMore: [] }>()
+const emit = defineEmits<{ select: [agent: Agent]; close: []; pageChange: [page: number]; loadMore: []; panelPress: [] }>()
 const panel = ref<HTMLElement | null>(null)
 const defaultAvatar = import.meta.env.BASE_URL + 'assets/agents-online/data-analysis.png'
 const listHeight = ref(218)
@@ -33,7 +33,7 @@ watch(() => props.activeIndex, () => nextTick(() => document.getElementById(`${p
 </script>
 
 <template>
-  <div ref="panel" class="mention-panel" :style="{ maxHeight: availableHeight === null ? undefined : `${availableHeight}px` }" @mousedown.prevent>
+  <div ref="panel" class="mention-panel" :style="{ maxHeight: availableHeight === null ? undefined : `${availableHeight}px` }" @mousedown.prevent="emit('panelPress')">
     <h3 class="mention-heading">专家</h3>
     <div :id="id" role="listbox" aria-label="专家候选" class="mention-list" data-testid="expert-mention-scroll" @scroll="scrolled" :style="{ maxHeight: `${listHeight}px` }">
       <button v-for="(expert, index) in experts" :id="`${id}-${index}`" :key="expert.id" type="button" role="option" :aria-selected="index === activeIndex" :class="{ highlighted: index === activeIndex }" @click="emit('select', expert)">

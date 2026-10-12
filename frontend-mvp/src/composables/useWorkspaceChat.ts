@@ -171,7 +171,7 @@ export function createChatController() {
   const attachedFileCount = ref(Number(route.query.files || 0))
   const leftCollapsed = ref(false)
   const rightCollapsed = ref(true)
-  const thinkingCollapsed = ref(false)
+  const thinkingCollapsed = ref(true)
   const messagesContainer = ref<HTMLElement | null>(null)
   const isAutoScroll = ref(true)
   const showBackToLatest = ref(false)
@@ -447,7 +447,7 @@ export function createChatController() {
     isAutoScroll.value = true
     showBackToLatest.value = false
     userScrollIntent.value = false
-    thinkingCollapsed.value = false
+    thinkingCollapsed.value = true
     streamingContent.value = ''
     abortController.value = new AbortController()
 
@@ -767,3 +767,4 @@ export function useChatController(): ChatController {
   if (!ctrl) throw new Error('ChatController not provided')
   return ctrl
 }
+

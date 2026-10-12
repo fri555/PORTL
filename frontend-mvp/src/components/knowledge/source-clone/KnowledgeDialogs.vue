@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Check, ChevronRight, FileText, Search, Trash2, UploadCloud, UserPlus, Users, X } from 'lucide-vue-next'
-import type { KnowledgeDialogKind, KnowledgeSpace, SourceKnowledgeBase, SourceKnowledgeNode } from '@/types/knowledge-source'
+import KnowledgeDestinationSelect from './KnowledgeDestinationSelect.vue'
+import type { KnowledgeDestination, KnowledgeDialogKind, KnowledgeSpace, SourceKnowledgeBase, SourceKnowledgeNode } from '@/types/knowledge-source'
 
 type DialogKind = KnowledgeDialogKind | 'rename'
 
 const props = defineProps<{
   kind: DialogKind
   target?: SourceKnowledgeBase | SourceKnowledgeNode | null | undefined
-  destinations?: { id: string; name: string }[]
+  destinations?: KnowledgeDestination[]
 }>()
 
 const emit = defineEmits<{
@@ -87,7 +88,7 @@ watch(
   () => {
     name.value = props.kind === 'rename' ? props.target?.name ?? '' : ''
     space.value = 'public'
-    selectedKnowledgeBase.value = props.target?.name ?? ''
+    selectedKnowledgeBase.value = props.target && 'space' in props.target ? props.target.id : ''
     selectedUploadTarget.value = props.kind === 'upload' ? props.target?.id ?? '' : ''
     files.value = []
     uploadMessages.value = []
@@ -343,7 +344,7 @@ function canRemoveDirectMember(member: string) {
           <label class="field-label" for="folder-name"><i>*</i>文件名称</label>
           <input id="folder-name" v-model="name" class="text-field" maxlength="80" placeholder="请输入文件名称" autofocus />
           <label class="field-label" for="folder-kb"><i>*</i>所属知识库</label>
-          <input id="folder-kb" v-model="selectedKnowledgeBase" class="text-field" placeholder="请选择知识库" />
+          <KnowledgeDestinationSelect id="folder-kb" v-model="selectedKnowledgeBase" :destinations="uploadDestinations" label="所属知识库" root-only />
           <footer class="dialog-footer">
             <button class="button secondary" type="button" @click="close">取消</button>
             <button class="button primary" type="submit" :disabled="!isFolderValid">新建</button>
@@ -353,17 +354,7 @@ function canRemoveDirectMember(member: string) {
         <form v-else-if="kind === 'upload'" class="dialog-form upload-form" @submit.prevent="submitUpload">
           <div class="upload-target-row">
             <label class="field-label" for="upload-target"><i>*</i>上传至</label>
-            <select
-              id="upload-target"
-              v-model="selectedUploadTarget"
-              class="text-field upload-target-select"
-              aria-required="true"
-            >
-              <option disabled value="">请选择知识库或文件夹</option>
-              <option v-for="destination in uploadDestinations" :key="destination.id" :value="destination.id">
-                {{ destination.name }}
-              </option>
-            </select>
+            <KnowledgeDestinationSelect id="upload-target" v-model="selectedUploadTarget" :destinations="uploadDestinations" label="上传至" />
           </div>
           <button
             class="drop-zone"

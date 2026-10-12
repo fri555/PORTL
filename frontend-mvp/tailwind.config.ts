@@ -52,7 +52,7 @@ export default {
         sm: 'calc(var(--radius) - 4px)',
       },
       fontFamily: {
-        sans: ['DM Sans', '-apple-system', '"PingFang SC"', '"Microsoft YaHei"', 'sans-serif'],
+        sans: ['system-ui', '-apple-system', '"Segoe UI"', '"PingFang SC"', '"Microsoft YaHei"', 'sans-serif'],
       },
       keyframes: {
         'accordion-down': {

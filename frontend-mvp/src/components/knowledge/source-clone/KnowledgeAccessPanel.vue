@@ -1,1320 +1,257 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import {
-  AlertTriangle,
-  ArrowUpRight,
-  Cable,
-  CheckCircle2,
-  Clock3,
-  Database,
-  FileText,
-  FolderTree,
-  RefreshCw,
-  ShieldCheck,
-  Unplug,
-} from 'lucide-vue-next'
-import {
-  ElDialog,
-  ElButton,
-  ElForm,
-  ElFormItem,
-  ElInput,
-  ElSelect,
-  ElOption,
-  ElTree,
-  ElAlert,
-  ElRadio,
-  ElRadioGroup,
-} from 'element-plus'
-import {
-  credentialStatusText, documents, getPrototypeScenario, permissionStatusText, selectScope, scopeDocumentIds, scopeDocuments,
-  nextScheduledSync, syncSchedule, type SyncInterval, type CredentialStatus, type PermissionStatus,
-} from './dingtalkPrototype'
-import DingTalkAccessForm from './DingTalkAccessForm.vue'
+import { computed, reactive, ref, watch } from 'vue'
+import { Bell, CheckCircle2, Clock3, Link2, RefreshCw, Search, Settings2 } from 'lucide-vue-next'
+import { ElButton, ElDialog, ElForm, ElFormItem, ElInput, ElOption, ElSelect } from 'element-plus'
+import { dingTalkImportTaskFixtures, scopedDingTalkImportTasks } from '@/mock/dingtalk-import-tasks'
+import type { DingTalkImportTask, DingTalkSyncFrequency, KnowledgeDestination } from '@/types/knowledge-source'
 
-interface ConnectionRecord {
-  id: string
-  name: string
-  destination: string
-  count: number
-  plannedCount: number
-  folder: string
-  sourceId: string
-  selectedKeys: string[]
-  source: string
-  schedule: string
-  scheduleAnchor: number
-  executionIdentity: string
-  status: 'connected' | 'syncing' | 'warning' | 'unverified' | 'disconnected'
-  credentialStatus: CredentialStatus
-  permissionStatus: PermissionStatus
-  lastSync: string
-  nextSync: string
-  added: number
-  updated: number
-  failed: number
-  skipped: number
-  lastResult: string
-  failures: { id: string; name: string; reason: string; isNew?: boolean }[]
+const props = withDefaults(defineProps<{ destinations: KnowledgeDestination[]; canManage?: boolean; records?: DingTalkImportTask[]; viewerUserId?: string }>(), { canManage: true, viewerUserId: '' })
+const emit = defineEmits<{ 'update-schedule': [importTaskId: string, frequency: DingTalkSyncFrequency, schedule: string] }>()
+const fixtureRecords = ref<DingTalkImportTask[]>(structuredClone(dingTalkImportTaskFixtures))
+const records = computed(() => props.canManage ? props.records ?? fixtureRecords.value : scopedDingTalkImportTasks(props.records ?? fixtureRecords.value, props.viewerUserId, 'user'))
+const connectionOpen = ref(false), scheduleOpen = ref(false), connectionSaved = ref(true), connectionChecking = ref(false), notice = ref('')
+const statusFilter = ref('all'), destinationFilter = ref('all'), keyword = ref('')
+const dateStart = ref(''), dateEnd = ref('')
+const activeRecord = ref<DingTalkImportTask | null>(null)
+const connection = reactive({ clientId: 'dingxxxxxxxxxxxx', clientSecret: '' })
+const scheduleDraft = reactive({ frequency: '不自动同步' as DingTalkSyncFrequency, time: '00:00', day: '周一' })
+const dayOptions = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+const canSaveSchedule = computed(() => scheduleDraft.frequency === '不自动同步' || /^([01]\d|2[0-3]):[0-5]\d$/.test(scheduleDraft.time))
+const sourceNames = (record: DingTalkImportTask) => record.documentMappings.map(item => item.sourceName).join('；')
+
+// Mock 管理员权限
+const isAdmin = ref(true)
+
+// 通知弹窗
+const notifyOpen = ref(false)
+const notifyRecord = ref<DingTalkImportTask | null>(null)
+function openNotify(record: DingTalkImportTask) {
+  notifyRecord.value = record
+  notifyOpen.value = true
 }
 
-const props = withDefaults(defineProps<{ destinations: { id: string; name: string }[]; canManage?: boolean }>(), { canManage: true })
-const scenario = getPrototypeScenario()
-const query = new URLSearchParams(window.location.search)
-const configureOpen = ref(query.get('create') === '1' || ['no-scope', 'no-libraries', 'no-permission', 'required-error', 'create-scope', 'create-rules', 'scope-loading', 'scope-error'].includes(scenario))
-const detailOpen = ref(query.get('detail') === '1' || scenario.startsWith('edit-') || ['disconnect', 'disconnected', 'reconnect', 'partial'].includes(scenario))
-const notice = ref('')
-const statusFilter = ref('all')
-const editKind = ref<'name' | 'scope' | 'destination' | 'schedule' | 'auth' | 'disconnect' | ''>('')
-const draft = reactive({
-  name: '',
-  scope: [] as string[],
-  destination: '',
-  folder: '',
-  interval: 'daily' as SyncInterval,
-  schedule: '',
-  appKey: '',
-  appSecret: '',
-  userId: '',
+// 保存位置选项
+const destinationOptions = computed(() => {
+  const set = new Set(records.value.map(r => r.destinationPath))
+  return [...set]
 })
-const editError = ref('')
-const scopeTree = ref<InstanceType<typeof ElTree>>()
-const scopeDefaults = ref<string[]>([])
-const syncTimers = new Map<string, number>()
-const demonstratePartial = query.get('sync') === 'partial' || scenario === 'partial'
-onBeforeUnmount(() => syncTimers.forEach((timer) => window.clearTimeout(timer)))
-const active = ref<ConnectionRecord | null>(null)
-const records = ref<ConnectionRecord[]>([
-  {
-    id: 'ding-group-policy',
-    name: '钉钉 · 集团制度知识库',
-    destination: '集团制度知识库',
-    count: 3,
-    plannedCount: 3,
-    folder: '钉钉制度文档',
-    sourceId: 'policies', selectedKeys: ['policies'],
-    source: '集团制度知识库 / 全部内容',
-    schedule: '每天 00:00',
-    scheduleAnchor: Date.now(),
-    executionIdentity: 'ding-admin-demo',
-    status: 'connected',
-    credentialStatus: 'valid', permissionStatus: 'normal',
-    lastSync: '2026-10-03 02:06',
-    nextSync: nextScheduledSync('每天 00:00'),
-    added: 1,
-    updated: 1,
-    failed: 0,
-    skipped: 1, lastResult: '同步成功', failures: [],
-  },
-])
-const demoRecord = records.value[0]!
-if (scenario === 'credentials-expired') {
-  Object.assign(demoRecord, { status: 'warning', credentialStatus: 'invalid', permissionStatus: 'unknown', nextSync: '已暂停' })
-} else if (scenario === 'permission-denied') {
-  Object.assign(demoRecord, { status: 'warning', credentialStatus: 'valid', permissionStatus: 'abnormal', nextSync: '已暂停' })
-} else if (scenario === 'unknown') {
-  Object.assign(demoRecord, { status: 'unverified', credentialStatus: 'unknown', permissionStatus: 'unknown', nextSync: '校验后计算' })
-} else if (scenario === 'disconnected' || scenario === 'reconnect') {
-  Object.assign(demoRecord, { status: 'disconnected', credentialStatus: 'unknown', permissionStatus: 'unknown', nextSync: '—' })
-} else if (scenario === 'partial') {
-  Object.assign(demoRecord, { failed: 1, added: 0, updated: 0, skipped: 2, lastResult: '部分失败', failures: [{ id: 'onboarding', name: '新员工入职指南', reason: '原文读取超时；保留上一成功版本', isNew: false }] })
-} else if (scenario === 'empty') records.value = []
-if (detailOpen.value) active.value = records.value[0] ?? null
 
-const statusText = computed(
-  () =>
-    ({
-      connected: '已连接',
-      syncing: '同步中',
-      warning: '授权异常',
-      unverified: '待校验',
-      disconnected: '已断开',
-    }) as const,
-)
-
-const filteredRecords = computed(() =>
-  records.value.filter(
-    (record) => statusFilter.value === 'all' || record.status === statusFilter.value,
-  ),
-)
-const scopeLibrary = computed(() => documents.find(item => item.id === active.value?.sourceId) ?? documents[0]!)
-const scopeTreeData = computed(() => [scopeLibrary.value])
-const targetOptions = computed(() => [...new Set(props.destinations.map(item => item.name))])
-function nextSyncAt(schedule: string, anchor = Date.now()) {
-  return nextScheduledSync(schedule, anchor)
-}
-function canSync(record: ConnectionRecord) {
-  return props.canManage && record.status === 'connected' && record.credentialStatus === 'valid' && record.permissionStatus === 'normal'
-}
-function needsAuthorization(record: ConnectionRecord) {
-  return record.credentialStatus !== 'valid' || record.permissionStatus !== 'normal'
-}
-function openAuthorization(record: ConnectionRecord) {
-  openDetail(record)
-  updateValue('auth')
-}
-function complete(record: {
-  name: string
-  destination: string
-  count: number
-  folder: string
-  sourceId?: string
-  selectedKeys?: string[]
-  source?: string
-  schedule?: string
-  executionUserId?: string
-}) {
-  if (!props.canManage) return
-  const next: ConnectionRecord = {
-    id: `ding-${Date.now()}`,
-    name: record.name,
-    destination: record.destination,
-    count: 0, plannedCount: record.count,
-    folder: record.folder,
-    sourceId: record.sourceId ?? 'policies', selectedKeys: record.selectedKeys ?? [],
-    source: record.source || '集团制度知识库 / 已选内容',
-    schedule: record.schedule || '每天 00:00',
-    scheduleAnchor: Date.now(),
-    executionIdentity: record.executionUserId || '应用身份（以实际接口授权为准）',
-    status: 'connected',
-    credentialStatus: 'valid', permissionStatus: 'normal',
-    lastSync: '首次同步待开始',
-    nextSync: '首次同步完成后计算',
-    added: 0,
-    updated: 0,
-    failed: 0,
-    skipped: 0, lastResult: '尚未同步', failures: [],
-  }
-  records.value.unshift(next)
-  configureOpen.value = false
-  active.value = records.value[0] ?? null
-  detailOpen.value = true
-  if (active.value) runSync(active.value)
-}
-
-function openDetail(record: ConnectionRecord) {
-  if (!props.canManage) return
-  active.value = record
-  detailOpen.value = true
-  notice.value = ''
-}
-function isFailureInScope(record: ConnectionRecord, id: string) {
-  const library = documents.find(item => item.id === record.sourceId)
-  return !!library && scopeDocumentIds(record.selectedKeys, library).includes(id)
-}
-function retryableFailures(record: ConnectionRecord) {
-  return record.failures.filter(failure => isFailureInScope(record, failure.id))
-}
-function runSync(record: ConnectionRecord, failedOnly = false) {
-  if (!canSync(record)) return
-  const currentFailures = retryableFailures(record)
-  const retryCount = currentFailures.length
-  const retryNew = currentFailures.filter(item=>item.isNew).length
-  const first = record.lastResult === '尚未同步'
-  const library = documents.find(item => item.id === record.sourceId)
-  const failureCandidate = library ? scopeDocuments(record.selectedKeys, library)[0] : undefined
-  if (failedOnly && !retryCount) return
-  record.status = 'syncing'
-  record.lastSync = '刚刚 · 正在对账'
-  notice.value = failedOnly ? '已发起失败项重试，仅处理仍在同步范围内的失败文档。' : '已发起同步，本次会自动跳过未变更内容。'
-  syncTimers.set(
-    record.id,
-    window.setTimeout(() => {
-      if (record.status !== 'syncing') return
-      record.status = 'connected'
-      if (failedOnly) {
-        record.added = retryNew; record.updated = retryCount - retryNew; record.skipped = 0; record.count += retryNew
-        record.failed = 0; record.failures = []; record.lastResult = '失败项重试成功'
-      } else if (demonstratePartial && failureCandidate) {
-        record.failed = 1; record.added = first ? Math.max(0, record.plannedCount - 1) : 0; record.updated = 0; record.skipped = first ? 0 : Math.max(0, record.plannedCount - 1)
-        if(first) record.count=record.added
-        record.failures = [{ id: failureCandidate.id, name: failureCandidate.name, reason: first ? '原文读取超时；尚未入库' : '原文读取超时；保留上一成功版本', isNew: first }]
-        record.lastResult = '部分失败'
-      } else { record.lastResult = '同步成功'; record.failed = 0; record.failures = []; record.added=first?record.plannedCount:0;record.updated=0;record.skipped=first?0:record.plannedCount;if(first)record.count=record.plannedCount }
-      record.lastSync = `刚刚 · 模拟${record.lastResult}`
-      record.nextSync = nextSyncAt(record.schedule, record.scheduleAnchor)
-      syncTimers.delete(record.id)
-    }, 900),
-  )
-}
-function updateValue(kind: typeof editKind.value) {
-  if (!props.canManage || !active.value || (active.value.status === 'syncing' && kind !== 'disconnect')) return
-  const record = active.value
-  editError.value = ''
-  editKind.value = kind
-  Object.assign(draft, {
-    name: record.name,
-    scope: [...record.selectedKeys],
-    destination: record.destination,
-    folder: record.folder,
-    interval: record.schedule === '每小时' ? 'hourly' : 'daily',
-    schedule: record.schedule === '每小时' ? '00:00' : record.schedule.replace('每天 ', ''),
-    appKey: '',
-    appSecret: '',
-    userId: record.executionIdentity.startsWith('应用身份') ? '' : record.executionIdentity,
+const filteredRecords = computed(() => {
+  const search = keyword.value.trim().toLocaleLowerCase()
+  return records.value.filter(item => {
+    // 状态筛选
+    if (statusFilter.value !== 'all' && item.status !== statusFilter.value) return false
+    // 保存位置筛选
+    if (destinationFilter.value !== 'all' && item.destinationPath !== destinationFilter.value) return false
+    // 日期筛选
+    const syncDate = item.latestSyncAt.split(' ')[0]
+    if (dateStart.value && syncDate < dateStart.value) return false
+    if (dateEnd.value && syncDate > dateEnd.value) return false
+    // 搜索
+    if (search && ![item.userAlias, sourceNames(item), item.destinationPath].some(value => value.toLocaleLowerCase().includes(search))) return false
+    return true
   })
-  scopeDefaults.value = [...record.selectedKeys]
+})
 
+function testConnection() {
+  if (!props.canManage || !connection.clientId.trim() || !connection.clientSecret.trim()) return
+  connectionChecking.value = true
+  window.setTimeout(() => { connectionChecking.value = false; connectionSaved.value = true; connection.clientSecret = ''; connectionOpen.value = false; notice.value = '数据源连接已更新。' }, 500)
 }
-function saveEdit() {
-  const record = active.value
-  if (!props.canManage || !record) return
-  editError.value = ''
-  if (record.status === 'syncing' && editKind.value !== 'disconnect') { editError.value = '同步已开始，请完成后再保存；当前修改已保留'; return }
-  if (editKind.value === 'name') {
-    const name = draft.name.trim()
-    if (!name || name.length > 50) { editError.value = '连接名称需为 1–50 字'; return }
-    if (records.value.some(item => item.id !== record.id && item.name === name)) { editError.value = '连接名称已存在，请修改'; return }
-    record.name = name
-    notice.value = '连接名称已保存。'
-  } else if (editKind.value === 'scope') {
-    if (!draft.scope.length || !scopeTree.value?.getCheckedKeys(true).length) {
-      editError.value = '请选择同步范围'
-      return
-    }
-    record.selectedKeys = [...draft.scope]
-    const count = scopeTree.value?.getCheckedKeys(true).length ?? 0
-    record.plannedCount = count
-    record.source = `${scopeLibrary.value.label} / ${draft.scope.includes(record.sourceId) ? '全部内容' : `已选 ${count} 篇`}`
-    notice.value = '范围已保存，下次同步生效；也可点击立即同步。移出范围的内容保留为离线快照。'
-  } else if (editKind.value === 'destination') {
-    if (!draft.destination || !targetOptions.value.includes(draft.destination) || !draft.folder.trim() || draft.folder.trim().length > 80) {
-      editError.value = '请选择目标知识库并填写来源文件夹'
-      return
-    }
-    if(record.destination===draft.destination && record.folder===draft.folder.trim()) { notice.value='保存位置未变更。'; editKind.value='';return }
-    record.destination = draft.destination
-    record.folder = draft.folder.trim()
-    record.count=0; record.lastResult='尚未同步'; record.lastSync='新落点尚未同步'
-    record.added=0; record.updated=0; record.skipped=0; record.failed=0; record.failures=[]
-    notice.value = '新落点将在下次同步接收当前范围的全部内容；旧落点保留离线快照，不自动迁移。'
-  } else if (editKind.value === 'schedule') {
-    if (draft.interval === 'daily' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(draft.schedule)) {
-      editError.value = '请选择有效同步时间'
-      return
-    }
-    record.schedule = syncSchedule(draft.interval, draft.schedule)
-    record.scheduleAnchor = Date.now()
-    record.nextSync = canSync(record) ? nextSyncAt(record.schedule, record.scheduleAnchor) : '—'
-    notice.value = draft.interval === 'hourly' ? '更新频率已保存，从当前保存时刻起每小时增量更新。' : '更新频率已保存，每天按北京时间增量更新。'
-  } else if (editKind.value === 'auth') {
-    if (!draft.appKey.trim() || !draft.appSecret.trim()) {
-      editError.value = '请填写 App Key 和 App Secret'
-      return
-    }
-    if (draft.appKey.length > 256 || draft.appSecret.length > 512 || draft.userId.length > 128 || /\s/.test(draft.appKey + draft.appSecret + draft.userId)) { editError.value = '凭证长度超限或包含空白字符'; return }
-    record.status = 'connected'
-    record.credentialStatus = 'valid'
-    record.permissionStatus = 'normal'
-    record.executionIdentity = draft.userId.trim() || '应用身份（以实际接口授权为准）'
-    runSync(record)
-    notice.value = '模拟校验成功：凭证有效、权限正常，已恢复同步；未保存密钥。'
-    draft.appKey = ''
-    draft.appSecret = ''
-  } else if (editKind.value === 'disconnect') {
-    window.clearTimeout(syncTimers.get(record.id))
-    syncTimers.delete(record.id)
-    if(record.status==='syncing') {record.lastResult='已取消';record.lastSync='刚刚 · 模拟任务已取消'}
-    record.status = 'disconnected'
-    record.credentialStatus = 'unknown'
-    record.permissionStatus = 'unknown'
-    record.nextSync = '—'
-    notice.value = '已停止同步；最后成功内容保留为离线快照，内容可访问性依据来源授权结果确定。'
+function openSchedule(record: DingTalkImportTask) {
+  if (!records.value.some(item => item.importTaskId === record.importTaskId)) return
+  activeRecord.value = record
+  scheduleDraft.frequency = record.frequency
+  scheduleDraft.day = '周一'
+  if (record.frequency === '每周') {
+    const parts = record.schedule.split(' ')
+    // 格式: "每周一次 周一 09:00"
+    const dayPart = parts.find(p => dayOptions.includes(p))
+    if (dayPart) scheduleDraft.day = dayPart
+    const timePart = parts.find(p => /^\d{2}:\d{2}$/.test(p))
+    scheduleDraft.time = timePart || '00:00'
+  } else if (record.frequency === '每天') {
+    const parts = record.schedule.split(' ')
+    const timePart = parts.find(p => /^\d{2}:\d{2}$/.test(p))
+    scheduleDraft.time = timePart || '00:00'
+  } else {
+    scheduleDraft.time = '00:00'
   }
-  editKind.value = ''
+  scheduleOpen.value = true
 }
-watch(() => props.canManage, allowed => {
-  if (allowed) return
-  syncTimers.forEach(timer => window.clearTimeout(timer))
-  syncTimers.clear()
-  configureOpen.value = false
-  detailOpen.value = false
-  editKind.value = ''
-  draft.appKey = ''
-  draft.appSecret = ''
-  active.value = null
-}, { immediate: true })
-if (scenario.startsWith('edit-')) updateValue(scenario.replace('edit-', '') as typeof editKind.value)
-else if (scenario === 'disconnect') updateValue('disconnect')
-else if (scenario === 'reconnect') updateValue('auth')
+function saveSchedule() {
+  if (!activeRecord.value || !canSaveSchedule.value || !records.value.some(item => item.importTaskId === activeRecord.value?.importTaskId)) return
+  let schedule: string
+  if (scheduleDraft.frequency === '不自动同步') {
+    schedule = '—'
+  } else if (scheduleDraft.frequency === '每周') {
+    schedule = `每周一次 ${scheduleDraft.day} ${scheduleDraft.time}`
+  } else {
+    schedule = `每天一次 ${scheduleDraft.time}`
+  }
+  if (props.records) emit('update-schedule', activeRecord.value.importTaskId, scheduleDraft.frequency, schedule)
+  else { activeRecord.value.frequency = scheduleDraft.frequency; activeRecord.value.schedule = schedule }
+  scheduleOpen.value = false
+  notice.value = `已更新任务 ${activeRecord.value.importTaskId} 的同步规则。`
+}
+function getTaskFailureReason(record: DingTalkImportTask): string {
+  if (record.failureReason) return record.failureReason
+  const failedMapping = record.documentMappings.find(m => m.status === '失败' && m.failureReason)
+  return failedMapping?.failureReason ?? '未知原因'
+}
+watch(() => [props.viewerUserId, props.canManage], () => { connectionOpen.value = false; scheduleOpen.value = false; activeRecord.value = null; notice.value = '' })
 </script>
 
 <template>
-  <section v-if="canManage" class="access-panel" aria-label="知识接入管理">
-    <div class="intro">
-      <div>
-        <span class="eyebrow">知识中心 / 知识接入</span>
-        <h1>统一连接企业知识</h1>
-        <p>管理员配置应用连接和持续同步；用户导入时使用各自绑定的钉钉身份。</p>
-      </div>
-      <div class="intro-actions">
-        <span class="prototype">M3 · 管理员配置 · 模拟数据</span
-        ><button type="button" class="primary-action" @click="configureOpen = true">
-          新建数据源
-        </button>
-      </div>
+<section v-if="canManage || viewerUserId" class="access-panel" :aria-label="canManage ? '数据源管理' : '我的同步记录'" :data-testid="canManage ? 'knowledge-access-admin' : 'knowledge-sync-personal'">
+  <!-- 页头：标题 + 搜索框（右上角） -->
+  <header class="page-head">
+    <h1>{{ canManage ? '数据源' : '同步记录' }}</h1>
+    <div class="page-head-actions">
+      <label class="record-search"><Search :size="15"/><input v-model="keyword" aria-label="搜索同步记录" placeholder="搜索花名、来源或落点"/></label>
+      <ElButton v-if="canManage && isAdmin" @click="connectionOpen = true"><Settings2 :size="15"/>配置连接</ElButton>
     </div>
-
-    <div class="metrics">
-      <div>
-        <span class="metric-icon blue"><Cable :size="18" /></span>
-        <p>
-          已接入数据源<strong>{{ records.length }}</strong>
-        </p>
-      </div>
-      <div>
-        <span class="metric-icon green"><FileText :size="18" /></span>
-        <p>
-          当前落点文档<strong>{{ records.reduce((sum, item) => sum + item.count, 0) }}</strong>
-        </p>
-      </div>
-      <div>
-        <span class="metric-icon amber"><AlertTriangle :size="18" /></span>
-        <p>
-          待处理异常<strong>{{ records.reduce((sum, item) => sum + item.failed, 0) }}</strong>
-        </p>
-      </div>
-    </div>
-
-    <p class="metrics-note">统计口径待评审 · 以上为示例数据，业务定义由产品补充</p>
-    <div class="section-heading">
-      <div>
-        <h2>可接入的数据源</h2>
-        <span>根据业务需要新增连接</span>
-      </div>
-    </div>
-    <div class="source-grid">
-      <article class="source-card">
-        <div class="card-heading">
-          <span class="source-logo">钉</span>
-          <div>
-            <h3>钉钉文档</h3>
-            <span>可导出且天马支持的钉钉文档</span>
-          </div>
-          <span class="available">可接入</span>
-        </div>
-        <p>选择知识库、文件夹或文档，首次导入后按每小时或每天增量更新。原生多维表暂不支持。</p>
-        <div class="features">
-          <span><FolderTree :size="14" />范围选择</span
-          ><span><ShieldCheck :size="14" />授权校验</span
-          ><span><RefreshCw :size="14" />定时增量</span>
-        </div>
-        <button type="button" class="connect" @click="configureOpen = true">
-          配置接入 <ArrowUpRight :size="16" />
-        </button>
-      </article>
-      <article class="source-card upcoming">
-        <Database :size="26" />
-        <h3>更多数据源</h3>
-        <p>预留其他数据源入口，本期仅提供钉钉文档接入。</p>
-        <span>敬请期待</span>
-      </article>
-    </div>
-
-    <div class="section-heading connection-heading">
-      <div>
-        <h2>已接入的数据源</h2>
-        <span>查看同步状态并维护连接</span>
-      </div>
-      <select v-model="statusFilter" class="filter" aria-label="筛选连接状态">
-        <option value="all">全部状态</option>
-        <option v-for="(label, value) in statusText" :key="value" :value="value">
-          {{ label }}
-        </option>
-      </select>
-    </div>
-    <div class="connection-table">
-      <div class="table-head">
-        <span>数据源</span><span>同步目标</span><span>同步状态</span><span>授权状态</span><span>最近同步</span
-        ><span>操作</span>
-      </div>
-      <article
-        v-for="record in filteredRecords"
-        :key="record.id"
-        class="connection-row"
-        @click="openDetail(record)"
-      >
-        <div class="source-cell">
-          <span class="source-logo small">钉</span>
-          <p>
-            <strong>{{ record.name }}</strong
-            ><small>{{ record.source }}</small>
-          </p>
-        </div>
-        <div>
-          <strong>{{ record.destination }}</strong
-          ><small>{{ record.count }} 篇文档</small>
-        </div>
-        <div>
-          <span class="state" :class="record.status"><i />{{ statusText[record.status] }}</span
-          ><small>{{ record.schedule }}</small>
-        </div>
-        <div class="authorization-cell">
-          <span>应用凭证 <b :class="record.credentialStatus">{{ credentialStatusText[record.credentialStatus] }}</b></span>
-          <span>执行身份 <b :class="record.permissionStatus">{{ permissionStatusText[record.permissionStatus] }}</b></span>
-          <button v-if="needsAuthorization(record)" type="button" class="authorization-link" @click.stop="openAuthorization(record)">{{ record.status === 'disconnected' ? '重新连接' : '重新授权' }}</button>
-        </div>
-        <div>
-          <strong>{{ record.lastSync }}</strong
-          ><small>下次：{{ record.nextSync }}</small>
-        </div>
-        <div class="row-actions">
-          <button
-            type="button"
-            :disabled="!canSync(record)"
-            @click.stop="runSync(record)"
-          >
-            <RefreshCw :size="15" />立即同步</button
-          ><button
-            type="button"
-            :aria-label="`管理${record.name}`"
-            @click.stop="openDetail(record)"
-          >
-            管理
-          </button>
-        </div>
-      </article>
-    </div>
-
-    <p v-if="!filteredRecords.length" class="empty-connections">
-      {{ records.length ? '没有符合该状态的数据源' : '暂无已接入的数据源' }}
-    </p>
-    <ElDialog
-      v-model="detailOpen"
-      width="min(860px, 96vw)"
-      align-center
-      :show-close="false"
-      :close-on-click-modal="false"
-      class="connection-management-dialog"
-    >
-      <div v-if="active">
-        <section class="detail-modal" role="dialog" aria-modal="true" aria-label="数据源详情">
-          <header>
-            <div class="drawer-title">
-              <span class="source-logo">钉</span>
-              <div>
-                <span class="eyebrow">数据源详情</span>
-                <h2>{{ active.name }}</h2>
-              </div>
-            </div>
-            <button type="button" class="icon-button" aria-label="关闭" @click="detailOpen = false">
-              ×
-            </button>
-          </header>
-          <div class="management-content">
-          <div class="health-card">
-            <div>
-              <span class="state" :class="active.status"><i />{{ statusText[active.status] }}</span>
-              <p>最近同步 {{ active.lastSync }}</p>
-            </div>
-            <button
-              type="button"
-              class="sync-button"
-              :disabled="!canSync(active)"
-              @click="runSync(active)"
-            >
-              <RefreshCw :size="15" />立即同步
-            </button>
-          </div>
-          <div class="authorization-health" aria-label="连接授权状态">
-            <div><span>应用凭证有效性</span><strong :class="active.credentialStatus">{{ credentialStatusText[active.credentialStatus] }}</strong></div>
-            <div><span>执行身份权限</span><strong :class="active.permissionStatus">{{ permissionStatusText[active.permissionStatus] }}</strong></div>
-          </div>
-          <p v-if="needsAuthorization(active) && active.status !== 'disconnected'" class="authorization-note">应用凭证或同步执行身份异常时暂停更新；不会改用其他人的身份继续读取。</p>
-          <p v-if="notice" class="notice"><CheckCircle2 :size="15" />{{ notice }}</p>
-          <section>
-            <h3>连接与同步</h3>
-            <dl>
-              <dt>连接名称</dt><dd>{{ active.name }}<button type="button" :disabled="active.status === 'syncing'" @click="updateValue('name')">修改名称</button></dd>
-              <dt>来源范围</dt>
-              <dd>
-                {{ active.source
-                }}<button
-                  type="button"
-                  :disabled="active.status === 'syncing'"
-                  @click="updateValue('scope')"
-                >
-                  编辑范围
-                </button>
-              </dd>
-              <dt>写入位置</dt>
-              <dd>
-                {{ active.destination }} / {{ active.folder
-                }}<button
-                  type="button"
-                  :disabled="active.status === 'syncing'"
-                  @click="updateValue('destination')"
-                >
-                  更换落点
-                </button>
-              </dd>
-              <dt>同步计划</dt>
-              <dd>
-                {{ active.schedule
-                }}<button
-                  type="button"
-                  :disabled="active.status === 'syncing'"
-                  @click="updateValue('schedule')"
-                >
-                  修改时间
-                </button>
-              </dd>
-              <dt>执行身份</dt><dd>{{ active.executionIdentity }}</dd>
-              <dt>内容授权</dt><dd>访问者自己的钉钉文档权限与平台知识库权限共同满足；管理员凭证不授予所有人访问权限。</dd>
-            </dl>
-          </section>
-          <section>
-            <h3>最近一次同步结果（演示） · {{ active.lastResult }}</h3>
-            <div class="sync-stats">
-              <div>
-                <strong>{{ active.added }}</strong
-                ><span>新增</span>
-              </div>
-              <div>
-                <strong>{{ active.updated }}</strong
-                ><span>更新</span>
-              </div>
-              <div>
-                <strong>{{ active.skipped }}</strong
-                ><span>跳过（未变化）</span>
-              </div>
-              <div><strong>0</strong><span>失效</span></div>
-              <div>
-                <strong :class="{ danger: active.failed }">{{ active.failed }}</strong
-                ><span>失败</span>
-              </div>
-            </div>
-            <div v-if="active.failures.length" data-testid="sync-failures" class="sync-failures">
-              <p>成功项已保留，以下文件可单独重试。</p>
-              <div v-for="failure in active.failures" :key="failure.id"><strong>{{ failure.name }}</strong><span>{{ failure.reason }}<template v-if="!isFailureInScope(active, failure.id)">；已移出同步范围，不再重试</template></span></div>
-              <ElButton :disabled="!canSync(active) || !retryableFailures(active).length" @click="runSync(active, true)">仅重试失败项</ElButton>
-            </div>
-          </section>
-          <section>
-            <h3>运行记录</h3>
-            <div class="timeline">
-              <span><Clock3 :size="16" /></span>
-              <p>
-                <strong>{{ statusText[active.status] }}</strong
-                ><small>{{ active.lastSync }}</small>
-              </p>
-            </div>
-            <p class="prototype-note">
-              交互演示不连接钉钉，不代表真实同步结果；正式环境按每次运行展示结果和失败原因。
-            </p>
-          </section>
-          </div>
-          <footer>
-            <button
-              type="button"
-              :disabled="active.status === 'syncing'"
-              @click="updateValue('auth')"
-            >
-              <ShieldCheck :size="15" />{{
-                active.status === 'disconnected' ? '重新连接' : '重新授权'
-              }}</button
-            ><button
-              type="button"
-              :disabled="active.status === 'disconnected'"
-              class="danger-button"
-              @click="updateValue('disconnect')"
-            >
-              <Unplug :size="15" />断开连接
-            </button>
-          </footer>
-        </section>
-      </div>
-    </ElDialog>
-
-    <ElDialog
-      :model-value="!!editKind"
-      :title="
-        (
-          {
-            name: '修改连接名称',
-            scope: '编辑同步范围',
-            destination: '更改保存位置',
-            schedule: '修改同步时间',
-            auth: '重新验证连接',
-            disconnect: '确认断开连接',
-          } as Record<string, string>
-        )[editKind]
-      "
-      width="min(520px, 94vw)"
-      align-center
-      append-to-body
-      :close-on-click-modal="false"
-      @close="
-        editKind = '';
-        draft.appSecret = '';
-      "
-    >
-      <ElForm label-position="top" @submit.prevent="saveEdit">
-        <ElFormItem v-if="editKind === 'name'" label="连接名称" required><ElInput v-model="draft.name" maxlength="50" show-word-limit aria-label="连接名称" /></ElFormItem>
-        <template v-if="editKind === 'scope'"
-          ><p>来源知识库：{{ active?.source.split(' / ')[0] }}</p>
-          <ElTree ref="scopeTree" :key="`${active?.id}-${editKind}`" :data="scopeTreeData" node-key="id" show-checkbox default-expand-all :default-checked-keys="scopeDefaults" @check="node => draft.scope = selectScope(draft.scope, node, (scopeTree?.getCheckedKeys() ?? []).map(String), scopeLibrary)" />
-          <p class="prototype-note">
-            勾选目录持续纳入新增文档，逐篇勾选仅同步所选文档。保存后下次同步生效；移出范围的历史文件保留为离线快照。
-          </p></template
-        >
-        <template v-else-if="editKind === 'destination'"
-          ><ElFormItem label="目标知识库" required
-            ><ElSelect v-model="draft.destination" aria-label="目标知识库"
-              ><ElOption
-                v-for="name in targetOptions"
-                :key="name"
-                :label="name"
-                :value="name" /></ElSelect></ElFormItem
-          ><ElFormItem label="来源文件夹" required
-            ><ElInput v-model="draft.folder" maxlength="80" aria-label="来源文件夹" /></ElFormItem
-          ><ElAlert
-            title="下次同步向新落点写入当前范围全部内容；旧落点保留离线快照，不自动迁移或删除。"
-            type="info"
-            :closable="false"
-        /></template>
-        <template v-else-if="editKind === 'schedule'">
-          <ElFormItem label="更新频率" required><ElRadioGroup v-model="draft.interval" aria-label="更新频率"><ElRadio value="hourly">每小时</ElRadio><ElRadio value="daily">每天</ElRadio></ElRadioGroup></ElFormItem>
-          <ElFormItem v-if="draft.interval === 'daily'" label="每日同步时间（北京时间）" required><ElInput v-model="draft.schedule" type="time" aria-label="同步时间" /></ElFormItem>
-          <p class="prototype-note">每小时从本次保存时刻起计算；首次导入后仅更新新增或有变更的文档，下次时间由系统计算。</p>
-        </template>
-        <template v-else-if="editKind === 'auth'"
-          ><ElAlert
-            title="模拟分别校验应用凭证与同步执行身份；请使用示例，不保存密钥。"
-            type="info"
-            :closable="false"
-          /><ElFormItem label="App Key" required
-            ><ElInput v-model="draft.appKey" aria-label="重新授权 App Key" maxlength="256" /></ElFormItem
-          ><ElFormItem label="App Secret" required
-            ><ElInput
-              v-model="draft.appSecret"
-              type="password"
-              show-password
-              aria-label="重新授权 App Secret" maxlength="512" /></ElFormItem
-          ><ElFormItem label="同步执行身份 User ID（接口需要时）"><ElInput v-model="draft.userId" maxlength="128" aria-label="重新授权 User ID" placeholder="由管理员确认的同步执行身份" /></ElFormItem><ElButton
-            @click="
-              draft.appKey = 'demo-app-key';
-              draft.appSecret = 'demo-secret';
-            "
-            >填入示例</ElButton
-          ></template
-        >
-        <p v-else-if="editKind === 'disconnect'">
-          断开“{{
-            active?.name
-          }}”后将停止正在进行和后续的同步。最后成功内容保留为离线快照，内容可访问性依据来源授权结果确定，可重新连接。
-        </p>
-        <ElAlert v-if="editError" :title="editError" type="error" :closable="false" />
-      </ElForm>
-      <template #footer
-        ><ElButton
-          @click="
-            editKind = '';
-            draft.appSecret = '';
-          "
-          >取消</ElButton
-        ><ElButton :type="editKind === 'disconnect' ? 'danger' : 'primary'" @click="saveEdit">{{
-          editKind === 'disconnect' ? '确认断开' : editKind === 'auth' ? '验证并恢复同步' : '保存'
-        }}</ElButton></template
-      >
-    </ElDialog>
-    <DingTalkAccessForm
-      :existing-names="records.map(record => record.name)"
-      v-if="configureOpen"
-      :destinations="destinations"
-      @close="configureOpen = false"
-      @complete="complete"
-    />
+  </header>
+  <p v-if="notice" class="notice" role="status"><CheckCircle2 :size="15"/>{{ notice }}</p>
+  <section v-if="canManage && isAdmin" class="connection-card" data-testid="dingtalk-connection-card">
+    <span class="dingtalk-logo">钉</span><div><strong>钉钉文档</strong><small>数据源连接</small></div>
+    <span class="connection-state"><i/>{{ connectionSaved ? '已连接' : '未连接' }}</span>
+    <button type="button" @click="connectionOpen = true"><Link2 :size="14"/>{{ connectionSaved ? '修改配置' : '配置连接' }}</button>
   </section>
-  <section v-else class="access-panel" role="status">仅管理员可管理知识接入</section>
+  <!-- 同步记录区域 -->
+  <section class="records-section">
+    <h2>{{ canManage ? '同步记录' : '我的导入任务' }}</h2>
+    <!-- 筛选栏：日期、保存位置、状态 -->
+    <div class="filter-bar">
+      <div class="filter-item">
+        <label>日期</label>
+        <div class="date-range">
+          <input type="date" v-model="dateStart" class="date-input" aria-label="开始日期"/>
+          <span class="date-sep">–</span>
+          <input type="date" v-model="dateEnd" class="date-input" aria-label="结束日期"/>
+        </div>
+      </div>
+      <div class="filter-item">
+        <label>保存位置</label>
+        <select v-model="destinationFilter" class="filter-select" aria-label="筛选保存位置">
+          <option value="all">全部位置</option>
+          <option v-for="dest in destinationOptions" :key="dest" :value="dest">{{ dest }}</option>
+        </select>
+      </div>
+      <div class="filter-item">
+        <label>状态</label>
+        <select v-model="statusFilter" class="filter-select" aria-label="筛选同步状态">
+          <option value="all">全部状态</option>
+          <option value="同步成功">同步成功</option>
+          <option value="同步中">同步中</option>
+          <option value="部分失败">部分失败</option>
+          <option value="同步失败">同步失败</option>
+        </select>
+      </div>
+    </div>
+    <!-- 表格 -->
+    <div class="record-table">
+      <div class="record-head">
+        <span>人员</span>
+        <span>来源</span>
+        <span>保存位置</span>
+        <span>同步规则</span>
+        <span>状态</span>
+        <span>执行时间</span>
+        <span>操作</span>
+      </div>
+      <article v-for="record in filteredRecords" :key="record.importTaskId" class="record-row" data-testid="dingtalk-sync-record">
+        <strong>{{ record.userAlias }}</strong>
+        <div class="source-cell" :title="sourceNames(record)">{{ sourceNames(record) }}</div>
+        <div class="destination-cell">{{ record.destinationPath }}</div>
+        <div class="rule-cell"><span>{{ record.frequency }}</span><small>{{ record.schedule }}</small></div>
+        <span class="record-status" :class="record.status.includes('失败') ? 'warning' : record.status === '同步中' ? 'running' : 'success'"><i/>{{ record.status }}</span>
+        <span class="exec-time">{{ record.executedAt || '—' }}</span>
+        <div class="action-cell">
+          <button type="button" class="schedule-action" @click="openSchedule(record)"><Clock3 :size="14"/>同步设置</button>
+          <button v-if="record.status.includes('失败')" type="button" class="notify-action" @click="openNotify(record)"><Bell :size="14"/>通知</button>
+        </div>
+      </article>
+      <p v-if="!filteredRecords.length" class="empty-records">暂无匹配的同步记录</p>
+    </div>
+  </section>
+  <ElDialog v-if="canManage && isAdmin" v-model="connectionOpen" title="配置数据源连接" width="520px" align-center :close-on-click-modal="false"><ElForm label-position="top" @submit.prevent="testConnection"><ElFormItem label="Client ID" required><ElInput v-model="connection.clientId" maxlength="256" autocomplete="off" placeholder="请输入 Client ID"/></ElFormItem><ElFormItem label="Client Secret" required><ElInput v-model="connection.clientSecret" type="password" show-password maxlength="512" autocomplete="new-password" placeholder="请输入 Client Secret"/></ElFormItem></ElForm><template #footer><ElButton @click="connectionOpen = false">取消</ElButton><ElButton type="primary" :disabled="!connection.clientId.trim() || !connection.clientSecret.trim()" :loading="connectionChecking" @click="testConnection">测试连接并保存</ElButton></template></ElDialog>
+  <ElDialog v-model="scheduleOpen" title="同步设置" width="480px" align-center><p class="dialog-source"><strong>{{ activeRecord?.importTaskId }}</strong><br/>{{ activeRecord ? sourceNames(activeRecord) : '' }}</p><ElForm label-position="top"><ElFormItem label="同步频率"><select v-model="scheduleDraft.frequency" class="dialog-select"><option value="不自动同步">不自动同步</option><option value="每天">每天</option><option value="每周">每周</option></select></ElFormItem><ElFormItem v-if="scheduleDraft.frequency !== '不自动同步'" :label="scheduleDraft.frequency === '每周' ? '每周一次执行时间' : '执行时间'"><ElInput v-model="scheduleDraft.time" type="time"/></ElFormItem><ElFormItem v-if="scheduleDraft.frequency === '每周'" label="执行星期"><ElSelect v-model="scheduleDraft.day" style="width:100%"><ElOption v-for="d in dayOptions" :key="d" :label="d" :value="d"/></ElSelect></ElFormItem></ElForm><template #footer><ElButton @click="scheduleOpen = false">取消</ElButton><ElButton type="primary" :disabled="!canSaveSchedule" @click="saveSchedule"><RefreshCw :size="14"/>保存</ElButton></template></ElDialog>
+  <ElDialog v-model="notifyOpen" title="待办任务执行通知" width="480px" align-center>
+    <div class="notify-body" v-if="notifyRecord">
+      <p><strong>任务名称：</strong>{{ sourceNames(notifyRecord) }}</p>
+      <p><strong>待办名称：</strong>{{ notifyRecord.documentMappings[0]?.sourceName || '—' }}</p>
+      <p><strong>执行时间：</strong>{{ notifyRecord.executedAt || notifyRecord.latestSyncAt }}</p>
+      <p><strong>执行状态：</strong><span class="record-status warning"><i/>{{ notifyRecord.status }}</span></p>
+      <p><strong>失败原因：</strong>{{ getTaskFailureReason(notifyRecord) }}</p>
+      <p class="notify-link"><a href="javascript:void(0)">查看详情</a></p>
+    </div>
+    <template #footer><ElButton type="primary" @click="notifyOpen = false">关闭</ElButton></template>
+  </ElDialog>
+</section>
 </template>
 
 <style scoped>
-.metrics-note { margin: 12px 0 24px; color: #87909e; font-size: 12px; }
-.authorization-cell { display: grid; gap: 5px; font-size: 12px; }
-.authorization-cell b { margin-left: 5px; font-weight: 500; }
-.authorization-cell .valid, .authorization-cell .normal, .authorization-health .valid, .authorization-health .normal { color: #168866; }
-.authorization-cell .invalid, .authorization-cell .abnormal, .authorization-health .invalid, .authorization-health .abnormal { color: #cf5b21; }
-.authorization-cell .unknown, .authorization-health .unknown { color: #87909e; }
-.authorization-link { color: #1677ff; width: fit-content; border: 0; padding: 0; background: none; font-size: 12px; cursor: pointer; }
-.authorization-health { display: flex; gap: 36px; margin: 18px 0; padding: 12px 16px; border: 1px solid #e8edf3; border-radius: 8px; }
-.authorization-health > div { display: flex; gap: 12px; align-items: center; }
-.authorization-health span, .authorization-note { color: #87909e; font-size: 12px; }
-.authorization-health strong { font-size: 12px; }
-.sync-failures{margin-top:16px;border:1px solid #f1ddbf;border-radius:8px;background:#fffaf3;padding:14px;font-size:12px}.sync-failures p{margin:0 0 10px;color:#916d36}.sync-failures>div{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}.sync-failures span{color:#7c8795}
-.access-panel {
-  box-sizing: border-box;
-  height: calc(100% - 72px);
-  overflow: auto;
-  padding: 28px 36px 48px;
-  color: #202632;
-  background: #fbfcfe;
-}
-.intro {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
-  margin-bottom: 24px;
-}
-.eyebrow {
-  color: #2563eb;
-  font-size: 12px;
-  font-weight: 650;
-}
-.intro h1 {
-  margin: 8px 0 6px;
-  font-size: 25px;
-  font-weight: 650;
-  letter-spacing: -0.5px;
-}
-.intro p,
-.source-card p {
-  margin: 0;
-  color: #78808c;
-  font-size: 13px;
-  line-height: 1.7;
-}
-.intro-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.prototype,
-.available {
-  padding: 5px 9px;
-  border-radius: 6px;
-  background: #f0f2f5;
-  color: #747d89;
-  font-size: 12px;
-  white-space: nowrap;
-}
-.primary-action,
-.sync-button {
-  border: 0;
-  border-radius: 8px;
-  background: #1677ff;
-  color: #fff;
-  padding: 9px 16px;
-  font: 13px inherit;
-  cursor: pointer;
-}
-.metrics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  max-width: 920px;
-  margin-bottom: 32px;
-}
-.metrics > div {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  border: 1px solid #e8ebef;
-  border-radius: 11px;
-  background: #fff;
-  padding: 15px 17px;
-}
-.metric-icon {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  place-items: center;
-  border-radius: 10px;
-}
-.metric-icon.blue {
-  background: #eaf3ff;
-  color: #1677ff;
-}
-.metric-icon.green {
-  background: #eaf8f0;
-  color: #239160;
-}
-.metric-icon.amber {
-  background: #fff4df;
-  color: #c77d15;
-}
-.metrics p {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-  color: #87909d;
-  font-size: 12px;
-}
-.metrics strong {
-  margin-top: 1px;
-  color: #253041;
-  font-size: 20px;
-}
-.section-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 0 0 13px;
-}
-.section-heading > div {
-  display: flex;
-  align-items: baseline;
-  gap: 13px;
-}
-.section-heading h2 {
-  margin: 0;
-  font-size: 15px;
-}
-.section-heading span {
-  color: #969ca5;
-  font-size: 12px;
-}
-.source-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  max-width: 920px;
-}
-.source-card {
-  border: 1px solid #e4e8ed;
-  border-radius: 12px;
-  background: #fff;
-  padding: 20px;
-}
-.card-heading {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  margin-bottom: 15px;
-}
-.source-logo {
-  display: grid;
-  width: 40px;
-  height: 40px;
-  flex: 0 0 40px;
-  place-items: center;
-  border-radius: 10px;
-  background: #1688ff;
-  color: #fff;
-  font-size: 21px;
-  font-weight: 700;
-}
-.source-logo.small {
-  width: 34px;
-  height: 34px;
-  flex-basis: 34px;
-  border-radius: 9px;
-  font-size: 17px;
-}
-.card-heading h3,
-.upcoming h3 {
-  margin: 0 0 3px;
-  font-size: 14px;
-}
-.card-heading div > span {
-  color: #949aa3;
-  font-size: 12px;
-}
-.card-heading .available {
-  margin-left: auto;
-  background: #edf8f2;
-  color: #25825a;
-}
-.features {
-  display: flex;
-  gap: 15px;
-  margin: 15px 0;
-  color: #747f8d;
-  font-size: 12px;
-}
-.features span {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.connect {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  justify-content: space-between;
-  border: 0;
-  border-radius: 8px;
-  background: #edf5ff;
-  color: #2476de;
-  padding: 9px 12px;
-  font: 13px inherit;
-  cursor: pointer;
-}
-.upcoming {
-  display: flex;
-  min-height: 150px;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  border-style: dashed;
-  color: #a3abb6;
-  text-align: center;
-}
-.upcoming p {
-  max-width: 320px;
-}
-.upcoming > span {
-  font-size: 12px;
-}
-.connection-heading {
-  max-width: 1120px;
-  margin-top: 30px;
-}
-.filter {
-  border: 1px solid #e1e5eb;
-  border-radius: 7px;
-  background: #fff;
-  padding: 7px 11px;
-  color: #66717f;
-  font: 12px inherit;
-}
-.connection-table {
-  max-width: 1120px;
-  overflow: hidden;
-  border: 1px solid #e6e9ed;
-  border-radius: 11px;
-  background: #fff;
-}
-.table-head,
-.connection-row {
-  display: grid;
-  grid-template-columns: minmax(160px, 1.3fr) minmax(110px, .9fr) minmax(100px, .8fr) minmax(105px, .8fr) minmax(135px, 1fr) 154px;
-  align-items: center;
-  gap: 16px;
-  padding: 0 17px;
-}
-.table-head {
-  height: 40px;
-  background: #f7f8fa;
-  color: #88919d;
-  font-size: 12px;
-}
-.connection-row {
-  min-height: 73px;
-  border-top: 1px solid #edf0f3;
-  cursor: pointer;
-}
-.connection-row:hover {
-  background: #fbfdff;
-}
-.connection-row strong,
-.connection-row small {
-  display: block;
-}
-.connection-row strong {
-  color: #354052;
-  font-size: 13px;
-  font-weight: 550;
-}
-.connection-row small {
-  margin-top: 4px;
-  color: #929aa5;
-  font-size: 11px;
-}
-.source-cell {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.state {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: #27865d;
-  font-size: 12px;
-  font-weight: 550;
-}
-.state i {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: currentColor;
-}
-.state.syncing {
-  color: #2477dc;
-}
-.state.warning {
-  color: #c77a10;
-}
-.state.disconnected {
-  color: #8a929d;
-}
-.row-actions {
-  display: flex;
-  gap: 5px;
-}
-.row-actions button {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  padding: 7px;
-  color: #3c70b8;
-  font: 12px inherit;
-  cursor: pointer;
-}
-.row-actions button:hover {
-  background: #eef5ff;
-}
-.drawer-mask {
-  position: fixed;
-  z-index: 1200;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: rgba(23, 31, 42, 0.4);
-}
-.detail-modal {
-  box-sizing: border-box;
-  width: min(860px, 96vw);
-  max-height: min(820px, 92vh);
-  overflow: auto;
-  border-radius: 16px;
-  background: #fff;
-  padding: 0 26px 22px;
-  box-shadow: 0 24px 70px rgba(28, 42, 61, 0.24);
-}
-.detail-modal > header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid #edf0f3;
-  padding: 20px 0;
-}
-.drawer-title {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.drawer-title h2 {
-  margin: 3px 0 0;
-  font-size: 17px;
-}
-.icon-button {
-  border: 0;
-  background: transparent;
-  color: #737c89;
-  font-size: 25px;
-  cursor: pointer;
-}
-.health-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 20px 0 12px;
-  border: 1px solid #e5eaf0;
-  border-radius: 11px;
-  padding: 15px;
-  background: #fbfcfe;
-}
-.health-card p {
-  margin: 6px 0 0;
-  color: #8b94a0;
-  font-size: 12px;
-}
-.sync-button {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.notice {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  border-radius: 8px;
-  background: #edf9f2;
-  padding: 10px 12px;
-  color: #267c57;
-  font-size: 12px;
-}
-.detail-modal section {
-  border-bottom: 1px solid #edf0f3;
-  padding: 18px 0;
-}
-.detail-modal section h3 {
-  margin: 0 0 14px;
-  font-size: 14px;
-}
-.detail-modal dl {
-  display: grid;
-  grid-template-columns: 76px 1fr 76px 1fr;
-  gap: 13px 16px;
-  margin: 0;
-  font-size: 13px;
-}
-.detail-modal dt {
-  color: #929aa5;
-}
-.detail-modal dd {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 0;
-  color: #354052;
-}
-.detail-modal dd button {
-  border: 0;
-  background: transparent;
-  color: #2875d4;
-  font: 12px inherit;
-  cursor: pointer;
-}
-.sync-stats {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
-}
-.sync-stats div {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  border-radius: 9px;
-  background: #f7f8fa;
-  padding: 12px;
-}
-.sync-stats strong {
-  font-size: 18px;
-}
-.sync-stats span {
-  margin-top: 3px;
-  color: #929aa5;
-  font-size: 11px;
-}
-.danger {
-  color: #dc3d3d;
-}
-.timeline {
-  display: inline-flex;
-  width: calc(50% - 8px);
-  box-sizing: border-box;
-  gap: 10px;
-  vertical-align: top;
-}
-.timeline + .timeline {
-  margin-left: 12px;
-}
-.timeline > span {
-  color: #349368;
-}
-.timeline p {
-  margin: 0;
-}
-.timeline strong,
-.timeline small {
-  display: block;
-  font-size: 12px;
-}
-.timeline small {
-  margin-top: 3px;
-  color: #969eaa;
-}
-.detail-modal > footer {
-  display: flex;
-  justify-content: space-between;
-  padding-top: 18px;
-}
-.detail-modal > footer button {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid #dfe4ea;
-  border-radius: 8px;
-  background: #fff;
-  padding: 9px 13px;
-  color: #52606f;
-  font: 12px inherit;
-  cursor: pointer;
-}
-.detail-modal > footer .danger-button {
-  color: #cf3f3f;
-}
-.connection-table button,
-.source-card button,
-.intro button {
-  font-family: inherit;
-}
-@media (max-width: 900px) {
-  .access-panel {
-    padding: 22px 18px;
-  }
-  .metrics,
-  .source-grid {
-    grid-template-columns: 1fr;
-  }
-  .table-head {
-    display: none;
-  }
-  .connection-row {
-    grid-template-columns: 1fr 1fr;
-    padding: 14px;
-  }
-  .connection-row > div:nth-child(4) {
-    display: none;
-  }
-  .intro {
-    flex-direction: column;
-  }
-  .intro-actions {
-    width: 100%;
-    justify-content: space-between;
-  }
-  .detail-modal dl {
-    grid-template-columns: 76px 1fr;
-  }
-}
-button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-.prototype-note {
-  font-size: 12px;
-  line-height: 1.7;
-  color: #78808c;
-}
-.detail-modal {
-  width: 100%;
-  max-height: 78vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  box-shadow: none;
-  padding: 0 10px 10px;
-}
-.detail-modal > header, .detail-modal > footer { flex-shrink: 0; }
-.management-content { min-height: 0; overflow-y: auto; padding-right: 4px; }
-.detail-modal dl {
-  grid-template-columns: 88px 1fr;
-}
-.detail-modal dd button {
-  flex-shrink: 0;
-}
-.connection-row small {
-  font-size: 12px;
-}
-.connection-table {
-  overflow-x: auto;
-}
-.el-checkbox-group {
-  display: flex;
-  flex-direction: column;
+.access-panel{min-height:0;flex:1;overflow:auto;padding:28px 8px 54px;color:#20242a;font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+.page-head{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.page-head h1{margin:0;font-size:20px;font-weight:600}
+.page-head-actions{display:flex;align-items:center;gap:12px}
+.page-head :deep(.el-button){display:flex;align-items:center;gap:6px}
+.notice{display:flex;align-items:center;gap:7px;margin:14px 0 0;border-radius:8px;background:#eef8f3;padding:9px 12px;color:#208257;font-size:12px}
+.connection-card{display:grid;grid-template-columns:42px minmax(0,1fr) auto auto;align-items:center;gap:12px;margin-top:22px;border:1px solid #e4e7eb;border-radius:12px;padding:16px 18px;background:#fff}
+.dingtalk-logo{display:grid;width:38px;height:38px;place-items:center;border-radius:10px;background:#e9f3ff;color:#1677ff;font-size:18px;font-weight:700}
+.connection-card strong,.connection-card small{display:block}
+.connection-card strong{font-size:14px}
+.connection-card small{margin-top:3px;color:#9299a3;font-size:11px}
+.connection-state{display:flex;align-items:center;gap:6px;color:#26835b;font-size:12px}
+.connection-state i,.record-status i{width:7px;height:7px;flex:none;border-radius:50%;background:currentColor}
+.connection-card button,.schedule-action,.notify-action{display:flex;align-items:center;gap:5px;border:0;background:transparent;color:#3376c5;font:12px inherit;cursor:pointer}
+.notify-action{color:#c47a1c}
+.records-section{margin-top:34px}
+.records-section h2{margin:0 0 16px;font-size:16px}
+/* 筛选栏 */
+.filter-bar{display:flex;align-items:flex-end;gap:20px;margin-bottom:14px;padding:14px 16px;border:1px solid #e5e8ec;border-radius:10px;background:#fafbfc}
+.filter-item{display:flex;flex-direction:column;gap:6px}
+.filter-item>label{font-size:11px;color:#717985;font-weight:500}
+.date-range{display:flex;align-items:center;gap:6px}
+.date-input{height:32px;border:1px solid #dcdfe6;border-radius:7px;padding:0 8px;color:#4a5563;font-size:12px;outline:none;background:#fff}
+.date-input:focus{border-color:#1677ff}
+.date-sep{color:#9199a3;font-size:12px}
+.filter-select{height:32px;border:1px solid #dcdfe6;border-radius:7px;background:#fff;padding:0 10px;color:#4a5563;font-size:12px;outline:none;min-width:140px}
+.filter-select:focus{border-color:#1677ff}
+/* 搜索框 */
+.record-search{display:flex;height:32px;width:240px;align-items:center;gap:7px;border:1px solid #dcdfe6;border-radius:7px;padding:0 10px;color:#9199a3;background:#fff}
+.record-search input{width:100%;border:0;outline:none;color:#4a5563;font:12px inherit}
+/* 表格 */
+.record-table{overflow:auto;border:1px solid #e5e8ec;border-radius:12px}
+.record-head,.record-row{display:grid;grid-template-columns:72px minmax(180px,1.5fr) minmax(155px,1.2fr) 100px 82px 140px 120px;min-width:940px;align-items:center;gap:12px;padding:0 16px}
+.record-head{height:40px;background:#f7f8fa;color:#717985;font-size:11px}
+.record-row{min-height:72px;border-top:1px solid #edf0f3;font-size:12px;line-height:1.6}
+.record-row>strong{font-weight:500}
+.record-row small{display:block;margin-top:4px;color:#969da7;font-size:10px}
+.source-cell,.destination-cell{padding:10px 0;overflow-wrap:anywhere}
+.rule-cell span{display:block}
+.record-status{display:flex;align-items:center;gap:5px;color:#27855b;font-size:11px}
+.record-status.warning{color:#c47a1c}
+.record-status.running{color:#2572c7}
+.exec-time{color:#596371;font-size:11px;white-space:nowrap}
+.action-cell{display:flex;align-items:center;gap:8px}
+.dialog-source{margin:0 0 16px;border-radius:8px;background:#f6f7f9;padding:10px 12px;color:#596371;font-size:12px;line-height:1.7}
+.dialog-select{width:100%;height:32px;border:1px solid #dcdfe6;border-radius:7px;background:#fff;padding:0 10px;color:#4a5563;font-size:12px;outline:none}
+.empty-records{padding:36px 16px;color:#8c949e;font-size:12px;text-align:center}
+/* 通知弹窗 */
+.notify-body p{margin:0 0 10px;font-size:13px;line-height:1.7;color:#303846}
+.notify-body strong{color:#4a5563}
+.notify-link a{color:#3376c5;font-size:13px;text-decoration:underline}
+@media(max-width:640px){
+  .access-panel{padding:20px 0}
+  .connection-card{grid-template-columns:42px 1fr auto}
+  .connection-state{grid-column:2}
+  .connection-card button{grid-column:3;grid-row:1/3}
+  .page-head{align-items:flex-start;flex-direction:column}
+  .page-head-actions{width:100%;flex-wrap:wrap}
+  .record-search{min-width:0;flex:1}
+  .filter-bar{flex-direction:column;align-items:stretch}
+  .page-head h1{font-size:18px}
 }
 </style>
-<style>
-.connection-management-dialog .el-dialog__header {
-  padding: 0;
-}
-.connection-management-dialog .el-dialog__body {
-  padding: 0 12px;
-}
-</style>
-
-
-
-
-

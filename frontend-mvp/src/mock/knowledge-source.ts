@@ -19,7 +19,10 @@ function kb(
   space: KnowledgeSpace,
   nodes: SourceKnowledgeNode[],
 ): SourceKnowledgeBase {
-  return { id, name, owner, createdAt, count, space, nodes, documents: leafNames(nodes) }
+  // This release supports exactly one folder level in local knowledge libraries.
+  const leaves = (children: SourceKnowledgeNode[]): SourceKnowledgeNode[] => children.flatMap(node => node.kind === 'file' ? [node] : leaves(node.children ?? []))
+  const firstLevelNodes = nodes.map(node => node.kind === 'folder' ? { ...node, children: leaves(node.children ?? []) } : node)
+  return { id, name, owner, createdAt, count, space, nodes: firstLevelNodes, documents: leafNames(firstLevelNodes) }
 }
 
 export const publicKnowledgeBases: SourceKnowledgeBase[] = [

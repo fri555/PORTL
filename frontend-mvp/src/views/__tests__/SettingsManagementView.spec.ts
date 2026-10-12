@@ -65,8 +65,8 @@ describe('SettingsManagementView', () => {
     expect(wrapper.text()).toContain('快捷提示词')
     expect(wrapper.text()).toContain('模型配置')
     expect(wrapper.text()).toContain('适用部门')
-    expect(wrapper.text()).toContain('接入系统标签')
-    expect(wrapper.text()).toContain('最多选择 3 个')
+    expect(wrapper.text()).toContain('能力标签')
+    expect(wrapper.text()).not.toContain('最多选择 3 个')
   })
 
   it('edits usage instructions as four plain labeled fields without grouped cards', async () => {
@@ -80,7 +80,7 @@ describe('SettingsManagementView', () => {
     const usageForm = wrapper.get('.usage-form-fields')
     expect(usageForm.findAll('[data-testid^="usage-field-"]')).toHaveLength(4)
     const labels = [
-      ['systems', '接入系统'],
+      ['systems', '能力标签'],
       ['input', '输入要求'],
       ['output', '输出形式'],
       ['limits', '使用限制'],

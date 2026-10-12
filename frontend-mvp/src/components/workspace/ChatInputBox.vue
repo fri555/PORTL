@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useChatController, type RunMode } from '@/composables/useWorkspaceChat'
+import { useAIChat } from '@/composables/useAIChat'
+import ThinkingProgressBar from '@/components/workspace/ThinkingProgressBar.vue'
 import {
   AlertCircle, Check, ChevronDown, FileText, Globe,
   Plus, SendHorizontal, Square, User, X, Zap,
 } from 'lucide-vue-next'
 
 const chat = useChatController()
+const ai = useAIChat()
 
 const modeMenuOpen = ref(false)
 
@@ -32,6 +35,17 @@ const recommendedPrompts = computed(() => {
     ;(e.promptCases || []).forEach((p) => list.push(p))
   })
   return list
+})
+
+const expertTodoSteps = computed(() => {
+  const liveSteps = ai.currentThinking.value
+  const latestCompleted = [...ai.activeMessages.value]
+    .reverse()
+    .find(message => message.role === 'assistant' && message.thinking?.some(step => step.module === 'todo'))
+  const source = liveSteps.some(step => step.module === 'todo')
+    ? liveSteps
+    : latestCompleted?.thinking ?? []
+  return source.filter(step => step.module === 'todo')
 })
 
 // 各模式专属 placeholder（对齐三张设计图）
@@ -110,6 +124,12 @@ function formatSize(bytes?: number) {
         </button>
       </span>
     </div>
+
+    <ThinkingProgressBar
+      v-if="chat.runMode.value === 'task' && expertTodoSteps.length > 0"
+      :steps="expertTodoSteps"
+      class="mb-2"
+    />
 
     <!-- 输入框容器 -->
     <div

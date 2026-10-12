@@ -21,6 +21,8 @@ const validStartedAt = typeof saved?.startedAt === 'number' && Number.isFinite(s
 const initialStatus = restoredStatus === 'running' && validStartedAt === null ? 'unknown' : restoredStatus
 const status = ref<FollowPlanStatus>(initialStatus === 'waiting' && !props.active ? 'superseded' : initialStatus)
 const startedAt = ref<number | null>(validStartedAt)
+const planExpanded = ref(false)
+const replyTime = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(validStartedAt ?? Date.now()))
 let finish: ReturnType<typeof setTimeout> | undefined
 const label = computed(() => ({ waiting: '等待执行', running: '正在模拟执行', done: '模拟执行完成', cancelled: '已取消', superseded: '已被新计划替代', unknown: '执行结果待核实' })[status.value])
 
@@ -66,15 +68,17 @@ onBeforeUnmount(() => { save(); clearTimers() })
     <p v-if="status === 'waiting'">确认计划后，点击“立即执行”开始。</p>
     <p v-else-if="status === 'unknown'">本轮执行记录不完整，请核实执行结果；不会自动重试或交付文件。</p>
     <p v-else-if="status === 'superseded'">此计划不再执行，历史内容继续保留。</p>
-    <ol><li>整理本轮任务和已授权资料</li><li>处理问题并形成结果</li><li>校验并交付文件；PPT 模板：{{ templateLabel }}</li></ol>
+    <button class="follow-plan-summary" type="button" :aria-expanded="planExpanded" @click="planExpanded = !planExpanded">3 项任务 · 整理资料 → 形成结论 → 交付结果</button><ol v-if="planExpanded"><li>整理本轮任务和已授权资料</li><li>处理问题并形成结果</li><li>校验并交付文件；PPT 模板：{{ templateLabel }}</li></ol>
     <footer v-if="active && status === 'waiting'"><button type="button" @click="emit('modify')">修改计划</button><button type="button" @click="run">立即执行</button><button type="button" @click="stop">停止本轮</button></footer>
     <button v-if="status === 'running'" type="button" @click="stop">停止执行</button>
     <p v-if="status === 'done'" class="follow-result">本轮模拟执行完成 · {{ templateLabel }} · 文件由正式服务生成后交付。</p>
     <small>交互示例，不调用真实业务数据或生成文件。</small>
+    <time class="follow-message-time" :title="replyTime">{{ replyTime }}</time>
   </section>
 </template>
 <style scoped>
 .follow-plan{border:1px solid #e2e8f0;border-radius:12px;padding:18px 20px;margin:10px 0 24px;background:#fff;color:#415267;font-size:13px;line-height:1.8}.follow-plan header{display:flex;justify-content:space-between;gap:12px}.follow-plan header span{color:#467abc;font-size:12px}.follow-plan p{font-size:12px;color:#738398}.follow-plan ol{padding-left:20px}.follow-plan footer{display:flex;gap:10px}.follow-plan button{padding:6px 12px;border:1px solid #d7e1ef;border-radius:7px;background:white;color:#3c71b9;cursor:pointer}.follow-plan button:disabled{opacity:.4;cursor:not-allowed}.follow-plan small{display:block;color:#9ba7b6;margin-top:12px;font-size:11px}.follow-result{background:#f1f7f3;border-radius:6px;padding:10px}
+.follow-plan-summary{display:block;width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;border:0!important;background:transparent!important;padding:7px 0!important;text-align:left;color:#747c88!important}.follow-message-time{display:block;margin-top:7px;color:#a0a6b0;font-size:10px;opacity:0}.follow-plan:hover .follow-message-time,.follow-plan:focus-within .follow-message-time{opacity:1}
 </style>
 
 

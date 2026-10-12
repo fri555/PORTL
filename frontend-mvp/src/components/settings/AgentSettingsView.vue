@@ -56,10 +56,12 @@ const checkedUsage = ref(false)
 const checkedPublication = ref(false)
 const checkedName = ref(false)
 const checkedVersion = ref(false)
+const checkedStatus = ref(false)
 const formRoot = ref<HTMLElement | null>(null)
 const nameInvalid = computed(() => checkedName.value && !draft.name.trim())
 const descriptionInvalid = computed(() => checkedPublication.value && (!draft.description.trim() || draft.description.length > USAGE_TEXT_MAX_LENGTH))
 const versionInvalid = computed(() => checkedVersion.value && formMode.value === 'create' && (!Number.isInteger(Number(draft.version)) || Number(draft.version) < 1))
+const statusInvalid = computed(() => checkedStatus.value && !draft.status)
 const usageInvalid = computed(() => {
   const systems = normalizeSystemTags(usageForm.systems)
   return {
@@ -108,6 +110,7 @@ const categoryByLabel: Record<string, Agent['category']> = {
 }
 const models = ['deepseek-v4-flash（deepseek-v4-flash）', 'Qwen3 企业主模型', 'DeepSeek 推理模型']
 const departmentOptions = ['通用', '商品部', '平台部', 'B2C线上', 'B2C线下']
+const statusOptions = ['正式', '测试']
 const systemOptions = ['DWS', '文档', '数据平台']
 
 const usageForm = reactive(createUsageForm())
@@ -135,6 +138,7 @@ const draft = reactive({
   name: '',
   version: 1 as number | string,
   category: '通用',
+  status: '测试' as '正式' | '测试',
   applicableDepartments: ['通用'] as string[],
   connectedSystems: [] as string[],
   description: '',
@@ -217,8 +221,9 @@ function resetDraft() {
   checkedPublication.value = false
   checkedName.value = false
   checkedVersion.value = false
+  checkedStatus.value = false
   Object.assign(draft, {
-    name: '', version: 1, category: '通用', description: '', avatar: '', logo: '', icon: '',
+    name: '', version: 1, category: '通用', status: '测试', description: '', avatar: '', logo: '', icon: '',
     publishTemplate: false,
     applicableDepartments: ['通用'], connectedSystems: [],
     model: '', react: true, chainOfThought: false, historyTurns: 20, compressionThreshold: 3000,
@@ -249,6 +254,7 @@ function openEdit(agent: AgentRow) {
     version: existingDraft?.version ?? 1,
     name: agent.name,
     category: agent.category,
+    status: (existingDraft as any)?.status ?? '测试',
     description: agent.description,
     avatar: agent.avatar,
     model: existingDraft?.defaultModel ?? '',
@@ -310,7 +316,8 @@ function saveAgent() {
   checkedName.value = true
   checkedVersion.value = true
   checkedPublication.value = true
-  if (!draft.name.trim() || versionInvalid.value || descriptionInvalid.value) {
+  checkedStatus.value = true
+  if (!draft.name.trim() || versionInvalid.value || descriptionInvalid.value || statusInvalid.value) {
     activeStep.value = 1
     void focusInvalidField()
     return
@@ -344,7 +351,7 @@ function saveAgent() {
     id, name:payload.name, description:payload.description, avatarUrl:payload.avatar,
     category: categoryByLabel[payload.category] ?? previous?.category ?? 'finance_admin', capabilityLevel:1, developerId:'', developerName:'', developerDepartment:'',
     status:'online', reviewStatus:'draft', systemPrompt:'', defaultModel:draft.model, welcomeMessage:'', quickCommands:[], knowledgeBaseIds:[], toolIds:[], skillIds:[], skillCount:0, toolCount:0,
-    isPublished:false, version:'1.0', totalCalls:0, avgRating:0, favoriteCount:0, createdAt:new Date().toISOString(), updatedAt:new Date().toISOString(),
+    isPublished:false, version:'1.0', totalCalls:0, avgRating:0, createdAt:new Date().toISOString(), updatedAt:new Date().toISOString(),
     ...previous, usageInstructions:payload.usageInstructions,
   }
   Object.assign(snapshot, {
@@ -775,6 +782,9 @@ function toggleLimited(list: string[], value: string, limit: number) {
               <label class="mt-5 block text-sm font-medium">分类 <b class="text-red-500">*</b>
                 <select v-model="draft.category" class="mt-2 h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm outline-none"><option v-for="category in categories" :key="category">{{ category }}</option></select>
               </label>
+              <label class="mt-5 block text-sm font-medium">状态 <b class="text-red-500">*</b>
+                <select v-model="draft.status" :class="['mt-2 h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm outline-none', { 'usage-invalid': statusInvalid }]"><option v-for="mode in statusOptions" :key="mode">{{ mode }}</option></select>
+              </label>
               <div class="mt-5 grid gap-5 sm:grid-cols-2">
                 <fieldset class="min-w-0 border-0 p-0">
                   <legend class="text-sm font-medium">适用部门 <b class="text-red-500">*</b></legend>
@@ -897,8 +907,8 @@ function toggleLimited(list: string[], value: string, limit: number) {
             </div>
             <div class="usage-form-fields space-y-6">
                 <div class="space-y-6">
-                  <label class="block text-sm font-medium text-zinc-700">接入系统 <b class="text-red-500">*</b>
-                    <ElInputTag v-model="manualUsageSystems" data-testid="usage-field-systems" :aria-invalid="usageInvalid.systems || undefined" :class="{ 'usage-invalid': usageInvalid.systems }" :max="8" maxlength="20" :delimiter="systemTagDelimiter" clearable class="mt-2 w-full" placeholder="输入业务系统名称，最多 8 个" aria-label="接入系统" />
+                  <label class="block text-sm font-medium text-zinc-700">能力标签 <b class="text-red-500">*</b>
+                    <ElInputTag v-model="manualUsageSystems" data-testid="usage-field-systems" :aria-invalid="usageInvalid.systems || undefined" :class="{ 'usage-invalid': usageInvalid.systems }" :max="8" maxlength="20" :delimiter="systemTagDelimiter" clearable class="mt-2 w-full" placeholder="输入智能体能力标签，每个标签最多8字符，回车确认单个标签" aria-label="能力标签" />
                   </label>
                   <label class="block text-sm font-medium text-zinc-700">输入要求 <span class="font-normal text-zinc-400">选填</span><textarea v-model="usageForm.input" data-testid="usage-field-input" :aria-invalid="usageInvalid.input || undefined" :class="{ 'usage-invalid': usageInvalid.input }" maxlength="500" rows="3" class="mt-2 w-full resize-none rounded-lg border border-zinc-200 p-3 text-sm outline-none focus:border-blue-400" placeholder="例如：需提供商品链接、日期范围和已授权文件" /><span class="mt-1 block text-right text-xs font-normal text-zinc-400">{{ usageForm.input.length }}/500</span></label>
                   <label class="block text-sm font-medium text-zinc-700">输出形式 <span class="font-normal text-zinc-400">选填</span><textarea v-model="usageForm.output" data-testid="usage-field-output" :aria-invalid="usageInvalid.output || undefined" :class="{ 'usage-invalid': usageInvalid.output }" maxlength="500" rows="3" class="mt-2 w-full resize-none rounded-lg border border-zinc-200 p-3 text-sm outline-none focus:border-blue-400" placeholder="例如：表格、报告、清单或文件" /><span class="mt-1 block text-right text-xs font-normal text-zinc-400">{{ usageForm.output.length }}/500</span></label>

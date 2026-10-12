@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { ElMessage } from 'element-plus';
 import {
   ArrowUpLeft,
   BookOpen,
@@ -96,13 +97,28 @@ const selectedText = computed(
 );
 const sourceTitle = (source: CitationSource) =>
   source.title?.trim() || (source.type === 'web' ? (safeCitationUrl(source) ? new URL(safeCitationUrl(source)).hostname : '未提供标题的网页') : '未命名知识文件');
+function citationExcerpt(source: CitationSource) {
+  if (source.access !== 'allowed') return source.access === 'forbidden' ? '当前无权访问该来源。' : '该来源已失效。'
+  return source.summary?.trim() || source.fragments[0]?.text || '暂无可展示的正文摘要。'
+}
 function sourceOrigin(source: CitationSource) {
   if (source.origin?.trim()) return source.origin.trim();
   const url = safeCitationUrl(source);
   if (source.type === 'web' && url) return new URL(url).hostname;
   return source.type === 'web' ? '站点未提供' : '知识库位置未提供';
 }
-
+function activateSource(id: string, fragmentId?: string, anchor?: string, event?: Event) {
+  const entry = entryFor(id);
+  if (!entry) return;
+  if (entry.source.type === 'web') {
+    if (entry.source.access !== 'allowed') { ElMessage.warning(entry.source.access === 'forbidden' ? '当前无权访问该来源。' : '该来源已失效。'); return; }
+    const url = safeCitationUrl(entry.source);
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+    else ElMessage.warning('来源网址暂不可用。');
+    return;
+  }
+  selectSource(id, fragmentId, anchor, event);
+}
 async function load() {
   const source = active.value?.source;
   const request = ++requestVersion;
@@ -231,20 +247,15 @@ defineExpose({ closePanel });
             :id="`${answerId}-cite-${p}-${c}`"
             type="button"
             class="inline-citation"
-            :class="{ selected: open && activeAnchor === `${answerId}-cite-${p}-${c}` }"
+            :class="[entryFor(citation.sourceId)!.source.type, { selected: open && activeAnchor === `${answerId}-cite-${p}-${c}` }]"
             :data-citation-number="entryFor(citation.sourceId)!.number"
             :title="`${entryFor(citation.sourceId)!.source.type === 'web' ? '网页' : '知识库'} · ${sourceTitle(entryFor(citation.sourceId)!.source)}`"
             :aria-label="`查看引用 ${entryFor(citation.sourceId)!.number}：${sourceTitle(entryFor(citation.sourceId)!.source)}`"
-            @click="
-              selectSource(
-                citation.sourceId,
-                citation.fragmentId,
-                `${answerId}-cite-${p}-${c}`,
-                $event,
-              )
-            "
+            @click="activateSource(citation.sourceId, citation.fragmentId, `${answerId}-cite-${p}-${c}`, $event)"
           >
-            {{ entryFor(citation.sourceId)!.number }}</button
+            {{ entryFor(citation.sourceId)!.number }}
+            <span class="citation-hover" role="tooltip"><strong><em class="citation-kind">{{ entryFor(citation.sourceId)!.source.type === 'web' ? '网页' : '知识库' }}</em>{{ sourceTitle(entryFor(citation.sourceId)!.source) }}</strong><span>{{ citationExcerpt(entryFor(citation.sourceId)!.source) }}</span></span>
+          </button
           ><span v-else class="missing-reference" role="status">［{{ sourceNumbers.get(citation.sourceId) }}］{{ streaming ? '引用准备中' : '来源信息暂不可用' }}</span></template
         >
       </p>
@@ -255,22 +266,22 @@ defineExpose({ closePanel });
       <header>
         <div>
           <strong
-            >引用来源 <span>{{ entries.length }}</span></strong
+            >参考 {{ entries.length }} 篇资料</strong
           ><small>知识库 {{ counts.knowledge }} · 网页 {{ counts.web }}</small>
         </div>
-        <button type="button" @click="openList"><List :size="14" />全部来源</button>
+        
       </header>
       <button
         v-for="entry in visible"
         :key="entry.source.id"
         type="button"
         class="source-card"
-        :class="{ active: open && activeId === entry.source.id }"
+        :class="[entry.source.type + '-source', { active: open && activeId === entry.source.id }]"
         :data-source-card="entry.number"
         :title="sourceTitle(entry.source)"
-        @click="selectSource(entry.source.id, undefined, undefined, $event)"
+        @click="activateSource(entry.source.id, undefined, undefined, $event)"
       >
-        <span class="source-number">{{ entry.number }}</span
+        <span class="source-number"><Globe2 v-if="entry.source.type === 'web'" :size="14"/><FileText v-else :size="14"/></span
         ><span class="source-card-copy"
           ><strong>{{ sourceTitle(entry.source) }}</strong
           ><small
@@ -286,7 +297,7 @@ defineExpose({ closePanel });
             ><span>{{ entry.source.publishedAt?.trim() || '发布时间未提供' }}</span
             ><span>{{ entry.source.summary?.trim() || '摘要未提供' }}</span></span
           ></span
-        ><ChevronRight :size="15" />
+        >
       </button>
       <button
         v-if="entries.length > 3"
@@ -344,7 +355,7 @@ defineExpose({ closePanel });
             type="button"
             class="source-card"
             :data-panel-source="entry.number"
-            @click="selectSource(entry.source.id)"
+            @click="activateSource(entry.source.id)"
           >
             <span class="source-number">{{ entry.number }}</span
             ><span class="source-card-copy"
@@ -504,6 +515,7 @@ defineExpose({ closePanel });
   line-height: 1;
   cursor: pointer;
 }
+.citation-hover{position:absolute;z-index:25;left:50%;bottom:calc(100% + 8px);display:none;width:300px;transform:translateX(-50%);border:1px solid #e2e7ed;border-radius:10px;background:#fff;padding:11px 12px;box-shadow:0 10px 30px rgba(26,42,61,.16);color:#384555;text-align:left;vertical-align:initial;white-space:normal}.citation-hover::after{position:absolute;left:50%;bottom:-5px;width:9px;height:9px;transform:translateX(-50%) rotate(45deg);border-right:1px solid #e2e7ed;border-bottom:1px solid #e2e7ed;background:#fff;content:""}.citation-hover strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}.citation-hover span{display:-webkit-box;overflow:hidden;margin-top:5px;color:#778393;font-size:11px;line-height:1.55;-webkit-box-orient:vertical;-webkit-line-clamp:4}.inline-citation:hover .citation-hover,.inline-citation:focus-visible .citation-hover{display:block}.web-source-teaser{display:block;margin-top:5px;color:#7f8b99;font-size:10px}.web-source-teaser>span{display:block}.web-source-teaser>span:last-child{display:-webkit-box;overflow:hidden;line-height:1.5;-webkit-box-orient:vertical;-webkit-line-clamp:4}
 .inline-citation:hover,
 .inline-citation.selected {
   background: #e5efff;
@@ -908,5 +920,10 @@ defineExpose({ closePanel });
     box-shadow: -10px 0 36px #20375420;
   }
 }
+.inline-citation{position:relative;min-width:16px;height:16px!important;border-radius:5px;font-size:10px!important;vertical-align:super;padding:0 4px!important}.inline-citation.knowledge{background:#eef0fe!important;color:#6b64b8!important}.inline-citation.web{background:#eef0fe!important;color:#6b64b8!important}.citation-hover{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(100% + 9px);width:330px;z-index:60;background:white;border:1px solid #e5e5e7;border-radius:8px;box-shadow:0 6px 24px #00000012;padding:12px;text-align:left;white-space:normal;color:#5d626a;font-size:11px;line-height:1.6}.citation-hover strong{display:block;margin-bottom:5px;font-weight:500;color:#34373c}.citation-hover>span{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}.answer-sources{margin-top:15px;padding:0!important;border:0!important;background:transparent!important}.answer-sources>header{margin-bottom:8px}.answer-sources>header strong{color:#999fa8;font-weight:400;font-size:12px}.answer-sources>header small{display:none}.source-card{display:flex;align-items:center;gap:8px;min-height:26px!important;border:0!important;border-radius:0!important;background:transparent!important;padding:3px 0!important;box-shadow:none!important}.source-card:hover,.source-card.active{background:transparent!important}.source-card-copy strong{color:#1973df;font-size:12px;font-weight:400;text-decoration:none}.source-card:hover .source-card-copy strong{text-decoration:underline}.web-source .source-card-copy strong{color:#6b64b8}.source-card-copy small,.web-source-teaser{display:none!important}.source-number{width:15px!important;height:18px!important;min-width:15px;background:transparent!important;color:#2c83e4!important}.web-source .source-number{color:#7569be!important}.source-expand{color:#939ba6;font-size:11px}.source-card{overflow:visible}.source-card-copy strong{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.citation-kind{margin-right:7px;font-size:10px;font-style:normal;color:#999;font-weight:400}
 </style>
+
+
+
 

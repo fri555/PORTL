@@ -2,7 +2,6 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import {
   ArrowUp,
-  ArrowUpRight,
   BookmarkPlus,
   CalendarPlus,
   CalendarSearch,
@@ -10,36 +9,22 @@ import {
   Database,
   ExternalLink,
   Globe2,
-  Heart,
   MessageSquareText,
   PackageSearch,
   Plus,
   Search,
   X,
 } from 'lucide-vue-next'
-import { useExpertCatalog, isExpertAvailable } from '@/composables/useExpertCatalog'
+import { isExpertAvailable } from '@/composables/useExpertCatalog'
 import { useExpertMention } from '@/composables/useExpertMention'
 import { homeDraft } from '@/composables/useHomeDraft'
 import ExpertMentionMenu from './ExpertMentionMenu.vue'
-import { AGENT_CATEGORY_META, type Agent } from '@/types/agent'
-import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import type { Agent } from '@/types/agent'
+import { AGENT_CATEGORY_META } from '@/types/agent'
 import { expertAgents as marketAgents } from '@/utils/expertPrototypeStore'
 import QuickPromptPanel from './QuickPromptPanel.vue'
 import ApprovalModeControl, { type ApprovalMode } from './ApprovalModeControl.vue'
 
-type ChatMode = 'daily' | 'expert'
-
-interface ExpertCard {
-  id: string
-  name: string
-  department: string
-  description: string
-  tags: string[]
-  avatar: string
-  shortcuts: string[]
-  available: boolean
-}
 
 interface UserQuickPrompt {
   id: string
@@ -52,20 +37,22 @@ const props = defineProps<{ initialAgentId?: string; initialPrompt?: string; ini
 const emit = defineEmits<{
   send: [prompt: string, approvalMode: ApprovalMode]
   'expert-selected': [id: string]
-  'mode-changed': [mode: ChatMode]
+  'mode-changed': [mode: 'daily' | 'expert']
 }>()
 
 const productionAssets = `${import.meta.env.BASE_URL}assets/production-home`
-const agentAssets = `${import.meta.env.BASE_URL}assets/agents-online`
-const router = useRouter()
-const { favoriteExperts, availableExperts, toggleFavorite, favoriteError } = useExpertCatalog()
+const { availableExperts } = { availableExperts: computed(() => marketAgents.filter(isExpertAvailable).sort((a, b) => a.id.localeCompare(b.id))) }
 const prompt = homeDraft
 if (props.initialPrompt) prompt.value = props.initialPrompt
-const mode = ref<ChatMode>(props.initialMode === 'expert' ? 'expert' : 'daily')
 const networkEnabled = ref(true)
+const currentMode = ref<'daily' | 'expert'>(props.initialMode === 'expert' ? 'expert' : 'daily')
+function setMode(mode: 'daily' | 'expert') {
+  currentMode.value = mode
+  emit('mode-changed', mode)
+}
 const approvalMode = ref<ApprovalMode>(props.initialApprovalMode === 'autonomous' ? 'autonomous' : 'default')
-const selectedExpert = ref<ExpertCard | null>(null)
-const selectedDepartment = ref('收藏')
+const selectedExpert = ref<Agent | null>(null)
+const selectedDepartment = ref('全部')
 const expertQuery = ref('')
 const userQuickPrompts = ref<UserQuickPrompt[]>([])
 const input = ref<HTMLTextAreaElement | null>(null)
@@ -77,10 +64,7 @@ watch(
       (item) => item.id === props.initialAgentId && isExpertAvailable(item),
     )
     if (!agent) return
-    mode.value = 'expert'
-    selectedExpert.value = toExpertCard(agent)
     if (props.initialPrompt) prompt.value = props.initialPrompt
-    emit('mode-changed', 'expert')
     emit('expert-selected', agent.id)
   },
   { immediate: true },
@@ -127,65 +111,32 @@ const dailyPrompts = [
   },
 ]
 
-function toExpertCard(agent: Agent): ExpertCard {
-  return { id: agent.id, name: agent.name, description: agent.description, department: AGENT_CATEGORY_META[agent.category]?.label ?? '通用', tags: [], avatar: agent.avatarUrl || `${agentAssets}/data-analysis.png`, shortcuts: agent.quickCommands, available: isExpertAvailable(agent) }
+const mention = useExpertMention(prompt, input, availableExperts, chooseMention)
+function chooseMention(agent: Agent) {
+  emit('expert-selected', agent.id)
 }
-const experts = computed(() => favoriteExperts.value.map(toExpertCard))
-const departmentOrder = ['通用', '商品', '直播', 'B2B', 'B2C', '门店']
-const availableDepartments = computed(() => ['收藏', ...departmentOrder.filter(department => experts.value.some(expert => expert.department === department))])
-watch(availableDepartments, departments => {
-  if (!departments.includes(selectedDepartment.value)) selectedDepartment.value = '收藏'
-})
-function removeFavorite(expert: ExpertCard) {
-  const agent = marketAgents.find(item => item.id === expert.id)
-  if (agent && !toggleFavorite(agent)) ElMessage.error(favoriteError.value || '取消收藏失败，请重试')
-}
+const { open: mentionOpen, keyword: mentionKeyword, results: mentionResults, allResults: mentionAllResults, activeIndex: mentionIndex, hasMore: mentionHasMore } = mention
+const availableDepartments = ['全部', ...Object.values(AGENT_CATEGORY_META).map((m) => m.label)]
 const filteredExperts = computed(() => {
   const keyword = expertQuery.value.trim().toLowerCase()
-  return experts.value.filter(expert => (selectedDepartment.value === '收藏' || selectedDepartment.value === expert.department) && [expert.name, expert.description].join(' ').toLowerCase().includes(keyword))
+  return availableExperts.value.filter((agent) => {
+    const deptLabel = AGENT_CATEGORY_META[agent.category]?.label ?? agent.category
+    const departmentMatched = selectedDepartment.value === '全部' || deptLabel === selectedDepartment.value
+    const searchText = [agent.name, agent.description, deptLabel, ...agent.quickCommands].join(' ').toLowerCase()
+    return departmentMatched && (!keyword || searchText.includes(keyword))
+  })
 })
-function chooseMention(agent: Agent) {
-  mode.value = 'expert'; emit('mode-changed', 'expert'); pickExpert(toExpertCard(agent))
-}
-function clearExpert() { selectedExpert.value = null; mode.value = 'daily'; emit('expert-selected', ''); emit('mode-changed', 'daily'); nextTick(() => input.value?.focus()) }
-const mention = useExpertMention(prompt, input, availableExperts, chooseMention)
-const { open: mentionOpen, keyword: mentionKeyword, results: mentionResults, allResults: mentionAllResults, activeIndex: mentionIndex, hasMore: mentionHasMore } = mention
-const quickPromptScope = computed(() =>
-  mode.value === 'daily' ? 'daily' : (selectedExpert.value?.id ?? 'expert'),
-)
-const quickPromptScopeLabel = computed(() =>
-  mode.value === 'daily' ? '日常办公' : (selectedExpert.value?.name ?? '业务专家'),
-)
-const scopedUserQuickPrompts = computed(() =>
-  userQuickPrompts.value.filter((item) => item.scope === quickPromptScope.value),
-)
 const placeholder = computed(() => {
-  if (mode.value === 'expert' && selectedExpert.value)
-    return `向${selectedExpert.value.name}描述你的任务...`
-  if (mode.value === 'expert') return '选择已收藏专家，或输入 @ 搜索更多专家…'
+  if (currentMode.value === 'expert' && selectedExpert.value) return `向${selectedExpert.value.name}描述你的任务…`
+  if (currentMode.value === 'expert') return '请在下方选择合适的专家。耶虎会匹配任务托付给他/她高效完成…'
   return '描述你的任务，输入 @ 可快捷选择专家…'
 })
-const canSend = computed(
-  () => !!prompt.value.trim() && (mode.value === 'daily' || !!selectedExpert.value),
-)
+const canSend = computed(() => !!prompt.value.trim() && (currentMode.value === 'daily' || !!selectedExpert.value))
 
-function changeMode(nextMode: ChatMode) {
-  mode.value = nextMode
-  selectedExpert.value = null
-  selectedDepartment.value = '收藏'
-  expertQuery.value = ''
-  emit('mode-changed', nextMode)
-}
-
-function pickDailyPrompt(text: string) {
-  prompt.value = text
-  nextTick(() => input.value?.focus())
-}
-
-function pickExpert(expert: ExpertCard) {
-  if (!expert.available) return
-  selectedExpert.value = expert
-  emit('expert-selected', expert.id)
+function pickExpert(agent: Agent) {
+  selectedExpert.value = agent
+  prompt.value = ''
+  emit('expert-selected', agent.id)
   nextTick(() => input.value?.focus())
 }
 
@@ -194,13 +145,20 @@ function useShortcut(text: string) {
   nextTick(() => input.value?.focus())
 }
 
+const quickPromptScope = computed(() => 'daily')
+const quickPromptScopeLabel = computed(() => '日常办公')
+const scopedUserQuickPrompts = computed(() =>
+  userQuickPrompts.value.filter((item) => item.scope === 'daily'),
+)
+
+function pickDailyPrompt(text: string) {
+  prompt.value = text
+  nextTick(() => input.value?.focus())
+}
+
 function send() {
   const value = prompt.value.trim()
-  if (!value || !canSend.value) return
-  const currentExpert = marketAgents.find(agent => agent.id === selectedExpert.value?.id)
-  if (selectedExpert.value && (!currentExpert || !isExpertAvailable(currentExpert))) { ElMessage.error('该专家暂不可用，请重新选择'); return }
-  emit('mode-changed', mode.value)
-  emit('expert-selected', selectedExpert.value?.id ?? '')
+  if (!value) return
   emit('send', value, approvalMode.value)
   prompt.value = ''
 }
@@ -249,44 +207,24 @@ function deleteQuickPrompt(id: string) {
         />
       </div>
 
-      <div
-        class="source-chat-home__modes"
-        data-testid="mode-switcher"
-        role="tablist"
-        aria-label="对话模式"
-      >
-        <button
-          type="button"
-          role="tab"
-          data-mode="daily"
-          :aria-selected="mode === 'daily'"
-          :class="{ active: mode === 'daily' }"
-          @click="changeMode('daily')"
-        >
-          日常办公
-        </button>
-        <button
-          type="button"
-          role="tab"
-          data-mode="expert"
-          :aria-selected="mode === 'expert'"
-          :class="{ active: mode === 'expert' }"
-          @click="changeMode('expert')"
-        >
-          业务专家
-        </button>
+      <!-- 模式切换胶囊按钮 -->
+      <div class="source-chat-home__modes">
+        <button type="button" :class="{ active: currentMode === 'daily' }" @click="setMode('daily')">日常办公</button>
+        <button type="button" :class="{ active: currentMode === 'expert' }" @click="setMode('expert')">专家模式</button>
       </div>
 
       <div class="source-chat-home__composer" data-testid="hero-composer">
-        <ExpertMentionMenu v-if="mentionOpen" id="home-expert-mentions" :experts="mentionResults" :active-index="mentionIndex" :keyword="mentionKeyword" :has-more="mentionHasMore" :total="mentionAllResults.length" @load-more="mention.loadMore" @select="mention.choose" @close="mentionOpen = false" />
-        <div class="source-chat-home__input-line" data-testid="expert-inline-input">
-        <div v-if="mode === 'expert' && selectedExpert" class="source-chat-home__expert-summary">
+        <ExpertMentionMenu v-if="mentionOpen" id="home-expert-mentions" :experts="mentionResults" :active-index="mentionIndex" :keyword="mentionKeyword" :has-more="mentionHasMore" :total="mentionAllResults.length" @load-more="mention.loadMore" @select="mention.choose" @close="mentionOpen = false" @panel-press="mention.onPanelPress" />
+        <div v-if="currentMode === 'expert' && selectedExpert" class="source-chat-home__expert-summary">
           <div class="source-chat-home__selected-row">
             <span data-testid="selected-expert-chip" class="source-chat-home__selected-chip">
-              <img :src="selectedExpert.avatar" alt="" /><span class="selected-expert-name">{{ selectedExpert.name }}</span><button type="button" aria-label="移除所选专家" @click="clearExpert"><X :size="13" /></button>
+              <img :src="selectedExpert.avatarUrl" alt="" />{{ selectedExpert.name }}
+              <button type="button" aria-label="取消选择专家" @click="selectedExpert = null"><X :size="14" /></button>
             </span>
+            <span class="source-chat-home__selected-role">{{ selectedExpert.description }}</span>
           </div>
         </div>
+        <div class="source-chat-home__input-line" data-testid="expert-inline-input">
         <textarea
           ref="input"
           v-model="prompt"
@@ -294,7 +232,7 @@ function deleteQuickPrompt(id: string) {
           :placeholder="placeholder"
           aria-label="向小马提问"
           role="combobox" aria-autocomplete="list" :aria-expanded="mentionOpen" aria-controls="home-expert-mentions" :aria-activedescendant="mentionOpen && mentionResults.length ? `home-expert-mentions-${mentionIndex}` : undefined"
-          @input="mention.inputChanged" @click="mention.update" @keyup="mention.caretChanged" @select="mention.update" @blur="mentionOpen = false" @compositionstart="mention.startComposition" @compositionend="mention.endComposition"
+          @input="mention.inputChanged" @click="mention.update" @keyup="mention.caretChanged" @select="mention.update" @blur="mention.onBlur" @compositionstart="mention.startComposition" @compositionend="mention.endComposition"
           @keydown="onKeydown"
         />
         </div>
@@ -324,13 +262,7 @@ function deleteQuickPrompt(id: string) {
             class="source-chat-home__send"
             :disabled="!canSend"
             aria-label="发送"
-            :title="
-              canSend
-                ? '发送'
-                : mode === 'expert' && !selectedExpert
-                  ? '请先选择专家'
-                  : '请输入内容'
-            "
+            :title="canSend ? '发送' : '请输入内容'"
             @click="send"
           >
             <ArrowUp :size="17" :stroke-width="2.2" />
@@ -339,7 +271,7 @@ function deleteQuickPrompt(id: string) {
       </div>
 
       <div
-        v-if="mode === 'daily' || selectedExpert"
+        v-if="currentMode === 'daily' || selectedExpert"
         class="source-chat-home__quick-entry"
         data-testid="quick-prompt-entry"
       >
@@ -356,7 +288,7 @@ function deleteQuickPrompt(id: string) {
       </div>
 
       <div
-        v-if="mode === 'daily'"
+        v-if="currentMode === 'daily'"
         class="source-chat-home__daily-grid"
         data-testid="daily-prompt-grid"
       >
@@ -399,15 +331,11 @@ function deleteQuickPrompt(id: string) {
         </button>
       </div>
 
-      <div v-if="mode === 'expert' && !selectedExpert" class="source-chat-home__expert-area">
+      <!-- 专家选择区域 -->
+      <div v-if="currentMode === 'expert' && !selectedExpert" class="source-chat-home__expert-area">
         <div class="source-chat-home__expert-sticky">
           <div class="source-chat-home__expert-toolbar" data-testid="expert-toolbar">
-            <div
-              class="source-chat-home__expert-tabs"
-              data-testid="expert-department-tabs"
-              role="tablist"
-              aria-label="按分类筛选已收藏专家"
-            >
+            <div class="source-chat-home__expert-tabs" data-testid="expert-department-tabs" role="tablist" aria-label="按部门筛选专家">
               <button
                 v-for="department in availableDepartments"
                 :key="department"
@@ -417,97 +345,61 @@ function deleteQuickPrompt(id: string) {
                 :aria-selected="selectedDepartment === department"
                 :class="{ active: selectedDepartment === department }"
                 @click="selectedDepartment = department"
-              >
-                {{ department }}
-              </button>
+              >{{ department }}</button>
             </div>
             <label class="source-chat-home__expert-search">
               <Search :size="15" />
-              <input
-                v-model="expertQuery"
-                aria-label="搜索专家"
-                placeholder="搜索已收藏专家" maxlength="60"
-              />
-              <button
-                v-if="expertQuery"
-                type="button"
-                aria-label="清空专家搜索"
-                @click="expertQuery = ''"
-              >
-                <X :size="14" />
-              </button>
+              <input v-model="expertQuery" aria-label="搜索专家" placeholder="搜索专家名称、简介..." />
+              <button v-if="expertQuery" type="button" aria-label="清空专家搜索" @click="expertQuery = ''"><X :size="14" /></button>
             </label>
           </div>
         </div>
-        <div
-          v-if="filteredExperts.length"
-          class="source-chat-home__expert-grid"
-          data-testid="expert-grid"
-        >
-          <article
-            v-for="expert in filteredExperts"
-            :key="expert.id"
+        <div v-if="filteredExperts.length" class="source-chat-home__expert-grid" data-testid="expert-grid">
+          <div
+            v-for="agent in filteredExperts"
+            :key="agent.id"
             class="source-chat-home__expert-card"
             data-testid="expert-card"
-            @click="pickExpert(expert)"
           >
-            <button type="button" class="source-chat-home__expert-main" :aria-label="'选择' + expert.name + '，' + expert.department" :disabled="!expert.available">
-            <img :src="expert.avatar" alt="" />
-            <span class="source-chat-home__expert-copy">
-              <span class="source-chat-home__expert-line" data-testid="expert-name-row">
-                <strong>{{ expert.name }}</strong><small v-if="!expert.available">暂不可用</small>
+            <button
+              type="button"
+              class="source-chat-home__expert-main"
+              :aria-label="`选择${agent.name}：${AGENT_CATEGORY_META[agent.category]?.label ?? agent.category}`"
+              @click="pickExpert(agent)"
+            >
+              <img :src="agent.avatarUrl" alt="" />
+              <span class="source-chat-home__expert-copy">
+                <span class="source-chat-home__expert-line" data-testid="expert-name-row">
+                  <strong>{{ agent.name }}</strong>
+                  <small>{{ AGENT_CATEGORY_META[agent.category]?.label ?? agent.category }}</small>
+                </span>
+                <span
+                  class="source-chat-home__expert-description"
+                  data-testid="expert-description-row"
+                  :title="agent.description"
+                >{{ agent.description }}</span>
               </span>
-              <span
-                class="source-chat-home__expert-description"
-                data-testid="expert-description-row"
-                :title="expert.description"
-                >{{ expert.description }}</span
-              >
-            </span>
-            <ArrowUpRight class="source-chat-home__expert-arrow" :size="12" />
             </button>
-            <button type="button" class="source-chat-home__unfavorite" :aria-label="'取消收藏' + expert.name" title="取消收藏" @click.stop="removeFavorite(expert)"><Heart :size="14" fill="currentColor" /></button>
-          </article>
+          </div>
         </div>
         <div v-else class="source-chat-home__expert-empty">
-          <Search :size="24" /><strong>{{ experts.length ? '未找到匹配的专家' : '还没有收藏专家' }}</strong><p v-if="!experts.length">在专家中心添加收藏后，会显示在这里；也可输入 @ 直接选用。</p><button v-if="!experts.length" type="button" @click="router.push('/agent-square')">添加专家</button
-          ><button
-            v-if="experts.length" type="button"
-            @click="
-              expertQuery = '';
-              selectedDepartment = '收藏';
-            "
-          >
-            清空筛选
-          </button>
+          <Search :size="24" />
+          <strong>未找到匹配的专家</strong>
+          <p>尝试更换筛选条件或搜索关键词</p>
+          <button type="button" @click="expertQuery = ''; selectedDepartment = '全部'">清空筛选</button>
         </div>
       </div>
 
-      <div
-        v-if="mode === 'expert' && selectedExpert"
-        class="source-chat-home__expert-shortcuts"
-        data-testid="expert-shortcut-grid"
-      >
+      <!-- 专家快捷入口 -->
+      <div v-if="currentMode === 'expert' && selectedExpert" class="source-chat-home__expert-shortcuts" data-testid="expert-shortcut-grid">
         <button
-          v-for="item in scopedUserQuickPrompts"
-          :key="item.id"
-          type="button"
-          data-testid="user-quick-prompt-card"
-          :title="item.content"
-          @click="insertQuickPrompt(item.content)"
-        >
-          {{ item.title }}<ExternalLink :size="12" />
-        </button>
-        <button
-          v-for="shortcut in selectedExpert.shortcuts"
+          v-for="shortcut in selectedExpert.quickCommands"
           :key="shortcut"
           type="button"
           :title="`使用快捷入口：${shortcut}`"
           :aria-label="`使用快捷入口：${shortcut}`"
           @click="useShortcut(shortcut)"
-        >
-          {{ shortcut }}<ExternalLink :size="12" />
-        </button>
+        >{{ shortcut }}<ExternalLink :size="12" /></button>
       </div>
     </div>
   </section>
@@ -1020,11 +912,7 @@ function deleteQuickPrompt(id: string) {
 .source-chat-home__expert-summary { flex: 0 1 auto; max-width: 42%; margin-top: 1px; }
 .source-chat-home__expert-arrow { position: absolute; right: 13px; top: 14px; color: #27313d; }
 .source-chat-home__expert-copy { padding-right: 14px; }
-.source-chat-home__unfavorite { position: absolute; right: 30px; top: 7px; display: grid; place-items: center; width: 25px; height: 25px; border: 0; border-radius: 6px; background: #fff; color: #df4a5a; cursor: pointer; opacity: 0; }
-.source-chat-home__expert-card:hover .source-chat-home__unfavorite,
-.source-chat-home__expert-card:focus-within .source-chat-home__unfavorite { opacity: 1; }
-.source-chat-home__unfavorite:hover { background: #fff0f2; }
-@media (hover: none) { .source-chat-home__unfavorite { opacity: 1; } }
+
 
 .source-chat-home__selected-row {
   display: flex;
@@ -1142,7 +1030,7 @@ function deleteQuickPrompt(id: string) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-.favorites-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;font-size:14px}.favorites-heading small{color:#8a94a1;margin-left:5px}.favorites-heading button{border:0;background:transparent;color:#2875d4;cursor:pointer;font-size:13px}.source-chat-home__selected-chip button{display:grid;place-items:center;border:0;background:transparent;color:inherit;cursor:pointer;padding:2px}.source-chat-home__expert-empty p{color:#7b8592;font-size:13px}.source-chat-home__expert-grid button:disabled{opacity:.55;cursor:not-allowed}</style>
+.source-chat-home__selected-chip button{display:grid;place-items:center;border:0;background:transparent;color:inherit;cursor:pointer;padding:2px}.source-chat-home__expert-empty p{color:#7b8592;font-size:13px}.source-chat-home__expert-grid button:disabled{opacity:.55;cursor:not-allowed}</style>
 
 
 

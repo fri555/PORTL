@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { getActivePinia } from 'pinia'
 import { useAppStore } from '@/stores/app'
 import { useRoute } from 'vue-router'
-import { Bot, FileText, FolderPlus, PanelLeftOpen, Plus, Search, Upload, X } from 'lucide-vue-next'
+import { Bot, ChevronDown, FileText, FolderPlus, PanelLeftOpen, Plus, Search, Upload, X } from 'lucide-vue-next'
 import KnowledgeDialogs from '@/components/knowledge/source-clone/KnowledgeDialogs.vue'
 import KnowledgeQaPanel from '@/components/knowledge/source-clone/KnowledgeQaPanel.vue'
 import KnowledgeSidebar from '@/components/knowledge/source-clone/KnowledgeSidebar.vue'
@@ -11,8 +11,12 @@ import KnowledgeTable from '@/components/knowledge/source-clone/KnowledgeTable.v
 import KnowledgeAccessPanel from '@/components/knowledge/source-clone/KnowledgeAccessPanel.vue'
 import DingTalkDocumentImport from '@/components/knowledge/source-clone/DingTalkDocumentImport.vue'
 import { boundDingTalkIdentity, getPrototypeScenario, personalDingTalkDocuments, prototypeCanWriteKnowledge, type ImportableDocument } from '@/components/knowledge/source-clone/dingtalkPrototype'
+import { dingTalkImportTaskFixtures, scopedDingTalkImportTasks } from '@/mock/dingtalk-import-tasks'
 import { sourceKnowledgeBases } from '@/mock/knowledge-source'
 import type {
+  DingTalkImportTask,
+  DingTalkSyncFrequency,
+  KnowledgeDestination,
   KnowledgeDialogKind,
   KnowledgeSpace,
   SourceKnowledgeBase,
@@ -24,17 +28,48 @@ const items = ref<SourceKnowledgeBase[]>(JSON.parse(JSON.stringify(sourceKnowled
 const route = useRoute()
 const appStore = getActivePinia() ? useAppStore() : null
 const scenario = getPrototypeScenario()
+const createMenuOpen = ref(route?.query.menu === 'open')
+const createMenuRoot = ref<HTMLElement | null>(null)
+const createMenuButton = ref<HTMLButtonElement | null>(null)
+function closeCreateMenu(restoreFocus = false) {
+  createMenuOpen.value = false
+  if (restoreFocus) nextTick(() => createMenuButton.value?.focus())
+}
+function closeMenuOutside(event: MouseEvent) {
+  if (event.target instanceof Node && !createMenuRoot.value?.contains(event.target)) closeCreateMenu()
+}
+function createMenuKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeCreateMenu(true); return }
+  if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+  event.preventDefault()
+  createMenuOpen.value = true
+  nextTick(() => {
+    const buttons = Array.from(createMenuRoot.value?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)') ?? [])
+    const index = buttons.findIndex(button => button === document.activeElement)
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : event.key === 'ArrowDown' ? (index + 1) % buttons.length : index <= 0 ? buttons.length - 1 : index - 1
+    buttons[next]?.focus()
+  })
+}
+onMounted(() => document.addEventListener('click', closeMenuOutside))
+onBeforeUnmount(() => document.removeEventListener('click', closeMenuOutside))
 const personalImportOpen = ref(route?.query.import === 'dingtalk' || ['personal-import', 'personal-partial', 'identity-unbound', 'identity-expired', 'export-unavailable', 'no-write-target'].includes(scenario))
 const canImportDingTalk = computed(() => Boolean(appStore?.user))
 const demoIdentityAuthorized = ref(false)
 watch(() => appStore?.user?.id, () => { demoIdentityAuthorized.value = false })
 const dingTalkIdentity = computed(() => boundDingTalkIdentity(appStore?.user, demoIdentityAuthorized.value ? 'normal' : scenario))
-const writableDestinations = computed(() => scenario === 'no-write-target' ? [] : items.value.filter(item => prototypeCanWriteKnowledge(item.id, appStore?.user?.role)).map(item => ({ id: item.id, name: item.name })))
+const importTasks = ref<DingTalkImportTask[]>(structuredClone(dingTalkImportTaskFixtures))
+const visibleImportTasks = computed(() => scopedDingTalkImportTasks(importTasks.value, appStore?.user?.id, appStore?.user?.role))
+const writableDestinations = computed<KnowledgeDestination[]>(() => scenario === 'no-write-target' ? [] : items.value
+  .filter(item => prototypeCanWriteKnowledge(item.id, appStore?.user?.role))
+  .flatMap(item => [{ id: item.id, name: item.name, kind: 'kb' as const, path: item.name },
+    ...(item.nodes ?? []).filter(node => node.kind === 'folder').map(node => ({ id: node.id, name: node.name, kind: 'folder' as const, parentId: item.id, path: item.name + ' / ' + node.name }))]))
 watch(canImportDingTalk, allowed => { if (!allowed) personalImportOpen.value = false })
 const canManageKnowledgeAccess = computed(() => appStore?.user?.role === 'admin')
 const activeSpace = ref<KnowledgeSpace>('public')
 const sidebarOpen = ref(false)
 const accessOpen = ref(canManageKnowledgeAccess.value && route?.query.view === 'access')
+const recordsOpen = ref(Boolean(appStore?.user) && route?.query.view === 'sync')
+watch(canImportDingTalk, allowed => { if (!allowed) recordsOpen.value = false })
 watch(canManageKnowledgeAccess, allowed => { if (!allowed) accessOpen.value = false })
 const qaOpen = ref(false)
 const selected = ref<SourceKnowledgeBase | null>(null)
@@ -50,9 +85,12 @@ watch(() => appStore?.user?.id, (next, previous) => {
   nodePath.value = []
   previewNode.value = null
   personalImportOpen.value = false
+  recordsOpen.value = false
+  closeCreateMenu()
   dialog.value = null
   dialogTarget.value = null
   query.value = ''
+  importTasks.value = structuredClone(dingTalkImportTaskFixtures)
   activeSpace.value = 'public'
 })
 
@@ -70,23 +108,15 @@ const currentNodes = computed(() => {
 })
 
 const selectedTreeId = computed(() => nodePath.value.at(-1)?.id ?? selected.value?.id)
-const uploadDestinations = computed(() => items.value.flatMap((knowledgeBase) => {
-  const destinations = [{ id: knowledgeBase.id, name: knowledgeBase.name }]
-  function appendFolders(nodes: SourceKnowledgeNode[], prefix: string) {
-    for (const node of nodes) {
-      if (node.kind !== 'folder') continue
-      const name = `${prefix} / ${node.name}`
-      destinations.push({ id: node.id, name })
-      appendFolders(node.children ?? [], name)
-    }
-  }
-  appendFolders(knowledgeBase.nodes ?? [], knowledgeBase.name)
-  return destinations
-}))
+const uploadDestinations = writableDestinations
+const currentDestinationId = computed(() => nodePath.value.at(-1)?.id ?? selected.value?.id ?? '')
+const mayWriteCurrent = computed(() => !selected.value || writableDestinations.value.some(item => item.id === currentDestinationId.value))
+const canCreateFolderHere = computed(() => nodePath.value.length === 0 && mayWriteCurrent.value)
 function openDialog(
   kind: Exclude<KnowledgeDialogKind, null>,
   target: SourceKnowledgeBase | SourceKnowledgeNode | null = null,
 ) {
+  closeCreateMenu()
   dialogTarget.value = target
   dialog.value = kind
 }
@@ -99,13 +129,24 @@ function closeDialog() {
 function openKnowledgeAccess() {
   if (!canManageKnowledgeAccess.value) return
   accessOpen.value = true
+  recordsOpen.value = false
   qaOpen.value = false
   previewNode.value = null
   if (window.matchMedia?.('(max-width: 640px)').matches) sidebarOpen.value = false
 }
 
+function openSyncRecords() {
+  if (!appStore?.user) return
+  accessOpen.value = false
+  recordsOpen.value = true
+  qaOpen.value = false
+  previewNode.value = null
+  closeCreateMenu()
+}
+
 function openFolderDialog() {
-  openDialog('folder', nodePath.value.at(-1) ?? selected.value)
+  if (!canCreateFolderHere.value) return
+  openDialog('folder', selected.value)
 }
 
 function authorizeCurrentDingTalkIdentity() {
@@ -113,32 +154,45 @@ function authorizeCurrentDingTalkIdentity() {
 }
 function openDingTalkImport() {
   if (!canImportDingTalk.value) return
+  closeCreateMenu()
   personalImportOpen.value = true
   qaOpen.value = false
   previewNode.value = null
 }
-function completeDingTalkImport(payload: { destinationId: string; newDestination?: string; documents: ImportableDocument[]; platformUserId: string }) {
+function completeDingTalkImport(payload: { destinationId: string; documents: ImportableDocument[]; platformUserId: string; frequency?: DingTalkSyncFrequency; schedule?: string }) {
   if (!appStore?.user || payload.platformUserId !== appStore.user.id) return
-  const newName = payload.newDestination?.trim()
-  const mayCreate = Boolean(newName && newName.length <= 60 && payload.destinationId.startsWith('local-dingtalk-') && !items.value.some(item => item.name === newName))
-  if (!mayCreate && !writableDestinations.value.some(item => item.id === payload.destinationId)) return
+  const destination = writableDestinations.value.find(item => item.id === payload.destinationId)
+  if (!destination || !payload.documents.length) return
   const currentDocuments = personalDingTalkDocuments(dingTalkIdentity.value, scenario)
   if (payload.documents.some(document => !currentDocuments.some(source => source.id === document.id && source.exportable))) return
-  if (mayCreate) items.value.unshift({ id: payload.destinationId, name: newName!, owner: '当前用户', createdAt: '刚刚', space: 'personal', count: 0, nodes: [] })
-  const destination = items.value.find(item => item.id === payload.destinationId)
-  if (!destination) return
-  const nodes = destination.nodes ?? (destination.nodes = [])
+  const nodes = findUploadDestination(destination.id)
+  if (!nodes) return
   const existingNames = new Set(nodes.map(node => node.name))
   const now = Date.now()
-  payload.documents.forEach((document, index) => {
+  const importTaskId = 'DT-' + now + '-' + (importTasks.value.length + 1)
+  const mappings = payload.documents.map((document, index) => {
     const baseName = document.name + '.' + document.format.toLowerCase()
     let name = baseName
     let suffix = 2
-    while (existingNames.has(name)) { name = document.name + '（' + suffix++ + '）.' + document.format.toLowerCase() }
+    while (existingNames.has(name)) name = document.name + '（' + suffix++ + '）.' + document.format.toLowerCase()
     existingNames.add(name)
-    nodes.push({ id: 'dingtalk-import-' + now + '-' + index, name, kind: 'file', owner: appStore.user!.displayName, updatedAt: '刚刚 · 单次导入', format: document.format, size: '钉钉转存 · 演示' })
+    const localFileId = 'dingtalk-import-' + now + '-' + (importTasks.value.length + 1) + '-' + index
+    nodes.push({ id: localFileId, name, kind: 'file', owner: appStore.user!.displayName, updatedAt: '刚刚 · 钉钉导入', format: document.format, size: '钉钉转存 · 演示' })
+    return { sourceDocumentId: document.id, sourceName: sourceDocumentPath(document), localFileId, status: '成功' as const }
   })
-  if (destination.count !== undefined) destination.count += payload.documents.length
+  const base = items.value.find(item => item.id === (destination.parentId ?? destination.id))
+  if (base?.count !== undefined) base.count += payload.documents.length
+  importTasks.value.unshift({ importTaskId, platformUserId: appStore.user.id, userAlias: appStore.user.displayName,
+    destinationId: destination.id, destinationPath: destination.path ?? destination.name,
+    frequency: payload.frequency ?? '不自动同步', schedule: payload.schedule ?? '—', latestSyncAt: '刚刚', status: '同步成功', documentMappings: mappings })
+}
+function sourceDocumentPath(document: ImportableDocument) {
+  const paths: Record<string, string> = { onboarding: '集团制度知识库 / 人事制度', attendance: '集团制度知识库 / 人事制度', expense: '集团制度知识库', catalog: '商品运营知识库', launch: '商品运营知识库' }
+  return (paths[document.id] ?? '钉钉文档') + ' / ' + document.name
+}
+function updateImportTaskSchedule(importTaskId: string, frequency: DingTalkSyncFrequency, schedule: string) {
+  const task = visibleImportTasks.value.find(item => item.importTaskId === importTaskId)
+  if (task) { task.frequency = frequency; task.schedule = schedule }
 }
 function openUploadDialog() {
   openDialog('upload', nodePath.value.at(-1) ?? selected.value)
@@ -146,6 +200,7 @@ function openUploadDialog() {
 
 function selectItem(item: SourceKnowledgeBase | string) {
   accessOpen.value = false
+  recordsOpen.value = false
   const next = typeof item === 'string' ? items.value.find((entry) => entry.id === item) : item
   selected.value = next ?? null
   nodePath.value = []
@@ -188,6 +243,7 @@ function navigateNode(node: SourceKnowledgeNode) {
 
 function navigateSidebar(payload: SourceKnowledgeNavigation) {
   accessOpen.value = false
+  recordsOpen.value = false
   const knowledgeBase = items.value.find((item) => item.id === payload.kbId)
   if (!knowledgeBase) return
   selected.value = knowledgeBase
@@ -206,6 +262,7 @@ function navigateSidebar(payload: SourceKnowledgeNavigation) {
 
 function switchSpace(space: KnowledgeSpace) {
   accessOpen.value = false
+  recordsOpen.value = false
   activeSpace.value = space
   selected.value = null
   nodePath.value = []
@@ -213,6 +270,8 @@ function switchSpace(space: KnowledgeSpace) {
 }
 
 function goRoot() {
+  accessOpen.value = false
+  recordsOpen.value = false
   selected.value = null
   nodePath.value = []
   previewNode.value = null
@@ -265,9 +324,11 @@ function removeNode(nodes: SourceKnowledgeNode[], id: string): boolean {
   return nodes.some((node) => node.children && removeNode(node.children, id))
 }
 
-function createFolder(payload: { name: string }) {
-  if (!selected.value) return
-  currentNodes.value.push({
+function createFolder(payload: { name: string; kb: string }) {
+  const destination = items.value.find(item => item.id === payload.kb)
+  if (!destination || !writableDestinations.value.some(item => item.id === payload.kb && !item.parentId)) return
+  const nodes = destination.nodes ?? (destination.nodes = [])
+  nodes.push({
     id: `local-folder-${Date.now()}`,
     name: payload.name,
     kind: 'folder',
@@ -279,6 +340,7 @@ function createFolder(payload: { name: string }) {
 }
 
 function uploadFiles(files: File[], destinationId: string, options: { monthlyReport: boolean }) {
+  if (!writableDestinations.value.some(item => item.id === destinationId)) return
   const destination = findUploadDestination(destinationId)
   if (!destination) return
   const next = files.map<SourceKnowledgeNode>((file, index) => ({
@@ -312,6 +374,18 @@ function findFolder(nodes: SourceKnowledgeNode[], id: string): SourceKnowledgeNo
   return null
 }
 
+onMounted(() => {
+  const kbId = typeof route?.query.kb === 'string' ? route.query.kb : ''
+  const folderId = typeof route?.query.folder === 'string' ? route.query.folder : ''
+  const knowledgeBase = items.value.find(item => item.id === kbId)
+  if (knowledgeBase) {
+    selected.value = knowledgeBase
+    activeSpace.value = knowledgeBase.space
+    const folder = knowledgeBase.nodes?.find(node => node.kind === 'folder' && node.id === folderId)
+    nodePath.value = folder ? [folder] : []
+  }
+  if (route?.query.upload === 'true') openUploadDialog()
+})
 function savePermission() {
   closeDialog()
 }
@@ -325,8 +399,11 @@ function savePermission() {
         :items="items"
         :selected-id="selectedTreeId"
         :access-active="accessOpen"
+        :records-active="recordsOpen"
         :can-manage-access="canManageKnowledgeAccess"
+        :can-view-records="Boolean(appStore?.user)"
         @access="openKnowledgeAccess"
+        @sync-records="openSyncRecords"
         @close="sidebarOpen = false"
         @create="openDialog('create')"
         @navigate="navigateSidebar"
@@ -360,7 +437,8 @@ function savePermission() {
             >
               <Plus :size="19" />
             </button>
-            <strong v-if="accessOpen" class="page-label">知识接入</strong>
+            <strong v-if="accessOpen" class="page-label">数据源</strong>
+            <div v-else-if="recordsOpen" class="breadcrumb"><button @click="goRoot">全部知识库</button><span>›</span><strong>同步记录</strong></div>
             <div v-else-if="selected" data-testid="knowledge-breadcrumb" class="breadcrumb">
               <button @click="goRoot">全部知识库</button><span>›</span>
               <button v-if="nodePath.length" @click="nodePath = []; previewNode = null">{{ selected.name }}</button>
@@ -374,18 +452,17 @@ function savePermission() {
             <strong v-else class="page-label">全部知识库</strong>
           </div>
 
-          <div v-if="!accessOpen" class="toolbar-actions" data-testid="knowledge-action-row">
-            <button
-              class="source-button primary"
-              aria-label="上传文件"
-              @click="openUploadDialog"
-            >
-              <Upload :size="16" />上传文件
-            </button>
-            <button class="source-button" aria-label="从钉钉导入" :disabled="!canImportDingTalk" @click="openDingTalkImport"><FileText :size="16" />从钉钉导入</button>
-            <button class="source-button" aria-label="新建文件夹" @click="openFolderDialog">
-              <FolderPlus :size="16" />新建文件夹
-            </button>
+          <div v-if="!accessOpen && !recordsOpen" class="toolbar-actions" data-testid="knowledge-action-row">
+            <div ref="createMenuRoot" class="create-menu" @keydown="createMenuKeydown">
+              <button ref="createMenuButton" type="button" class="source-button primary create-trigger" aria-label="新建" aria-haspopup="menu" :aria-expanded="createMenuOpen" aria-controls="knowledge-create-options" @click="createMenuOpen = !createMenuOpen"><Plus :size="17"/>新建</button>
+              <div v-if="createMenuOpen" id="knowledge-create-options" class="create-options" role="menu" aria-label="新建菜单">
+                <button v-if="!selected" type="button" role="menuitem" aria-label="新建知识库" @click="openDialog('create')"><Plus :size="17"/><span>新建知识库</span></button>
+                <button v-if="!nodePath.length" type="button" role="menuitem" aria-label="新建文件夹" :disabled="!canCreateFolderHere" @click="openFolderDialog"><FolderPlus :size="17"/><span>新建文件夹</span></button>
+                <button type="button" role="menuitem" aria-label="上传文件" :disabled="!mayWriteCurrent" @click="openUploadDialog"><Upload :size="17"/><span>上传文件</span></button>
+                <div class="create-divider" role="separator"/>
+                <button type="button" role="menuitem" aria-label="从钉钉导入" :disabled="!canImportDingTalk || !mayWriteCurrent" @click="openDingTalkImport"><span class="dingtalk-menu-icon" aria-hidden="true">钉</span><span>从钉钉导入</span></button>
+              </div>
+            </div>
             <button
               v-if="!qaOpen"
               class="source-button qa"
@@ -397,7 +474,7 @@ function savePermission() {
           </div>
         </header>
 
-        <KnowledgeAccessPanel v-if="accessOpen && canManageKnowledgeAccess" :can-manage="canManageKnowledgeAccess" :destinations="writableDestinations" />
+        <KnowledgeAccessPanel v-if="(accessOpen && canManageKnowledgeAccess) || recordsOpen" :can-manage="accessOpen && canManageKnowledgeAccess" :viewer-user-id="appStore?.user?.id" :destinations="writableDestinations" :records="visibleImportTasks" @update-schedule="updateImportTaskSchedule" />
         <KnowledgeTable v-else
           :items="visibleItems"
           :detail="selected"
@@ -428,7 +505,7 @@ function savePermission() {
       </aside>
     </div>
 
-    <DingTalkDocumentImport v-if="personalImportOpen && canImportDingTalk" :key="dingTalkIdentity.platformUserId" :identity="dingTalkIdentity" :destinations="writableDestinations" :application-available="!['credentials-expired', 'permission-denied', 'unknown', 'disconnected'].includes(scenario)" @close="personalImportOpen = false" @authorize="authorizeCurrentDingTalkIdentity" @complete="completeDingTalkImport" />
+    <DingTalkDocumentImport v-if="personalImportOpen && canImportDingTalk" :key="dingTalkIdentity.platformUserId" :identity="dingTalkIdentity" :destinations="writableDestinations" :default-destination-id="currentDestinationId" :application-available="!['credentials-expired', 'permission-denied', 'unknown', 'disconnected'].includes(scenario)" @close="personalImportOpen = false" @authorize="authorizeCurrentDingTalkIdentity" @complete="completeDingTalkImport" />
     <KnowledgeDialogs
       :kind="dialog"
       :target="dialogTarget"
@@ -551,6 +628,7 @@ function savePermission() {
   white-space: nowrap;
   font-weight: 600;
 }
+.create-menu{position:relative}.create-menu .create-trigger{border-radius:18px;padding:0 17px}.create-options{position:absolute;z-index:30;top:calc(100% + 8px);right:0;width:204px;border:1px solid #e2e4e8;border-radius:12px;background:#fff;padding:7px;box-shadow:0 10px 28px rgba(0,0,0,.12)}.create-options button{display:flex;width:100%;min-height:40px;align-items:center;gap:11px;border:0;border-radius:7px;background:#fff;padding:9px 12px;color:#30343a;font-size:13px;text-align:left;cursor:pointer}.create-options button:hover,.create-options button:focus-visible{background:#f5f6f8}.create-options button:disabled{opacity:.45;cursor:not-allowed}.create-options button>svg{color:#707b89}.create-divider{height:1px;margin:5px 5px;background:#eceef1}.dingtalk-menu-icon{display:grid;width:18px;height:18px;flex:none;place-items:center;border-radius:4px;background:#e9f3ff;color:#1677ff;font-size:11px;font-weight:700}
 .source-button {
   display: flex;
   height: 32px;
@@ -656,3 +734,6 @@ function savePermission() {
   }
 }
 </style>
+
+
+

@@ -4,26 +4,29 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   ArrowRight,
   BookOpen,
+  Building,
   FileText,
   FileSpreadsheet,
   Presentation,
   Image,
   Plug,
+  File,
+  User,
   Wrench,
   Zap,
   ChevronDown,
   CheckCircle2,
-  Heart,
+  XCircle,
   MessageSquareText,
   Search,
   X,
 } from 'lucide-vue-next'
-import { useExpertCatalog, isExpertAvailable } from '@/composables/useExpertCatalog'
+import { isExpertAvailable } from '@/composables/useExpertCatalog'
 import { FIXED_USAGE_NOTICE, usageFormFromContent } from '@/utils/agentUsage'
-import { ElDialog, ElMessage } from 'element-plus'
+import { ElDialog, ElNotification } from 'element-plus'
 import { homeDraft } from '@/composables/useHomeDraft'
 import ExpertSystemTags from '@/components/expert/ExpertSystemTags.vue'
-import { expertDateLabel, expertFileFormats, expertKnowledgeEntries, expertMatchesSearch, expertSystemTags } from '@/utils/expertPresentation'
+import { expertDateLabel, expertFileFormats, expertKnowledgeEntries, expertMatchesSearch, expertOwnerLabel, expertSystemTags } from '@/utils/expertPresentation'
 import SourceChatSidebar from '@/components/chat/source-clone/SourceChatSidebar.vue'
 import { listPrototypeChatSessions } from '@/utils/prototypeChatStore'
 import { expertAgents as agents } from '@/utils/expertPrototypeStore'
@@ -52,7 +55,7 @@ onMounted(() => window.addEventListener('tianma:chat-action', headerAction))
 onBeforeUnmount(() => window.removeEventListener('tianma:chat-action', headerAction))
 const searchQuery = ref('')
 const activeCategory = ref<AgentCategory | 'all'>('all')
-const { favoriteIds, favoriteError, toggleFavorite: changeFavorite } = useExpertCatalog()
+
 const detailAgent = ref<Agent | null>(route.query.detail === '1' ? (agents[0] ?? null) : null)
 
 const categoryOrder: AgentCategory[] = [
@@ -79,10 +82,46 @@ const filteredAgents = computed(() => {
   return list
 })
 
+// 部门→业务线映射
+const DEPT_TO_BUSINESS: Record<string, string> = {
+  '平台部': 'tech_dev',
+  '线下业务部': 'retail_ops',
+  '商品专卖店': 'customer_service',
+  '品牌中心': 'customer_service',
+  '商品运营中心': 'supply_chain',
+  '线上B2C': 'customer_service',
+  '直播部': 'marketing',
+}
+
+// 当前用户部门（mock）
+const currentUserDepartment = ref('品牌中心')
+
+// 推荐专家列表
+const recommendedAgents = computed(() => {
+  const dept = currentUserDepartment.value
+  const business = DEPT_TO_BUSINESS[dept]
+  if (!business) return []
+  return filteredAgents.value.filter(a => a.category === business).slice(0, 6)
+})
+
+function permissionLabel(agent: Agent) {
+  const depts = agent.useDepartments?.filter(Boolean) ?? []
+  return depts.length ? `限 ${depts[0]} 可用` : '全员可用'
+}
+function permissionIcon(agent: Agent) {
+  return agent.usePermission === false ? XCircle : CheckCircle2
+}
+function permissionClass(agent: Agent) {
+  const depts = agent.useDepartments?.filter(Boolean) ?? []
+  return depts.length ? 'restricted' : 'open'
+}
 function categoryColor(category: AgentCategory) {
   return AGENT_CATEGORY_META[category]?.color ?? '#5b6b82'
 }
-function toggleFavorite(agent: Agent) { if (!changeFavorite(agent)) ElMessage.error(favoriteError.value || '收藏未保存，请重试') }
+
+function applyPermission(agent: Agent) {
+  ElNotification({ type: 'success', title: '权限申请已发送', message: '已发送权限申请给负责人 ' + (agent.developerName || '未配置'), duration: 2000 })
+}
 async function useAgent(agent: Agent, prompt = '') {
   const current = agents.find(item => item.id === agent.id)
   if (!current || !isExpertAvailable(current)) return
@@ -100,11 +139,14 @@ const detailUsage = computed(() => usageFormFromContent(detailAgent.value?.usage
 const fileFormats = computed(() => detailAgent.value ? expertFileFormats(detailAgent.value) : undefined)
 const knowledgeEntries = computed(() => detailAgent.value ? expertKnowledgeEntries(detailAgent.value) : [])
 const visibleKnowledgeEntries = computed(() => knowledgeExpanded.value ? knowledgeEntries.value : knowledgeEntries.value.slice(0, 3))
-function formatIcon(format: string) {
-  if (['XLS', 'XLSX', 'CSV'].includes(format)) return FileSpreadsheet
-  if (format === 'PPTX') return Presentation
-  if (['JPG', 'JPEG', 'PNG', 'WEBP'].includes(format)) return Image
-  return FileText
+function fileFormatInfo(format: string) {
+  const lower = format.toLowerCase()
+  if (['pdf'].includes(lower)) return { icon: FileText, color: '#ef4444' }
+  if (['doc', 'docx'].includes(lower)) return { icon: FileText, color: '#3b82f6' }
+  if (['xls', 'xlsx', 'csv'].includes(lower)) return { icon: FileSpreadsheet, color: '#10b981' }
+  if (['ppt', 'pptx'].includes(lower)) return { icon: Presentation, color: '#f97316' }
+  if (['jpg', 'jpeg', 'png', 'webp'].includes(lower)) return { icon: Image, color: '#8b5cf6' }
+  return { icon: File, color: '#9ca3af' }
 }
 </script>
 
@@ -140,11 +182,52 @@ function formatIcon(format: string) {
           </button>
         </div>
       </div>
-      <div v-if="filteredAgents.length" class="agent-grid">
+      <section v-if="recommendedAgents.length > 0" class="recommend-section">
+        <h2 class="section-title">推荐</h2>
+        <div class="agent-grid">
+          <article
+            v-for="agent in recommendedAgents"
+            :key="agent.id"
+            class="agent-card"
+            :class="{ 'no-permission': agent.usePermission === false }"
+            tabindex="0"
+            role="button"
+            :aria-label="'查看' + agent.name + '详情'"
+            @keydown.enter.self="detailAgent = agent"
+            @keydown.space.self.prevent="detailAgent = agent"
+            @click="detailAgent = agent"
+          >
+            <div class="card-top-badges">
+              <span class="perm-icon" :title="permissionLabel(agent)"><component :is="permissionIcon(agent)" :size="12" /></span>
+              <span v-if="expertOwnerLabel(agent) !== '未配置负责人'" class="owner-badge"><User :size="12" />{{ expertOwnerLabel(agent) }}</span>
+              <span v-for="dept in (agent.useDepartments?.filter(Boolean) ?? [])" :key="dept" class="dept-badge"><Building :size="12" />{{ dept }}</span>
+            </div>
+            <div class="agent-avatar card-avatar" :style="{ background: categoryColor(agent.category) }">
+              <img v-if="agent.avatarUrl" :src="agent.avatarUrl" alt="" />
+              <span v-else>{{ agent.name.slice(0, 1) }}</span>
+            </div>
+            <div class="agent-copy">
+              <h3 :title="agent.name">{{ agent.name }}</h3>
+              <p :title="agent.description?.trim() || '默认智能体'">{{ agent.description?.trim() || '默认智能体' }}</p>
+            </div>
+            <ExpertSystemTags :tags="expertSystemTags(agent)" />
+            <button v-if="agent.usePermission === false" data-testid="expert-primary-action" class="card-primary apply-btn" @click.stop="applyPermission(agent)">
+              申请
+            </button>
+            <button v-else data-testid="expert-primary-action" class="card-primary" :disabled="!isExpertAvailable(agent)" :title="!isExpertAvailable(agent) ? (agent.status === 'maintenance' ? '维护中，暂不可用' : '已下线，暂不可用') : undefined" @click.stop="useAgent(agent)">
+              <MessageSquareText :size="14" />对话
+            </button>
+          </article>
+        </div>
+      </section>
+      <section v-if="filteredAgents.length" class="more-section">
+        <h2 class="section-title">更多</h2>
+        <div class="agent-grid">
         <article
           v-for="agent in filteredAgents"
           :key="agent.id"
           class="agent-card"
+          :class="{ 'no-permission': agent.usePermission === false }"
           tabindex="0"
           role="button"
           :aria-label="'查看' + agent.name + '详情'"
@@ -152,14 +235,11 @@ function formatIcon(format: string) {
           @keydown.space.self.prevent="detailAgent = agent"
           @click="detailAgent = agent"
         >
-          <button
-            :aria-label="favoriteIds.has(agent.id) ? '取消收藏' + agent.name : '收藏' + agent.name"
-            :aria-pressed="favoriteIds.has(agent.id)"
-            :title="favoriteIds.has(agent.id) ? '取消收藏' : '收藏'"
-            class="heart"
-            :class="{ active: favoriteIds.has(agent.id) }"
-            @click.stop="toggleFavorite(agent)"
-          ><Heart :size="17" /></button>
+          <div class="card-top-badges">
+            <span class="perm-icon" :title="permissionLabel(agent)"><component :is="permissionIcon(agent)" :size="12" /></span>
+            <span v-if="expertOwnerLabel(agent) !== '未配置负责人'" class="owner-badge"><User :size="12" />{{ expertOwnerLabel(agent) }}</span>
+            <span v-for="dept in (agent.useDepartments?.filter(Boolean) ?? [])" :key="dept" class="dept-badge"><Building :size="12" />{{ dept }}</span>
+          </div>
           <div class="agent-avatar card-avatar" :style="{ background: categoryColor(agent.category) }">
             <img v-if="agent.avatarUrl" :src="agent.avatarUrl" alt="" />
             <span v-else>{{ agent.name.slice(0, 1) }}</span>
@@ -169,11 +249,15 @@ function formatIcon(format: string) {
             <p :title="agent.description?.trim() || '默认智能体'">{{ agent.description?.trim() || '默认智能体' }}</p>
           </div>
           <ExpertSystemTags :tags="expertSystemTags(agent)" />
-          <button data-testid="expert-primary-action" class="card-primary" :class="{ collected: favoriteIds.has(agent.id) }" :disabled="!isExpertAvailable(agent)" :title="!isExpertAvailable(agent) ? (agent.status === 'maintenance' ? '维护中，暂不可用' : '已下线，暂不可用') : undefined" @click.stop="favoriteIds.has(agent.id) ? useAgent(agent) : toggleFavorite(agent)">
-            <MessageSquareText v-if="favoriteIds.has(agent.id)" :size="14" /><Heart v-else :size="14" />{{ favoriteIds.has(agent.id) ? '对话' : '收藏' }}
+          <button v-if="agent.usePermission === false" data-testid="expert-primary-action" class="card-primary apply-btn" @click.stop="applyPermission(agent)">
+            申请
+          </button>
+          <button v-else data-testid="expert-primary-action" class="card-primary" :disabled="!isExpertAvailable(agent)" :title="!isExpertAvailable(agent) ? (agent.status === 'maintenance' ? '维护中，暂不可用' : '已下线，暂不可用') : undefined" @click.stop="useAgent(agent)">
+            <MessageSquareText :size="14" />对话
           </button>
         </article>
       </div>
+      </section>
       <div v-else class="empty">
         <Search :size="28" />
         <h3>没有找到匹配的专家</h3>
@@ -208,7 +292,7 @@ function formatIcon(format: string) {
             </div>
             <div>
               <h2>{{ detailAgent.name }} <CheckCircle2 :size="17" /></h2>
-              <div class="modal-meta"><span class="online" :class="{ unavailable: detailAgent.status !== 'online' }"><i />{{ detailAgent.status === 'online' ? '在线' : detailAgent.status === 'maintenance' ? '维护中' : '已下线' }}</span></div>
+              <div class="modal-meta"></div>
             </div>
           </header>
           <div class="modal-body usage-body">
@@ -233,29 +317,11 @@ function formatIcon(format: string) {
               </dl>
               <div class="capability-heading">支持文件格式</div>
               <div v-if="fileFormats?.length" class="format-list" data-testid="expert-file-formats">
-                <div v-for="format in fileFormats" :key="format" class="file-format" :class="'format-' + format.toLowerCase()">
-                  <component :is="formatIcon(format)" :size="23" :stroke-width="1.5" /><span>{{ format }}</span>
+                <div v-for="format in fileFormats" :key="format" class="file-format">
+                  <component :is="fileFormatInfo(format).icon" :size="23" :stroke-width="1.5" :color="fileFormatInfo(format).color" /><span :style="{ color: fileFormatInfo(format).color }">{{ format }}</span>
                 </div>
               </div>
               <p v-else class="detail-empty">{{ fileFormats === undefined ? '未提供' : '未配置' }}</p>
-              <template v-if="detailAgent.capabilities?.tools?.length">
-                <div class="capability-heading">工具</div>
-                <div class="capability-cards" data-testid="expert-capability-tools">
-                  <article v-for="item in detailAgent.capabilities.tools" :key="item.id" class="capability-card"><span class="capability-icon capability-icon-tool"><Wrench :size="18" /></span><div class="capability-card-body"><strong>{{ item.name?.trim() || '未提供名称' }}</strong><p v-if="item.description">{{ item.description }}</p></div><button class="capability-delete" aria-label="删除工具"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button></article>
-                </div>
-              </template>
-              <template v-if="detailAgent.capabilities?.connectors?.length">
-                <div class="capability-heading">连接器</div>
-                <div class="capability-cards" data-testid="expert-capability-connectors">
-                  <article v-for="item in detailAgent.capabilities.connectors" :key="item.id" class="capability-card"><span class="capability-icon capability-icon-connector"><Zap :size="18" /></span><div class="capability-card-body"><strong>{{ item.name?.trim() || '未提供名称' }}</strong><span v-if="item.protocol" class="capability-badge">{{ item.protocol }}</span></div><button class="capability-delete" aria-label="删除连接器"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button></article>
-                </div>
-              </template>
-              <template v-if="detailAgent.capabilities?.skills?.length">
-                <div class="capability-heading">技能</div>
-                <div class="capability-cards" data-testid="expert-capability-skills">
-                  <article v-for="item in detailAgent.capabilities.skills" :key="item.id" class="capability-card"><span class="capability-icon capability-icon-skill"><Zap :size="18" /></span><div class="capability-card-body"><strong>{{ item.name?.trim() || '未提供名称' }}</strong><span v-if="item.identifier" class="capability-badge">{{ item.identifier }}</span></div><button class="capability-delete" aria-label="删除技能"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button></article>
-                </div>
-              </template>
             </section>
             <section class="usage-section">
               <h3>知识边界</h3>
@@ -263,7 +329,7 @@ function formatIcon(format: string) {
               <div v-if="knowledgeEntries.length" class="knowledge-list" :class="{ expanded: knowledgeExpanded }" data-testid="expert-knowledge-content">
                 <article v-for="item in visibleKnowledgeEntries" :key="item.id" class="knowledge-entry" data-testid="knowledge-entry" :data-kind="item.kind">
                   <component :is="item.kind === 'library' ? BookOpen : FileText" :size="18" />
-                  <div><strong :title="item.name">{{ item.name }}</strong><span>所有人 · 上传时间 {{ expertDateLabel(item.lastSuccessfulSyncAt) }}</span></div>
+                  <div><strong :title="item.name">{{ item.name }}</strong><span>{{ item.ownerName || '所有人' }} · 上传时间 {{ expertDateLabel(item.lastUploadedAt || item.lastSuccessfulSyncAt) }}</span></div>
                 </article>
               </div>
               <p v-else class="detail-empty">未引用知识内容</p>
@@ -278,15 +344,16 @@ function formatIcon(format: string) {
             <section v-if="quickStarts.length" class="usage-section"><h3><MessageSquareText :size="16" />快捷开始</h3><div class="prompt-list"><button v-for="(command, index) in quickStarts" :key="index" :title="command" :disabled="!isExpertAvailable(detailAgent)" @click="useAgent(detailAgent, command)">{{ detailAgent.quickPromptDefinitions?.find(item => item.content === command)?.title || command }}<ArrowRight :size="14" /></button></div></section>
           </div>
           <footer class="modal-footer">
-            <button
-              class="favorite-button"
-              :class="{ active: favoriteIds.has(detailAgent.id) }"
-              @click="toggleFavorite(detailAgent)"
-            >
-              <Heart :size="16" />{{ favoriteIds.has(detailAgent.id) ? '已收藏' : '收藏' }}
-            </button>
             <div>
               <button
+                v-if="detailAgent.usePermission === false"
+                class="primary"
+                @click="applyPermission(detailAgent)"
+              >
+                申请权限<ArrowRight :size="15" />
+              </button>
+              <button
+                v-else
                 class="primary"
                 :disabled="detailAgent.status !== 'online' || !detailAgent.isPublished"
                 @click="useAgent(detailAgent)"
@@ -316,23 +383,30 @@ function formatIcon(format: string) {
 .category-tabs { display:flex; gap:8px; overflow:auto; }
 .category-tabs button { height:30px; flex-shrink:0; border:0; border-radius:7px; background:transparent; padding:0 13px; color:#6b7280; font:13px inherit; cursor:pointer; }
 .category-tabs button.active { background:#e9edf1; color:#111827; font-weight:500; }
+.recommend-section { margin-bottom:24px; }
+.more-section { margin-top:8px; }
+.section-title { display:flex; align-items:center; margin:0 0 14px; font-size:16px; font-weight:600; color:#202631; }
+.recommend-badge { font-size:12px; font-weight:normal; background:#f0f9ff; color:#0284c7; padding:2px 8px; border-radius:12px; margin-left:8px; }
 .agent-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; }
-.agent-card { position:relative; display:flex; min-width:0; min-height:294px; box-sizing:border-box; flex-direction:column; align-items:center; border:1px solid #e6e9ec; border-radius:18px; padding:24px 18px 17px; background:#fff; cursor:pointer; transition:border-color .15s,box-shadow .15s; }
+.agent-card { position:relative; display:flex; min-width:0; height:294px; box-sizing:border-box; flex-direction:column; align-items:center; border:1px solid #e6e9ec; border-radius:18px; padding:14px 18px 17px; background:#fff; cursor:pointer; transition:border-color .15s,box-shadow .15s; overflow:hidden; }
 .agent-card:hover { border-color:#d2dae3; box-shadow:0 5px 18px rgba(33,45,62,.05); }
 .agent-avatar { display:grid; flex-shrink:0; place-items:center; overflow:hidden; color:#fff; font-size:22px; font-weight:600; }
 .agent-avatar img { width:100%; height:100%; object-fit:cover; }
-.agent-avatar.card-avatar { width:60px; height:60px; border-radius:50%; }
-.agent-copy { min-width:0; width:100%; margin-top:13px; text-align:center; }
+.agent-avatar.card-avatar { width:52px; height:52px; border-radius:50%; }
+.agent-copy { min-width:0; width:100%; margin-top:10px; text-align:center; }
 .agent-copy h3 { overflow:hidden; margin:0; text-overflow:ellipsis; white-space:nowrap; font-size:15px; font-weight:600; line-height:23px; }
-.agent-copy p { display:-webkit-box; min-height:57px; overflow:hidden; margin:9px 0 0; color:#737d89; font-size:12px; line-height:19px; text-align:left; -webkit-box-orient:vertical; -webkit-line-clamp:3; }
-.heart { position:absolute; top:11px; right:11px; display:grid; width:28px; height:28px; place-items:center; border:0; border-radius:7px; background:transparent; color:#a4abb5; cursor:pointer; }
-.heart.active { color:#e76074; }
-.heart.active svg { fill:currentColor; }
-.heart:hover { background:#fff0f3; color:#df5d72; }
+.agent-copy p { display:-webkit-box; min-height:38px; overflow:hidden; margin:6px 0 0; color:#737d89; font-size:12px; line-height:19px; text-align:left; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
+.perm-icon { display:inline-flex; align-items:center; justify-content:center; height:20px; padding:0 5px; border-radius:12px; font-size:11px; background:#f0fdf4; border:1px solid #bbf7d0; color:#22c55e; }
+.agent-card.no-permission .perm-icon { background:#fef2f2; border-color:#fecaca; color:#ef4444; }
+.card-top-badges { display:flex; flex-wrap:wrap; gap:4px; width:100%; align-self:flex-start; margin-bottom:4px; }
+.card-tag-row { display:flex; flex-wrap:wrap; gap:5px; width:100%; margin-top:6px; }
+.owner-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:12px; font-size:11px; background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; }
+.dept-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:12px; font-size:11px; background:#f9fafb; color:#6b7280; border:1px solid #e5e7eb; }
+.agent-card.no-permission { border-color:#d1d5db; background:#fafafa; }
+.apply-btn { border-color:#176fd1!important; background:#1677e8!important; color:#fff!important; cursor:pointer!important; }
+.apply-btn:hover { background:#1265c8!important; }
 .card-primary { display:flex; width:100%; min-height:34px; margin-top:auto; align-items:center; justify-content:center; gap:6px; border:1px solid #dfe4ea; border-radius:18px; background:#fff; color:#465569; font:12px inherit; cursor:pointer; }
-.card-primary.collected { border-color:transparent; background:#eaf2fc; color:#246cbc; }
 .card-primary:hover { border-color:#c2d4e9; background:#f4f8fe; }
-.card-primary.collected:hover { background:#deebfb; }
 .empty { display:flex; min-height:260px; flex-direction:column; align-items:center; justify-content:center; color:#9ba3ad; }
 .empty h3 { margin:10px 0 4px; color:#4a5564; font-size:14px; }
 .empty p { margin:0; font-size:12px; }
@@ -350,8 +424,7 @@ function formatIcon(format: string) {
 .modal-hero p { margin:0; color:#687687; font-size:12px; line-height:1.65; }
 .modal-meta { display:flex; flex-wrap:wrap; gap:14px; margin-top:10px; }
 .modal-meta span { display:flex; align-items:center; gap:4px; }
-.modal-meta .online { color:#2c8a61; }
-.modal-meta i { width:6px; height:6px; border-radius:50%; background:currentColor; }
+
 .modal-body { min-height:0; flex:1; overflow-y:auto; padding:22px 28px; }
 .usage-intro { display:flex; align-items:center; gap:8px; color:#344256; margin-bottom:18px; }
 .usage-intro span { margin-left:auto; color:#8a94a3; font-size:12px; }
@@ -368,13 +441,12 @@ function formatIcon(format: string) {
 .usage-empty { color:#8a94a3; font-size:13px; }
 .prompt-list { display:grid; gap:7px; }
 .prompt-list button { display:flex; align-items:center; justify-content:space-between; border:1px solid #e4e8ed; border-radius:9px; background:#fff; padding:10px 11px; color:#465365; font:12px inherit; text-align:left; cursor:pointer; }
-.modal-footer { display:flex; flex:0 0 auto; align-items:center; justify-content:space-between; border-top:1px solid #e8ebef; padding:15px 28px; background:#fff; box-shadow:0 -4px 14px rgba(25,39,56,.04); }
+.modal-footer { display:flex; flex:0 0 auto; align-items:center; justify-content:flex-end; border-top:1px solid #e8ebef; padding:15px 28px; background:#fff; box-shadow:0 -4px 14px rgba(25,39,56,.04); }
 .modal-footer button { display:inline-flex; align-items:center; gap:6px; border-radius:9px; padding:9px 14px; font:12px inherit; cursor:pointer; }
-.favorite-button { border:1px solid #dfe4e9; background:#fff; color:#596575; }
-.favorite-button.active { color:#e05e70; }
-.favorite-button.active svg { fill:currentColor; }
+
 .modal-footer .primary { border:1px solid #176fd1; background:#1677e8; color:#fff; }
 .modal-meta .unavailable { color:#85909e; }
+
 .detail-description { margin:0 0 16px; white-space:pre-wrap; overflow-wrap:anywhere; color:#566476; font-size:13px; line-height:1.7; }
 .basic-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px 26px; margin:0; }
 .basic-grid > div { min-width:0; display:flex; flex-direction:column; gap:5px; }

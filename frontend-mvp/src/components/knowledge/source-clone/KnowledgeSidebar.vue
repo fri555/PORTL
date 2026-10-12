@@ -9,6 +9,7 @@ import {
   PanelLeftClose,
   Plus,
   Cable,
+  History,
   Search,
 } from 'lucide-vue-next'
 import type {
@@ -24,12 +25,15 @@ const props = defineProps<{
   selectedId?: string
   lockedIds?: Set<string>
   accessActive?: boolean
+  recordsActive?: boolean
   canManageAccess?: boolean
+  canViewRecords?: boolean
 }>()
 
 const emit = defineEmits<{
   close: []
   access: []
+  'sync-records': []
   create: []
   select: [id: string]
   navigate: [payload: SourceKnowledgeNavigation]
@@ -130,6 +134,9 @@ function navigate(row: SidebarTreeRow) {
 
     <button v-if="canManageAccess" class="knowledge-sidebar__access" :class="{ 'is-active': accessActive }" :aria-current="accessActive ? 'page' : undefined" type="button" @click="emit('access')">
       <Cable :size="17" /><span>知识接入</span>
+    </button>
+    <button v-if="canViewRecords" class="knowledge-sidebar__access" :class="{ 'is-active': recordsActive }" :aria-current="recordsActive ? 'page' : undefined" type="button" @click="emit('sync-records')">
+      <History :size="17" /><span>同步记录</span>
     </button>
 
     <div class="knowledge-sidebar__spaces" role="tablist" aria-label="知识库空间">

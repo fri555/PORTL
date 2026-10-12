@@ -15,18 +15,19 @@ import {
   FileText,
   Globe2,
   Link2,
-  Paperclip,
+  Plus,
   Play,
   Presentation,
   ShieldCheck,
   Share2,
   Timer,
+  UploadCloud,
+  Wrench,
   X,
 } from 'lucide-vue-next'
 import { expertAgents as agents, getHistoricalExpert } from '@/utils/expertPrototypeStore'
 import { dailyAssistant } from '@/mock/agents'
 import { ElMessage } from 'element-plus'
-import QuickPromptPanel from './QuickPromptPanel.vue'
 import ExpertMentionMenu from './ExpertMentionMenu.vue'
 import { useExpertCatalog, isExpertAvailable } from '@/composables/useExpertCatalog'
 import { useExpertMention } from '@/composables/useExpertMention'
@@ -34,6 +35,7 @@ import AnswerCitations from './AnswerCitations.vue'
 import { citationSources, citedParagraphs, dailySource } from '@/mock/citations'
 import type { CitationPreviewLoader } from '@/types/citation'
 import FollowUpPlan from './FollowUpPlan.vue'
+import TaskStallReminder from './TaskStallReminder.vue'
 import ApprovalModeControl, { type ApprovalMode } from './ApprovalModeControl.vue'
 import { readPrototypeChatValue, writePrototypeChatValue } from '@/utils/prototypeChatStore'
 import { recordExpertSuccessfulSend } from '@/utils/expertSendRecent'
@@ -82,6 +84,8 @@ function detailKeydown(event: KeyboardEvent) {
   if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); submitFollowUp() }
 }
 const demoQuery = new URLSearchParams(window.location.search)
+const fixtureUserTime = '2026-10-12 09:01:00'
+const fixtureAnswerTime = '2026-10-12 09:01:18'
 type PlanStatus = 'waiting' | 'paused' | 'running' | 'awaiting_clarification' | 'awaiting_confirmation' | 'unknown' | 'failed' | 'cancelled' | 'superseded' | 'done'
 const allowedDemoStates: PlanStatus[] = ['waiting','paused','running','awaiting_clarification','awaiting_confirmation','unknown','failed','cancelled','superseded','done']
 interface PlanClarification { id: string; label: string; required: boolean; value: string; defaultValue?: string; defaultValid?: boolean }
@@ -127,6 +131,7 @@ const planStatus = ref<PlanStatus>(initialPlanStatus())
 const clarifications = ref<PlanClarification[]>(Array.isArray(savedPlan?.clarifications) ? savedPlan.clarifications.filter(item => item && typeof item.id === 'string' && typeof item.label === 'string' && typeof item.required === 'boolean' && typeof item.value === 'string') : demoClarifications())
 const clarificationConfirmed = ref(savedPlan?.clarificationConfirmed === true)
 const authorizationRequired = ['tool','business'].includes(demoQuery.get('authorization') ?? '')
+const humanAuthorizationRequired = demoQuery.get('humanRequired') === '1'
 const authorizationConfirmed = ref(savedPlan?.authorizationConfirmed === true)
 const skippedClarifications = computed(() => clarifications.value.filter(item => !item.required))
 const missingRequiredClarification = computed(() => clarifications.value.some(item => item.required && !item.value.trim()))
@@ -148,6 +153,10 @@ const artifactFailed = ref(demoQuery.get('artifactState') === 'failed')
 const artifactRetrying = ref(false)
 let executionTimer: number | undefined
 const processOpen = ref(false)
+const fullPlanOpen = ref(false)
+watch(planStatus, status => { if (status === 'done') processOpen.value = false })
+const templateInput = ref<HTMLInputElement | null>(null)
+const uploadedTemplateName = ref('')
 const templateHintDismissed = ref(false)
 const officialTemplate = ref(savedPlan?.officialTemplate ?? (demoQuery.get('template') === 'official'))
 const draftOfficialTemplate = ref(false)
@@ -156,9 +165,7 @@ const composerTemplate = computed({get:()=>composingNewRequest.value ? draftOffi
 const selectedAgent = computed(() => getHistoricalExpert(props.agentId ?? ''))
 // The suggestion belongs to the separate context-suggestions feature; this prototype consumes a supplied choice only.
 const templateSuggestionAvailable = computed(() => props.sessionId === 'expert-template' || demoQuery.get('templateSuggestion') === '1')
-const templateLabel = computed(() =>
-  officialTemplate.value ? '天马集团PPT统一模板-20251119版' : '普通模板',
-)
+const templateLabel = computed(() => uploadedTemplateName.value || (officialTemplate.value ? '天马集团PPT统一模板-20251119版' : '普通模板'))
 const contextSuggestions = ref([
   '把今天的待办按优先级排序',
   '帮我起草经营复盘会议纪要',
@@ -259,6 +266,8 @@ const executionSteps = computed<ExecutionStep[]>(() => {
   ]
 })
 const completedExecutionSteps = computed(() => executionSteps.value.filter(step => step.status === 'done').length)
+const activeExecutionStep = computed(() => executionSteps.value.find(step => ['running','failed','waiting'].includes(step.status)) || executionSteps.value.at(-1)!)
+const toolCallLabel = computed(() => activeExecutionStep.value.title === '理解任务' ? '任务理解' : activeExecutionStep.value.title)
 const processHeadline = computed(() => {
   if (isDwsAction.value && dwsStage.value === 'auth') return '等待账号授权'
   if (isDwsAction.value && dwsStage.value === 'confirm') return '等待操作确认'
@@ -277,7 +286,7 @@ function executionStatusLabel(status: ExecutionStepStatus) {
   return ({ waiting: '待执行', running: '进行中', done: '已完成', failed: '失败', cancelled: '已取消' } as const)[status]
 }
 function handleDwsAuthorized() {
-  if (dwsStage.value === 'auth') dwsStage.value = 'confirm'
+  if (dwsStage.value === 'auth') dwsStage.value = normalizedApprovalMode.value === 'autonomous' && !humanAuthorizationRequired ? 'done' : 'confirm'
 }
 
 const title = computed(() =>
@@ -338,7 +347,10 @@ function scheduleExecution() {
 }
 function beginExecution(startedAt = Date.now()) {
   if (!['waiting','failed','awaiting_confirmation'].includes(planStatus.value) || followUpRunning.value || followUpBlocked.value || missingRequiredClarification.value) return
-  if (authorizationRequired && !authorizationConfirmed.value) { planStatus.value = 'awaiting_confirmation'; return }
+  if (authorizationRequired && !authorizationConfirmed.value) {
+    if (normalizedApprovalMode.value === 'autonomous' && !humanAuthorizationRequired) authorizationConfirmed.value = true
+    else { planStatus.value = 'awaiting_confirmation'; return }
+  }
   executionStartedAt.value = startedAt
   executionFinishedAt.value = null
   planStatus.value = 'running'
@@ -373,7 +385,23 @@ function retryPlan() {
   executionAttempt.value++
   beginExecution()
 }
-function retryArtifact(useOrdinary = false) {
+function choosePptTemplate(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  if (!/\.pptx?$/i.test(file.name)) { ElMessage.error('仅支持上传 PPT 或 PPTX 模板'); return }
+  if (file.size > 50 * 1024 * 1024) { ElMessage.error('PPT 模板不能超过 50MB'); return }
+  uploadedTemplateName.value = file.name
+  officialTemplate.value = true
+  draftOfficialTemplate.value = true
+  templateHintDismissed.value = false
+  ElMessage.success('PPT 模板已交给模板套用技能')
+  ;(event.target as HTMLInputElement).value = ''
+}
+function clearPptTemplate() {
+  uploadedTemplateName.value = ''
+  officialTemplate.value = false
+  draftOfficialTemplate.value = false
+}function retryArtifact(useOrdinary = false) {
   if (artifactRetrying.value) return
   if (useOrdinary) officialTemplate.value=false
   artifactRetrying.value=true
@@ -389,7 +417,7 @@ function submitFollowUp() {
   if (targetExpertId && (!targetExpert || !isExpertAvailable(targetExpert))) { ElMessage.error('该专家暂不可用，请重新选择'); return }
   const text = prompt.value.trim()
   const choice = draftOfficialTemplate.value
-  followUps.value.push({ id: followUps.value.length+1, text, expert: targetExpert?.name || expertName.value, expertId: targetExpertId || '', usesExpert: !!targetExpertId || isExpert.value, time: new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).format(new Date()), templateLabel: choice ? '天马集团PPT统一模板-20251119版' : '普通模板' })
+  followUps.value.push({ id: followUps.value.length+1, text, expert: targetExpert?.name || expertName.value, expertId: targetExpertId || '', usesExpert: !!targetExpertId || isExpert.value, time: new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).format(new Date()), templateLabel: choice ? templateLabel.value : '普通模板' })
   if (targetExpertId) recordExpertSuccessfulSend(targetExpertId)
   templateHintDismissed.value = false
   draftOfficialTemplate.value = false
@@ -428,7 +456,8 @@ onMounted(() => {
   if (isExpert.value && planStatus.value === 'running') {
     if (executionStartedAt.value === null) executionStartedAt.value = Date.now()
     scheduleExecution()
-  } else preparePlan()
+  } else if (planStatus.value === 'awaiting_confirmation' && normalizedApprovalMode.value === 'autonomous' && authorizationRequired && !humanAuthorizationRequired) beginExecution()
+  else preparePlan()
   savePrototypePlan()
 })
 onBeforeUnmount(() => {
@@ -444,20 +473,20 @@ onBeforeUnmount(() => {
       <div class="conversation-inner">
         <div class="user-row">
           <div class="user-message">
-            <time>{{ isCitationDemo ? '2026-10-06 09:01' : '2026-10-03 14:26' }}</time>
             <div class="user-bubble">{{ title }}</div>
+            <time class="message-time" :title="fixtureUserTime" data-testid="user-message-time">{{ fixtureUserTime }}</time>
           </div>
         </div>
         <article class="answer">
           <header class="answer-agent">
             <img
-              :src="`${assetBase}assets/${isExpert ? 'agents-online/data-analysis.png' : 'production-home/mascot-xiaoma.png'}`"
+              :src="isExpert ? (selectedAgent?.avatarUrl || `${assetBase}assets/production-home/mascot-xiaoma.png`) : `${assetBase}assets/production-home/mascot-xiaoma.png`"
               alt=""
             />
             <div>
               <strong>{{ expertName }}</strong
               ><span
-                >{{ isExpert ? selectedAgent?.developerDepartment || '业务专家' : '通用助手 · 默认智能体' }} · {{ isCitationDemo ? '2026-10-06 09:01' : '2026-10-03 14:26' }}</span
+                >{{ isExpert ? selectedAgent?.developerDepartment || '业务专家' : '通用助手 · 默认智能体' }}</span
               >
             </div>
           </header>
@@ -475,16 +504,14 @@ onBeforeUnmount(() => {
           </div>
           <section v-if="processOpen" class="process-overview" data-testid="execution-process">
             <header>
-              <div><strong>执行过程</strong><small>展示可核验的阶段、状态与耗时</small></div>
+              <div><strong>处理过程</strong><small>查看本轮工具调用与处理摘要</small></div>
             </header>
-            <ol>
-              <li v-for="(step, index) in executionSteps" :key="step.title" :class="step.status" data-testid="execution-step">
-                <span class="process-step-index"><CheckCircle2 v-if="step.status === 'done'" :size="15" /><template v-else>{{ index + 1 }}</template></span>
-                <div><strong>{{ step.title }}</strong><small>{{ step.detail }}</small></div>
-                <div class="process-step-state"><span>{{ executionStatusLabel(step.status) }}</span><time>{{ step.duration }}</time></div>
-                <button v-if="step.status === 'failed'" type="button" @click="retryPlan">重试执行</button>
-              </li>
-            </ol>
+            <div class="tool-call-row" :class="activeExecutionStep.status">
+              <span class="tool-call-icon"><Wrench :size="15" /></span>
+              <div><strong>工具调用 · {{ toolCallLabel }}</strong><small>{{ activeExecutionStep.detail }}</small></div>
+              <span>{{ executionStatusLabel(activeExecutionStep.status) }} · {{ activeExecutionStep.duration }}</span>
+            </div>
+            <div class="ai-reply-row"><span>AI 回复</span><p>{{ planStatus === 'done' ? '已完成处理并生成回复，详细结果见下方。' : planStatus === 'running' ? '正在处理，完成后将在这里给出结果。' : '等待当前步骤完成后生成回复。' }}</p></div>
             <section v-if="failedAttempts.length" class="process-attempts" data-testid="execution-attempt-history">
               <h3>历史执行记录</h3>
               <article v-for="attempt in failedAttempts" :key="attempt.version">
@@ -494,7 +521,8 @@ onBeforeUnmount(() => {
             </section>
           </section>
           <template v-if="isDwsAction">
-            <p>创建待办属于钉钉写操作。首次使用需要本人完成账号授权，创建前仍需你确认；自主执行也不会自动同意授权。</p>
+            <TaskStallReminder v-if="normalizedApprovalMode === 'autonomous'" :task-id="sessionId" :title="title" :agent-name="expertName" :detail-url="'/PORTL/chat/' + encodeURIComponent(sessionId)" :state="dwsStage === 'auth' ? 'dws_auth' : dwsStage === 'confirm' ? 'awaiting_confirmation' : dwsStage" :progress-key="dwsStage" />
+            <p>创建待办属于钉钉写操作。首次使用需要本人完成账号授权；自主执行可在授权完成后自动同意本轮操作确认。</p>
 
             <section
               v-if="dwsStage === 'auth'"
@@ -532,7 +560,7 @@ onBeforeUnmount(() => {
 
             <template v-else>
               <div v-if="dwsStage !== 'cancelled'" class="dws-success" data-testid="dws-auth-success">
-                <CheckCircle2 :size="16" />{{ dwsStage === 'done' ? '账号已授权，操作已由你确认。' : '账号授权成功，操作仍需你确认。' }}
+                <CheckCircle2 :size="16" />{{ dwsStage === 'done' ? normalizedApprovalMode === 'autonomous' && !humanAuthorizationRequired ? '账号已授权，已按自主执行规则同意本轮操作。' : '账号已授权，操作已由你确认。' : '账号授权成功，操作仍需你确认。' }}
               </div>
               <section
                 v-if="dwsStage === 'confirm'"
@@ -580,7 +608,7 @@ onBeforeUnmount(() => {
             <p>
               已为「{{
                 expertName
-              }}」生成示例计划，将围绕你的任务整理资料、形成结果。此处演示自动执行交互，不调用真实业务数据或生成文件。
+              }}」生成执行计划，将围绕你的任务整理资料并形成结果。
             </p>
             <section class="plan-card" data-testid="expert-auto-plan">
               <header>
@@ -593,7 +621,7 @@ onBeforeUnmount(() => {
                     </p>
                     <p v-else-if="planStatus === 'awaiting_clarification'">{{ missingRequiredClarification ? '缺少必填信息，补充后才能执行。' : '请确认非必填信息，可保留空值。' }}</p>
                     <p v-else-if="planStatus === 'running'">
-                      正在模拟执行；工具、账号和业务授权都需你确认。
+                      {{ normalizedApprovalMode === 'autonomous' ? '正在自主执行，已自动同意可代办的执行审批。' : '正在模拟执行，审批授权按现有流程确认。' }}
                     </p>
                     <p v-else-if="planStatus === 'awaiting_confirmation'">{{ authorizationKind }}前需要你确认，本次操作尚未执行。</p>
                     <p v-else-if="planStatus === 'unknown'">执行结果尚未核实，不能重复启动或显示成功。</p>
@@ -603,29 +631,11 @@ onBeforeUnmount(() => {
                 </div>
                 <span class="plan-state" :class="planStatus">{{ planStateLabel }}</span>
               </header>
-              <ol>
-                <li>
-                  <span>1</span>
-                  <div>
-                    <strong>整理任务资料</strong><small>依据用户提供内容与已授权信息</small>
-                  </div>
-                  <em>预计 1 分钟</em>
-                </li>
-                <li>
-                  <span>2</span>
-                  <div>
-                    <strong>处理问题并形成结论</strong><small>结合当前专家的能力完成任务</small>
-                  </div>
-                  <em>预计 2 分钟</em>
-                </li>
-                <li>
-                  <span>3</span>
-                  <div>
-                    <strong>生成报告与汇报材料</strong
-                    ><small>按需求生成文件；PPT 模板：{{ templateLabel }}</small>
-                  </div>
-                  <em>预计 2 分钟</em>
-                </li>
+              <button type="button" class="plan-line" data-testid="expert-plan-one-line" :aria-expanded="fullPlanOpen" aria-label="查看完整执行计划" @click="fullPlanOpen = !fullPlanOpen"><span class="plan-line-count">3 项</span><strong>整理资料 → 形成结论 → 生成报告与 PPTX</strong><small>PPT 模板：{{ templateLabel }}</small><ChevronDown :size="14" /></button>
+              <ol v-if="fullPlanOpen" class="plan-details" data-testid="expert-plan-details">
+                <li>整理本轮任务所需的已授权资料，确认分析范围。</li>
+                <li>分析资料并形成结论，整理报告内容与演示结构。</li>
+                <li>生成报告与 PPTX；使用所选模板「{{ templateLabel }}」。</li>
               </ol>
               <footer>
                 <button v-if="planStatus === 'waiting'" type="button" @click="modifyPlan">
@@ -643,6 +653,7 @@ onBeforeUnmount(() => {
                 <button v-if="planStatus === 'failed'" type="button" class="run-now" @click="retryPlan">重试执行</button>
               </footer>
             </section>
+            <TaskStallReminder v-if="normalizedApprovalMode === 'autonomous'" :key="sessionId" :task-id="'task-' + sessionId" :title="title" :agent-name="expertName" :detail-url="'/PORTL/chat/' + encodeURIComponent(sessionId)" :executed-at="new Date(executionStartedAt ?? Date.now()).toLocaleString('sv-SE', { timeZone: 'Asia/Shanghai' })" :failure-reason="planStatus === 'failed' ? '资料读取失败，请重试或检查数据源权限。' : ''" :state="planStatus" :progress-key="planStatus + '-' + completedExecutionSteps" :demo-waiting="demoQuery.get('reminderDemo') === '1'" />
             <section v-if="planStatus === 'awaiting_clarification'" class="clarification-card" data-testid="clarification-card">
               <strong>请补充任务信息</strong>
               <label v-for="item in clarifications.filter(item => normalizedApprovalMode === 'default' || item.required)" :key="item.id">
@@ -758,6 +769,7 @@ onBeforeUnmount(() => {
           >
             {{ isExpert ? '模拟完成' : '全部完成' }} · 处理用时 {{ processingDuration }}
           </p>
+          <time class="message-time" :title="fixtureAnswerTime" data-testid="assistant-message-time">{{ fixtureAnswerTime }}</time>
           <div class="answer-actions">
             <button type="button" aria-label="复制回答" title="复制"><Copy :size="16" /></button>
             <button type="button" aria-label="引用回答" title="引用"><Link2 :size="16" /></button>
@@ -782,7 +794,7 @@ onBeforeUnmount(() => {
           </div>
         </article>
         <template v-for="turn in followUps" :key="turn.id">
-          <div class="user-row sent-follow-up"><div class="user-message"><time>{{turn.time}}</time><div class="user-bubble" data-testid="sent-follow-up">{{turn.text}}</div></div></div>
+          <div class="user-row sent-follow-up"><div class="user-message"><div class="user-bubble" data-testid="sent-follow-up">{{turn.text}}</div><time class="message-time" :title="turn.time">{{turn.time}}</time></div></div>
           <p class="follow-up-routing" data-testid="follow-up-expert">本轮专家：{{turn.expert}} · 历史回复保留原专家。</p>
           <FollowUpPlan v-if="turn.usesExpert" :active="turn.id === followUps.at(-1)?.id && !['running','awaiting_clarification','awaiting_confirmation','unknown'].includes(planStatus)" :approval-mode="normalizedApprovalMode" :template-label="turn.templateLabel" :state-key="persistState ? sessionId + ':turn:' + turn.id : undefined" @running="followUpRunning = $event" @blocked="followUpBlocked = $event" @modify="input?.focus()" />
         </template>
@@ -807,28 +819,23 @@ onBeforeUnmount(() => {
     </aside>
 
     <div class="compact-composer">
-      <ExpertMentionMenu v-if="mentionOpen" id="detail-expert-mentions" :experts="mentionResults" :active-index="mentionIndex" :keyword="mentionKeyword" :has-more="mentionHasMore" :total="mentionAllResults.length" @load-more="mention.loadMore" @select="mention.choose" @close="mentionOpen = false" />
-            <div v-if="(isExpert || pendingExpertId) && !mentionOpen && templateSuggestionAvailable && (!templateHintDismissed || composerTemplate)" class="template-tip">
-              <Presentation :size="17" /><span
-                ><strong>{{
-                  composerTemplate ? '已选择天马官方模板' : '需要使用天马官方模板吗？'
-                }}</strong
-                >默认使用普通模板；开始执行后不能更换。</span
-              ><button
-                type="button"
-                :disabled="['running', 'awaiting_clarification', 'awaiting_confirmation', 'unknown'].includes(planStatus) || followUpRunning || followUpBlocked"
-                @click="composerTemplate = !composerTemplate"
-              >
-                {{ composerTemplate ? '取消选择' : '使用天马官方模板' }}
-              </button>
-              <button v-if="!composerTemplate" type="button" aria-label="关闭模板提示" @click="templateHintDismissed = true"><X :size="14" /></button>
-            </div>
+      <ExpertMentionMenu v-if="mentionOpen" id="detail-expert-mentions" :experts="mentionResults" :total="mentionAllResults.length" :active-index="mentionIndex" :keyword="mentionKeyword" :has-more="mentionHasMore" @load-more="mention.loadMore" @select="mention.choose" @close="mentionOpen = false" @panel-press="mention.onPanelPress" />
+      <div v-if="(isExpert || pendingExpertId) && !mentionOpen" class="template-tip ppt-skill-card" data-testid="ppt-template-skill">
+        <span class="skill-icon"><Presentation :size="17" /></span>
+        <span><strong>PPT 模板（技能待选型）</strong>{{ uploadedTemplateName ? uploadedTemplateName : '上传模板，演示预期入口；实际套用能力待验证' }}</span>
+        <input ref="templateInput" class="visually-hidden" type="file" accept=".ppt,.pptx" @change="choosePptTemplate" />
+        <button v-if="uploadedTemplateName" type="button" aria-label="移除PPT模板" @click="clearPptTemplate"><X :size="14" /></button>
+        <button type="button" :disabled="['running','awaiting_clarification','awaiting_confirmation','unknown'].includes(planStatus)||followUpRunning||followUpBlocked" @click="templateInput?.click()"><UploadCloud :size="14" />{{ uploadedTemplateName ? '更换' : '上传模板' }}</button>
+      </div>
       <div class="detail-input-line" data-testid="expert-inline-input">
+      <button type="button" class="composer-plus-btn" aria-label="上传文件" title="上传文件">
+        <Plus :size="20" />
+      </button>
       <div v-if="pendingExpertId || isExpert" class="next-expert-chip" data-testid="selected-expert-chip"><span>{{ pendingExpertName || expertName }}</span><button v-if="pendingExpertId" type="button" aria-label="移除所选专家" @click="pendingExpertId = ''; input?.focus()"><X :size="13" /></button></div>
       <textarea
         @compositionstart="mention.startComposition()"
         @compositionend="mention.endComposition"
-        @input="mention.inputChanged" @click="mention.update" @keyup="mention.caretChanged" @select="mention.update" @blur="mentionOpen = false" @keydown="detailKeydown"
+        @input="mention.inputChanged" @click="mention.update" @keyup="mention.caretChanged" @select="mention.update" @blur="mention.onBlur" @keydown="detailKeydown"
         role="combobox" aria-autocomplete="list" :aria-expanded="mentionOpen" aria-controls="detail-expert-mentions" :aria-activedescendant="mentionOpen && mentionResults.length ? `detail-expert-mentions-${mentionIndex}` : undefined"
         ref="input"
         v-model="prompt"
@@ -837,15 +844,9 @@ onBeforeUnmount(() => {
         rows="1"
       />
       </div>
-      <ApprovalModeControl :model-value="normalizedApprovalMode" readonly />
-      <QuickPromptPanel
-        :scope="pendingExpertId || agentId || (isExpert ? 'expert' : 'daily')"
-        :scope-label="pendingExpertName || expertName"
-        :prompts="[]"
-        @created="insertQuickPrompt($event.content)"
-      />
-      <button type="button" aria-label="添加参考文件" title="添加参考文件">
-        <Paperclip :size="18" />
+      <ApprovalModeControl v-model="normalizedApprovalMode" />
+      <button type="button" class="composer-globe-btn" aria-label="联网搜索" title="联网搜索">
+        <Globe2 :size="18" />
       </button>
       <button
         type="button"
@@ -1135,7 +1136,7 @@ onBeforeUnmount(() => {
   width: min(760px, calc(100% - 300px));
   transform: translateX(-50%);
   display: grid;
-  grid-template-columns: 1fr auto 34px 34px 38px;
+  grid-template-columns: 1fr auto auto;
   align-items: end;
   gap: 5px;
   padding: 12px 12px 9px;
@@ -1692,20 +1693,27 @@ onBeforeUnmount(() => {
 .process-overview li.failed .process-step-state span { color: #c84a43; }
 .process-overview li.running .process-step-state span { color: #276fc5; }
 .process-overview li > button { border: 0; border-radius: 7px; background: #edf4fd; padding: 5px 8px; color: #276fc5; font: 10px inherit; cursor: pointer; }
-.compact-composer :deep(.approval-mode__fixed) { height: 32px; }
 button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 .compact-composer .template-tip{position:absolute;bottom:calc(100% + 10px);left:0;right:0;margin:0;box-shadow:0 4px 16px #00000008}.compact-composer .template-tip button{width:auto;flex-shrink:0}.compact-composer .template-tip button:last-child{position:static}
-.detail-input-line{display:flex;align-items:flex-start;gap:8px;min-width:0}.detail-input-line textarea{min-width:0;width:0;flex:1;padding-top:4px}.next-expert-chip{display:flex;flex:0 1 auto;max-width:45%;align-items:center;gap:6px;white-space:nowrap;border-radius:6px;background:#edf5ff;color:#246ec9;padding:4px 8px;font-size:12px}.next-expert-chip span{overflow:hidden;text-overflow:ellipsis}.next-expert-chip button{width:18px!important;height:18px!important;display:grid;place-items:center;background:transparent!important;color:inherit!important}.follow-up-routing{padding:14px;background:#f4f7fb;border-radius:9px;font-size:13px;color:#567}
+.detail-input-line{display:flex;align-items:center;gap:6px;min-width:0}.detail-input-line textarea{min-width:0;width:0;flex:1;padding-top:4px}.composer-plus-btn,.composer-globe-btn{flex-shrink:0;color:#666;transition:color .15s}.composer-plus-btn:hover,.composer-globe-btn:hover{color:#111}.next-expert-chip{display:flex;flex:0 1 auto;max-width:45%;align-items:center;gap:6px;white-space:nowrap;border-radius:6px;background:#edf5ff;color:#246ec9;padding:4px 8px;font-size:12px}.next-expert-chip span{overflow:hidden;text-overflow:ellipsis}.next-expert-chip button{width:18px!important;height:18px!important;display:grid;place-items:center;background:transparent!important;color:inherit!important}.follow-up-routing{padding:14px;background:#f4f7fb;border-radius:9px;font-size:13px;color:#567}
 
 @media(min-width:1100px){
   .detail-shell--preview .conversation{width:calc(100% - 430px);padding-right:24px;padding-left:36px;box-sizing:border-box}
   .detail-shell--preview .compact-composer{left:calc((100% - 430px)/2);width:min(760px,calc(100% - 500px));box-sizing:border-box}
 }
 .detail-shell--preview .anchor-rail{display:none}
+.plan-line{width:100%;background:transparent;text-align:left;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) auto 14px;align-items:center;gap:9px;margin:14px 0;border-top:1px solid #edf0f4;border-bottom:1px solid #edf0f4;padding:10px 0;white-space:nowrap}.plan-details{margin:0 0 14px;padding-left:24px;color:#637080;font-size:12px;line-height:1.9}.plan-line-count{border-radius:10px;background:#edf4fd;padding:2px 7px;color:#2d72c2;font-size:10px}.plan-line strong{overflow:hidden;text-overflow:ellipsis;font-size:12px}.plan-line small{overflow:hidden;max-width:210px;text-overflow:ellipsis;color:#8a94a1;font-size:10px}.tool-call-row{display:grid;grid-template-columns:30px minmax(0,1fr) auto;align-items:center;gap:10px;padding:12px 0}.tool-call-icon{display:grid;width:28px;height:28px;place-items:center;border-radius:8px;background:#edf4fd;color:#3477c5}.tool-call-row>div strong,.tool-call-row>div small{display:block}.tool-call-row>div strong{font-size:12px}.tool-call-row>div small{margin-top:2px;color:#8b94a0;font-size:10px}.tool-call-row>span:last-child{color:#778291;font-size:10px;white-space:nowrap}.tool-call-row.failed .tool-call-icon{background:#fff0ed;color:#c84a43}.ai-reply-row{display:flex;align-items:flex-start;gap:10px;border-top:1px solid #eef0f3;padding:11px 0 5px}.ai-reply-row>span{flex:none;border-radius:5px;background:#f2f3f5;padding:2px 6px;color:#687382;font-size:10px}.ai-reply-row p{margin:0;color:#586575;font-size:11px}.ppt-skill-card{background:#f7f8fa;color:#4f5b69}.ppt-skill-card .skill-icon{display:grid;width:30px;height:30px;flex:none;place-items:center;border-radius:8px;background:#fff0e8;color:#d3672b}.ppt-skill-card>span:nth-child(2){line-height:1.45}.ppt-skill-card>span:nth-child(2) strong{display:block;color:#343d49}.ppt-skill-card button{display:inline-flex!important;width:auto!important;height:28px!important;align-items:center;gap:4px;border-radius:7px!important;padding:0 8px!important;background:#fff!important;color:#526173!important}.visually-hidden{position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important}
+.message-time{display:block;min-height:16px;margin-top:6px;color:#a0a5ad;font-size:10px;line-height:16px;opacity:0;transition:opacity .15s}.user-message>time.message-time{text-align:right;order:2}.user-message:hover>.message-time,.user-message:focus-within>.message-time,.answer:hover>.message-time,.answer:focus-within>.message-time{opacity:1}.process-summary>button{border:0!important;border-radius:0!important;background:transparent!important;padding:5px 0!important;min-height:24px;gap:8px}.process-summary>button:hover{background:transparent!important}.process-title{font-weight:400!important;font-size:12px;color:#7c838c!important}.process-title i{width:5px;height:5px;background:#a3a9b2!important;box-shadow:none!important}.process-meta{font-size:10px}.process-overview{background:transparent!important;border:0!important;border-left:1px solid #e6e8eb!important;border-radius:0!important;padding:8px 0 8px 16px!important;margin:4px 0 12px!important}.process-overview>header{border:0!important;padding-bottom:6px!important}.tool-call-row{padding:6px 0!important}.tool-call-icon{background:#f1f2f4!important;color:#858c96!important;width:22px!important;height:22px!important;border-radius:5px!important}.ai-reply-row{padding:7px 0!important;border:0!important}.process-attempts{background:transparent}
 </style>
+
+
+
+
+
+
 
 
 

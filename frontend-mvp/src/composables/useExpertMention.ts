@@ -14,6 +14,7 @@ export function useExpertMention(text: Ref<string>, input: Ref<HTMLTextAreaEleme
   const range = ref({ start: 0, end: 0 })
   const composing = ref(false)
   const recent = ref<ExpertSendRecent>({})
+  const panelPressed = ref(false)
   const allResults = computed(() => {
     const query = keyword.value.toLowerCase()
     return experts.value
@@ -77,9 +78,25 @@ export function useExpertMention(text: Ref<string>, input: Ref<HTMLTextAreaEleme
     if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { if (open.value && !event.shiftKey) return }
     if (['Home','End','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key) || event.shiftKey) update()
   }
+  function onPanelPress() {
+    panelPressed.value = true
+    setTimeout(() => { panelPressed.value = false }, 300)
+  }
+  function onBlur(event: FocusEvent) {
+    // If focus moved to the mention panel (tabindex="-1"), keep menu open
+    const rt = event.relatedTarget as HTMLElement | null
+    if (rt && rt.closest?.('.mention-panel')) return
+    // If panel was just pressed (mousedown fired), defer the close
+    if (panelPressed.value && open.value) {
+      panelPressed.value = false
+      setTimeout(() => { if (open.value) update() }, 80)
+      return
+    }
+    open.value = false
+  }
   function startComposition() { composing.value = true; open.value = false }
   function endComposition() { composing.value = false; nextTick(update) }
   onMounted(() => { if (text.value) nextTick(() => { input.value?.setSelectionRange(text.value.length, text.value.length); update() }) })
-  return { open, keyword, activeIndex, results, allResults, activeType, page, pageCount, setPage, hasMore, loadMore, choose, keydown, update, caretChanged, inputChanged, startComposition, endComposition }
+  return { open, keyword, activeIndex, results, allResults, activeType, page, pageCount, setPage, hasMore, loadMore, choose, keydown, update, caretChanged, inputChanged, startComposition, endComposition, onBlur, onPanelPress }
 }
 

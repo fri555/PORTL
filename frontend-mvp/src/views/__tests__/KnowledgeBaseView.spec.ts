@@ -1,16 +1,22 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import { useAppStore } from '@/stores/app'
+import { mockUser } from '@/mock/user'
 import KnowledgeBaseView from '@/views/KnowledgeBaseView.vue'
 
 describe('KnowledgeBaseView source clone', () => {
   let wrapper: ReturnType<typeof mount>
 
   beforeEach(() => {
+    const pinia = createPinia(); setActivePinia(pinia); useAppStore().login({ ...mockUser, role: 'admin' })
     wrapper = mount(KnowledgeBaseView, {
       attachTo: document.body,
-      global: { stubs: { Teleport: true } },
+      global: { plugins: [pinia], stubs: { Teleport: true } },
     })
   })
+
+  afterEach(() => wrapper.unmount())
 
   it('renders local mock knowledge bases in the captured four-column shell', () => {
     const rows = wrapper.findAll('[data-testid="knowledge-kb-row"]')
@@ -37,7 +43,7 @@ describe('KnowledgeBaseView source clone', () => {
     await sidebar.get('button[aria-label="展开集团制度知识库"]').trigger('click')
     expect(sidebar.text()).toContain('人事制度')
     await sidebar.get('button[aria-label="展开人事制度"]').trigger('click')
-    expect(sidebar.text()).toContain('考勤与休假')
+    expect(sidebar.text()).toContain('考勤管理制度_v3.pdf')
 
     await sidebar.get('button[aria-label="个人空间"]').trigger('click')
     expect(sidebar.get('button[aria-label="个人空间"]').attributes('aria-selected')).toBe('true')
@@ -53,6 +59,7 @@ describe('KnowledgeBaseView source clone', () => {
     expect(wrapper.get('[role="dialog"]').text()).toContain('个人空间')
     await wrapper.get('button[aria-label="关闭弹窗"]').trigger('click')
 
+    await wrapper.get('button[aria-label="新建"]').trigger('click')
     await wrapper.get('button[aria-label="上传文件"]').trigger('click')
     const upload = wrapper.get('[role="dialog"]')
     expect(upload.text()).toContain('上传至')
@@ -64,6 +71,7 @@ describe('KnowledgeBaseView source clone', () => {
     expect(upload.get('button[type="submit"]').attributes()).toHaveProperty('disabled')
     await wrapper.get('button[aria-label="关闭弹窗"]').trigger('click')
 
+    await wrapper.get('button[aria-label="新建"]').trigger('click')
     await wrapper.get('button[aria-label="新建文件夹"]').trigger('click')
     expect(wrapper.get('[role="dialog"]').text()).toContain('文件名称')
     expect(wrapper.get('[role="dialog"]').text()).toContain('所属知识库')
@@ -229,7 +237,7 @@ describe('KnowledgeBaseView source clone', () => {
     expect(panel.text()).toContain('参考 1 篇资料')
   })
 
-  it('navigates knowledge base folders recursively and previews a local file', async () => {
+  it('navigates a one-level knowledge folder and previews a local file', async () => {
     await wrapper.findAll('[data-testid="knowledge-kb-row"]')[0].trigger('click')
     await flushPromises()
     expect(wrapper.get('[data-testid="knowledge-breadcrumb"]').text()).toContain('全部知识库')
@@ -238,11 +246,7 @@ describe('KnowledgeBaseView source clone', () => {
 
     await wrapper.findAll('[data-testid="knowledge-node-row"]')[0].trigger('click')
     expect(wrapper.get('[data-testid="knowledge-breadcrumb"]').text()).toContain('人事制度')
-    expect(wrapper.get('[data-testid="knowledge-node-row"]').text()).toContain('考勤与休假')
-
-    await wrapper.findAll('[data-testid="knowledge-node-row"]')[0].trigger('click')
-    expect(wrapper.get('[data-testid="knowledge-breadcrumb"]').text()).toContain('考勤与休假')
-    expect(wrapper.findAll('[data-testid="knowledge-node-row"]')[0].text()).toContain('考勤管理制度_v3.pdf')
+    expect(wrapper.get('[data-testid="knowledge-node-row"]').text()).toContain('考勤管理制度_v3.pdf')
 
     await wrapper.findAll('[data-testid="knowledge-node-row"]')[0].trigger('click')
     expect(wrapper.get('[data-testid="knowledge-file-preview"]').text()).toContain('考勤管理制度_v3.pdf')
@@ -251,6 +255,7 @@ describe('KnowledgeBaseView source clone', () => {
 
   it('creates a folder in the current local mock location', async () => {
     await wrapper.findAll('[data-testid="knowledge-kb-row"]')[0].trigger('click')
+    await wrapper.get('button[aria-label="新建"]').trigger('click')
     await wrapper.get('button[aria-label="新建文件夹"]').trigger('click')
     const dialog = wrapper.get('[role="dialog"]')
     await dialog.get('#folder-name').setValue('本地新增目录')

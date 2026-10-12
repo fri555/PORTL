@@ -6,9 +6,14 @@ export interface Agent {
   category: AgentCategory
   capabilityLevel: 1 | 2 | 3 | 4 | 5
   developerId: string
+  creator?: { id: string; name: string; alias?: string }
+  serviceBusiness?: string
+  developerAlias?: string
   developerName: string
   developerDepartment: string
   useDepartments?: string[]
+  /** Current signed-in user permission result; omitted legacy prototype records retain access. */
+  usePermission?: boolean
   status: 'online' | 'offline' | 'maintenance'
   reviewStatus: 'draft' | 'pending' | 'approved' | 'rejected'
   systemPrompt: string
@@ -25,21 +30,22 @@ export interface Agent {
   version: string
   totalCalls: number
   avgRating: number
-  favoriteCount: number
   usageInstructions: string
   firstPublishedAt?: string
   publishedAt?: string
   capabilities?: {
+    publicKnowledgeEnabled?: boolean
+    personalKnowledgeEnabled?: boolean
     internetEnabled?: boolean
     supportedFileFormats?: string[]
     connectedSystems?: string[]
     selectedDocumentNames?: string[]
     selectedToolNames?: string[]
-    knowledgeDocuments?: { id: string; name: string; lastSuccessfulSyncAt?: string }[]
+    knowledgeDocuments?: { id: string; name: string; knowledgeBaseId?: string; knowledgeBaseName?: string; lastSuccessfulSyncAt?: string }[]
     connectors?: { id: string; name: string; protocol?: string; description?: string }[]
     tools?: { id: string; name: string; description?: string }[]
     skills?: { id: string; name: string; identifier?: string; description?: string }[]
-    knowledgeBases?: { id: string; name: string; lastSuccessfulSyncAt?: string }[]
+    knowledgeBases?: { id: string; name: string; ownerName?: string; lastUploadedAt?: string; lastSuccessfulSyncAt?: string }[]
   }
   createdAt: string
   updatedAt: string

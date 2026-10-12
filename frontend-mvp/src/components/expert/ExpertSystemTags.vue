@@ -16,7 +16,7 @@ async function measure() {
   if (!width) { visibleCount.value = Math.min(3, props.tags.length); return }
   const children = Array.from(measures.value?.querySelectorAll<HTMLElement>('.measure-tag') ?? [])
   const widths = children.map(child => child.getBoundingClientRect().width)
-  let count = Math.min(3, props.tags.length)
+  let count = props.tags.length
   const overflowWidth = measures.value?.querySelector<HTMLElement>('.measure-overflow')?.getBoundingClientRect().width || 32
   while (count > 0) {
     const needed = widths.slice(0, count).reduce((sum, item) => sum + item, 0) + Math.max(0, count - 1) * 5 + (count < props.tags.length ? overflowWidth + 5 : 0)
@@ -49,7 +49,7 @@ onBeforeUnmount(() => { observer?.disconnect(); window.removeEventListener('resi
   </div>
 </template>
 <style scoped>
-.system-tags { position:relative; display:flex; width:100%; min-height:26px; gap:5px; align-items:center; justify-content:center; margin:9px 0 13px; }
+.system-tags { position:relative; display:flex; width:100%; min-height:26px; gap:5px; align-items:center; justify-content:flex-start; margin:9px 0 13px; overflow:hidden; }
 .system-tag,.system-overflow,.measure-tag,.measure-overflow { display:block; flex:0 0 auto; border:0; border-radius:5px; background:#f0f4f8; padding:3px 6px; color:#65778a; font:10px/17px system-ui,-apple-system,'PingFang SC','Microsoft YaHei',sans-serif; white-space:nowrap; }
 .system-overflow { cursor:pointer; background:#eaf1fa; color:#2670bf; }
 .system-overflow:focus-visible { outline:2px solid #1677ff; outline-offset:2px; }

@@ -7,28 +7,22 @@ export function expertDateLabel(value?: string) {
   const parts = new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(value))
   return ['year', 'month', 'day'].map(type => parts.find(part => part.type === type)?.value).join('-')
 }
-export type ExpertKnowledgeEntry = { id: string; name: string; kind: 'document' | 'library'; lastSuccessfulSyncAt?: string }
+export function expertOwnerLabel(agent: Agent) { const name=agent.creator?.name?.trim() || agent.developerName?.trim(); const alias=agent.creator?.alias?.trim() || agent.developerAlias?.trim(); return name ? name + (alias && alias!==name ? '（'+alias+'）' : '') : '未配置负责人' }
+export function expertDepartmentLabels(agent: Agent) { return agent.serviceBusiness?.trim() ? [agent.serviceBusiness.trim()] : normalizeSystemTags(agent.useDepartments) }
+export type ExpertKnowledgeEntry = { id: string; name: string; kind: 'library'; ownerName?: string; lastUploadedAt?: string; lastSuccessfulSyncAt?: string }
 export function expertKnowledgeEntries(agent: Agent): ExpertKnowledgeEntry[] {
-  const explicit = agent.capabilities?.knowledgeDocuments
-  if (explicit !== undefined) return explicit.map(item => ({ ...item, name: item.name?.trim() || '未提供名称', kind: 'document' }))
-  const documentNames = normalizeSystemTags(agent.capabilities?.selectedDocumentNames)
-  if (documentNames.length) return documentNames.map((name, index) => ({ id: 'document-' + index, name, kind: 'document' }))
-  return (agent.capabilities?.knowledgeBases ?? agent.knowledgeBaseIds.map(id => ({ id, name: knowledgeBases.find(item => item.id === id)?.name || '未提供名称' })))
-    .map(item => ({ ...item, name: item.name?.trim() || '未提供名称', kind: 'library' }))
+ const result: ExpertKnowledgeEntry[]=[]
+ if(agent.capabilities?.personalKnowledgeEnabled) result.push({id:'personal',name:'个人知识库',kind:'library'})
+ if(agent.capabilities?.publicKnowledgeEnabled===false)return result
+ const bound=agent.capabilities?.knowledgeBases ?? agent.knowledgeBaseIds.map(id=>({id,name:knowledgeBases.find(k=>k.id===id)?.name || '未提供名称'}))
+ const fromDocs=(agent.capabilities?.knowledgeDocuments ?? []).filter(d=>d.knowledgeBaseId).map(d=>({id:d.knowledgeBaseId!,name:d.knowledgeBaseName || knowledgeBases.find(k=>k.id===d.knowledgeBaseId)?.name || '未提供名称'}))
+ for(const item of [...bound,...fromDocs]) if(!result.some(k=>k.id===item.id)) result.push({...item,kind:'library'})
+ return result
 }
 export function expertSystemTags(agent: Agent) {
-  const hasKnowledge = expertKnowledgeEntries(agent).length > 0
-  const sources = { connectedSystems: agent.capabilities?.connectedSystems, hasKnowledge, internetEnabled: agent.capabilities?.internetEnabled }
-  const manual = stripAutomaticSystemTags(usageFormFromContent(agent.usageInstructions).systems, sources)
-  const platformKnowledge = new Set(['知识库', '企业知识库'])
-  const platformInternet = new Set(['联网', '联网查询', '互联网', '网络搜索'])
-  const suppliedSystems = (agent.capabilities?.connectedSystems ?? []).filter(value => !platformKnowledge.has(value.trim()) && !platformInternet.has(value.trim()))
-  const automatic = normalizeSystemTags([
-    ...suppliedSystems,
-    ...(hasKnowledge ? ['知识库'] : []),
-    ...(agent.capabilities?.internetEnabled === true ? ['联网'] : []),
-  ])
-  return normalizeSystemTags([...manual, ...automatic])
+ const hasKnowledge=agent.capabilities?.publicKnowledgeEnabled===true || agent.capabilities?.personalKnowledgeEnabled===true || (agent.capabilities?.publicKnowledgeEnabled===undefined && expertKnowledgeEntries(agent).length>0)
+ const manual=usageFormFromContent(agent.usageInstructions).systems.filter(value=>!['知识库','联网'].includes(value))
+ return normalizeSystemTags([...manual,...(hasKnowledge?['知识库']:[]),...(agent.capabilities?.internetEnabled?['联网']:[])])
 }
 const PLATFORM_FORMATS = new Set(['PDF', 'DOC', 'DOCX', 'XLS', 'XLSX', 'TXT', 'MD', 'CSV', 'PPTX', 'JPG', 'JPEG', 'PNG', 'WEBP'])
 export function expertFileFormats(agent: Agent): string[] | undefined {

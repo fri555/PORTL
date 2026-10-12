@@ -59,12 +59,12 @@ describe('local knowledge-source fixtures', () => {
     expect(personalWithFolders.length).toBeGreaterThanOrEqual(2)
   })
 
-  it('contains at least two knowledge trees with three nested node levels', () => {
+  it('limits local folders to one level beneath each knowledge base', () => {
     const deepTrees = sourceKnowledgeBases.filter((knowledgeBase) =>
       Math.max(0, ...(knowledgeBase.nodes ?? []).map(nodeDepth)) >= 3,
     )
 
-    expect(deepTrees.length).toBeGreaterThanOrEqual(2)
+    expect(deepTrees).toHaveLength(0)
   })
 
   it('uses stable unique resource ids and complete file metadata', () => {
