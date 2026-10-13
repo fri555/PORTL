@@ -22,7 +22,6 @@ import {
   Share2,
   Timer,
   UploadCloud,
-  Wrench,
   X,
 } from 'lucide-vue-next'
 import { expertAgents as agents, getHistoricalExpert } from '@/utils/expertPrototypeStore'
@@ -32,6 +31,8 @@ import ExpertMentionMenu from './ExpertMentionMenu.vue'
 import { useExpertCatalog, isExpertAvailable } from '@/composables/useExpertCatalog'
 import { useExpertMention } from '@/composables/useExpertMention'
 import AnswerCitations from './AnswerCitations.vue'
+import InlineExecutionTrace from './InlineExecutionTrace.vue'
+import ExpertTodoProgress from './ExpertTodoProgress.vue'
 import { citationSources, citedParagraphs, dailySource } from '@/mock/citations'
 import type { CitationPreviewLoader } from '@/types/citation'
 import FollowUpPlan from './FollowUpPlan.vue'
@@ -152,9 +153,7 @@ const planTitle = computed(() => ({ waiting:'执行计划已就绪', paused:'执
 const artifactFailed = ref(demoQuery.get('artifactState') === 'failed')
 const artifactRetrying = ref(false)
 let executionTimer: number | undefined
-const processOpen = ref(false)
 const fullPlanOpen = ref(false)
-watch(planStatus, status => { if (status === 'done') processOpen.value = false })
 const templateInput = ref<HTMLInputElement | null>(null)
 const uploadedTemplateName = ref('')
 const templateHintDismissed = ref(false)
@@ -266,8 +265,6 @@ const executionSteps = computed<ExecutionStep[]>(() => {
   ]
 })
 const completedExecutionSteps = computed(() => executionSteps.value.filter(step => step.status === 'done').length)
-const activeExecutionStep = computed(() => executionSteps.value.find(step => ['running','failed','waiting'].includes(step.status)) || executionSteps.value.at(-1)!)
-const toolCallLabel = computed(() => activeExecutionStep.value.title === '理解任务' ? '任务理解' : activeExecutionStep.value.title)
 const processHeadline = computed(() => {
   if (isDwsAction.value && dwsStage.value === 'auth') return '等待账号授权'
   if (isDwsAction.value && dwsStage.value === 'confirm') return '等待操作确认'
@@ -275,16 +272,8 @@ const processHeadline = computed(() => {
   if (!isExpert.value || planStatus.value === 'done') return '处理完成'
   return ({ failed: '执行失败', running: '执行中', cancelled: '已取消', superseded: '已被替代', awaiting_confirmation: '等待确认', awaiting_clarification: '等待补充', unknown: '结果待核实', waiting: '计划就绪', paused: '计划就绪' } as Record<PlanStatus, string>)[planStatus.value]
 })
-const processTone = computed(() => {
-  if (isDwsAction.value) return dwsStage.value === 'done' ? 'done' : dwsStage.value === 'cancelled' ? 'cancelled' : 'waiting'
-  if (!isExpert.value) return 'done'
-  return planStatus.value === 'failed' ? 'failed' : planStatus.value === 'running' ? 'running' : planStatus.value === 'done' ? 'done' : 'waiting'
-})
 const processingDuration = computed(() => durationText(executionSteps.value.reduce((total, step) => total + (parseFloat(step.duration) || 0) * 1000, 0)))
 function durationText(milliseconds: number) { return (Math.max(0, milliseconds) / 1000).toFixed(1) + ' 秒' }
-function executionStatusLabel(status: ExecutionStepStatus) {
-  return ({ waiting: '待执行', running: '进行中', done: '已完成', failed: '失败', cancelled: '已取消' } as const)[status]
-}
 function handleDwsAuthorized() {
   if (dwsStage.value === 'auth') dwsStage.value = normalizedApprovalMode.value === 'autonomous' && !humanAuthorizationRequired ? 'done' : 'confirm'
 }
@@ -490,36 +479,12 @@ onBeforeUnmount(() => {
               >
             </div>
           </header>
-          <div class="process-summary" :class="processTone">
-            <button
-              type="button"
-              data-testid="execution-process-trigger"
-              :aria-expanded="processOpen"
-              @click="processOpen = !processOpen"
-            >
-              <span class="process-title"><i />{{ processHeadline }}</span>
-              <span class="process-meta"><template v-if="executionAttempt > 1">第 {{ executionAttempt }} 次执行 · </template>{{ completedExecutionSteps }}/{{ executionSteps.length }} 个阶段</span>
-              <ChevronDown :size="15" :class="{ open: processOpen }" />
-            </button>
-          </div>
-          <section v-if="processOpen" class="process-overview" data-testid="execution-process">
-            <header>
-              <div><strong>处理过程</strong><small>查看本轮工具调用与处理摘要</small></div>
-            </header>
-            <div class="tool-call-row" :class="activeExecutionStep.status">
-              <span class="tool-call-icon"><Wrench :size="15" /></span>
-              <div><strong>工具调用 · {{ toolCallLabel }}</strong><small>{{ activeExecutionStep.detail }}</small></div>
-              <span>{{ executionStatusLabel(activeExecutionStep.status) }} · {{ activeExecutionStep.duration }}</span>
-            </div>
-            <div class="ai-reply-row"><span>AI 回复</span><p>{{ planStatus === 'done' ? '已完成处理并生成回复，详细结果见下方。' : planStatus === 'running' ? '正在处理，完成后将在这里给出结果。' : '等待当前步骤完成后生成回复。' }}</p></div>
-            <section v-if="failedAttempts.length" class="process-attempts" data-testid="execution-attempt-history">
-              <h3>历史执行记录</h3>
-              <article v-for="attempt in failedAttempts" :key="attempt.version">
-                <header>第 {{ attempt.version }} 次执行 · 执行失败</header>
-                <p v-for="step in attempt.steps.filter(item => item.status === 'failed')" :key="step.title"><strong>{{ step.title }}</strong><span>{{ step.detail }}</span><time>{{ step.duration }}</time></p>
-              </article>
-            </section>
-          </section>
+          <InlineExecutionTrace
+            :status="isDwsAction ? (dwsStage === 'done' ? 'done' : dwsStage === 'cancelled' ? 'cancelled' : 'waiting') : isExpert ? planStatus : 'done'"
+            :headline="processHeadline"
+            :steps="executionSteps"
+            :attempt="executionAttempt"
+          />
           <template v-if="isDwsAction">
             <TaskStallReminder v-if="normalizedApprovalMode === 'autonomous'" :task-id="sessionId" :title="title" :agent-name="expertName" :detail-url="'/PORTL/chat/' + encodeURIComponent(sessionId)" :state="dwsStage === 'auth' ? 'dws_auth' : dwsStage === 'confirm' ? 'awaiting_confirmation' : dwsStage" :progress-key="dwsStage" />
             <p>创建待办属于钉钉写操作。首次使用需要本人完成账号授权；自主执行可在授权完成后自动同意本轮操作确认。</p>
@@ -827,6 +792,7 @@ onBeforeUnmount(() => {
         <button v-if="uploadedTemplateName" type="button" aria-label="移除PPT模板" @click="clearPptTemplate"><X :size="14" /></button>
         <button type="button" :disabled="['running','awaiting_clarification','awaiting_confirmation','unknown'].includes(planStatus)||followUpRunning||followUpBlocked" @click="templateInput?.click()"><UploadCloud :size="14" />{{ uploadedTemplateName ? '更换' : '上传模板' }}</button>
       </div>
+      <ExpertTodoProgress v-if="isExpert && executionSteps.length" :steps="executionSteps" />
       <div class="detail-input-line" data-testid="expert-inline-input">
       <button type="button" class="composer-plus-btn" aria-label="上传文件" title="上传文件">
         <Plus :size="20" />

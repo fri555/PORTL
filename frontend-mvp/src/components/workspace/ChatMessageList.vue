@@ -2,7 +2,6 @@
 import { computed, nextTick } from 'vue'
 import { useAIChat, stripModePrefix } from '@/composables/useAIChat'
 import { useChatController } from '@/composables/useWorkspaceChat'
-import ThinkingChain from '@/components/workspace/ThinkingChain.vue'
 import ExpertPicker from '@/components/workspace/ExpertPicker.vue'
 import {
   BookOpen, Check, Copy, Database, FileText, Loader2, Quote, RefreshCw,
@@ -97,7 +96,7 @@ function formatSize(bytes?: number) {
     </div>
 
     <!-- Messages -->
-    <template v-for="(message, index) in ai.activeMessages.value" :key="message.id">
+    <template v-for="message in ai.activeMessages.value" :key="message.id">
       <div v-if="message.role === 'system'" class="flex justify-center my-1">
         <div class="max-w-[80%] rounded-full bg-zinc-100 px-4 py-1 text-center text-[11px] text-zinc-500">{{ message.content }}</div>
       </div>
@@ -115,15 +114,6 @@ function formatSize(bytes?: number) {
 
         <!-- Content -->
         <div class="min-w-0" :class="message.role === 'user' ? 'max-w-[80%]' : 'max-w-[88%]'">
-          <!-- Thinking chain -->
-          <div v-if="chat.getLastThinking(message) && message.id !== 'welcome'" class="mb-1.5">
-            <ThinkingChain
-              :steps="chat.getLastThinking(message)!"
-              :is-collapsed="index !== ai.activeMessages.value.length - 1 || chat.thinkingCollapsed.value"
-              @toggle="chat.thinkingCollapsed.value = !chat.thinkingCollapsed.value"
-            />
-          </div>
-
           <!-- User bubble (white card) -->
           <div
             v-if="message.role === 'user'"
@@ -178,12 +168,6 @@ function formatSize(bytes?: number) {
         </div>
       </div>
     </template>
-
-    <!-- Active thinking -->
-    <div v-if="ai.isStreaming.value && ai.currentThinking.value.length > 0 && !ai.isApiConfigured()" class="flex gap-3">
-      <div class="shrink-0 mt-0.5"><div class="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-900 text-white"><Sparkles class="h-4 w-4" /></div></div>
-      <div class="max-w-[82%] min-w-0"><ThinkingChain :steps="ai.currentThinking.value" :is-collapsed="chat.thinkingCollapsed.value" @toggle="chat.thinkingCollapsed.value = !chat.thinkingCollapsed.value" /></div>
-    </div>
 
     <!-- Streaming -->
     <div v-if="chat.streamingContent.value" class="flex gap-3">
