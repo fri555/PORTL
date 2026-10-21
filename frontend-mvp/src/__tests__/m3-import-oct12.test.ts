@@ -34,11 +34,12 @@ describe('M3 context, tree destinations and task records', () => {
   })
   it('opens own sync records from the toolbar and hides all connection configuration', async () => {
     const w = await page('/knowledge', 'user')
-    await w.get('[aria-label="同步记录"]').trigger('click')
+    await w.get('.knowledge-sidebar__access').trigger('click')
     expect(w.find('[data-testid="knowledge-sync-personal"]').exists()).toBe(true)
     expect(w.find('[data-testid="knowledge-access-admin"]').exists()).toBe(false)
     expect(w.find('[data-testid="dingtalk-connection-card"]').exists()).toBe(false)
     expect(w.text()).not.toContain('配置连接')
+    await w.findAll('.records-tabs button').find(button => button.text() === '记录')!.trigger('click')
     expect(w.findAll('[data-testid="dingtalk-sync-record"]')).toHaveLength(2)
     expect(w.text()).not.toContain('清晖')
     expect(w.text()).not.toContain('知夏')
@@ -88,24 +89,25 @@ describe('M3 context, tree destinations and task records', () => {
   it('offers ordinary users only writable personal destinations including their folders', async () => {
     const w = await page('/knowledge?import=dingtalk', 'user')
     const destinations = w.getComponent(ImportDialog).props('destinations')
-    expect(destinations.some(item => item.id === 'kb-public-1')).toBe(false)
-    expect(destinations.some(item => item.id === 'policy-hr')).toBe(false)
+    expect(destinations.some(item => item.id === 'kb-public-1')).toBe(true)
+    expect(destinations.some(item => item.id === 'policy-hr')).toBe(true)
     expect(destinations.some(item => item.id === 'personal-key-customers' && item.parentId === 'kb-personal-1')).toBe(true)
-    expect(w.find('.knowledge-sidebar__access').exists()).toBe(false)
+    expect(w.find('.knowledge-sidebar__access').exists()).toBe(true)
   })
   it('creates one task with two source-to-local mappings and saves into the selected folder', async () => {
     const w = await page('/knowledge?kb=kb-public-1&folder=policy-hr&import=dingtalk')
-    const docs = personalDingTalkDocuments(boundDingTalkIdentity(mockUser)).slice(0, 2)
+    // The existing onboarding/attendance fixture is already imported to this KB.
+    const docs = personalDingTalkDocuments(boundDingTalkIdentity(mockUser)).filter(item => ['catalog', 'launch'].includes(item.id))
     w.getComponent(ImportDialog).vm.$emit('complete', { destinationId: 'policy-hr', documents: docs, platformUserId: mockUser.id, frequency: '每天', schedule: '00:00' })
     await w.vm.$nextTick()
-    expect(w.text()).toContain('新员工入职指南.docx'); expect(w.text()).toContain('考勤与休假制度.pdf')
+    expect(w.text()).toContain('商品分类说明.xlsx'); expect(w.text()).toContain('新品上架流程.docx')
     await w.get('[aria-label="展开侧栏"]').trigger('click'); await w.get('.knowledge-sidebar__access').trigger('click')
     const panel = w.getComponent(AccessPanel)
     const records = panel.props('records') as DingTalkImportTask[]
     expect(records).toHaveLength(8)
     const task = records[0]!
     expect(task.importTaskId).toMatch(/^DT-/)
-    expect(task.documentMappings.map(item => item.sourceDocumentId)).toEqual(['onboarding', 'attendance'])
+    expect(task.documentMappings.map(item => item.sourceDocumentId)).toEqual(['catalog', 'launch'])
     expect(task.documentMappings.every(item => item.localFileId)).toBe(true)
     expect(task.destinationId).toBe('policy-hr')
     const originalMappings = task.documentMappings.map(item => item.localFileId)
@@ -116,6 +118,7 @@ describe('M3 context, tree destinations and task records', () => {
   })
   it('separates sources/destination, joins multiple document sources with semicolons, and searches alias/source/destination', async () => {
     const w = await page('/knowledge?view=access')
+    await w.findAll('.records-tabs button').find(button => button.text() === '记录')!.trigger('click')
     expect(w.get('.record-head').text()).toContain('来源')
     const rows = w.findAll('[data-testid="dingtalk-sync-record"]')
     expect(rows).toHaveLength(7)

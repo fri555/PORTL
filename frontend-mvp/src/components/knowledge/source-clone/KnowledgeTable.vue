@@ -20,6 +20,7 @@ const props = withDefaults(
     detail?: SourceKnowledgeBase | null
     nodes?: SourceKnowledgeNode[]
     lockedIds?: Set<string>
+    canAction?: (action: KnowledgeAction, target: KnowledgeTarget) => boolean
   }>(),
   { detail: null, nodes: () => [] },
 )
@@ -77,6 +78,7 @@ function chooseAction(
   kind: KnowledgeAction,
   target: KnowledgeTarget,
 ) {
+  if (props.canAction && !props.canAction(kind, target)) return
   event.stopPropagation()
   openMenuId.value = null
   emit('action', { kind, target })
@@ -105,7 +107,7 @@ onBeforeUnmount(() => {
   <div class="knowledge-table" :class="{ 'knowledge-table--detail': detail }">
     <div class="knowledge-table__header knowledge-table__grid" data-testid="knowledge-table-header">
       <span>名称</span>
-      <span>所有者</span>
+      <span>创建者</span>
       <button
         v-if="!detail"
         type="button"
@@ -154,9 +156,9 @@ onBeforeUnmount(() => {
               <MoreHorizontal :size="18" :stroke-width="1.8" />
             </button>
             <div v-if="openMenuId === item.id" class="knowledge-table__menu" role="menu" :data-placement="menuPlacement" :style="menuStyle" @click.stop>
-              <button type="button" role="menuitem" @click="chooseAction($event, 'rename', item)">重命名</button>
-              <button type="button" role="menuitem" @click="chooseAction($event, 'permission', item)">权限管理</button>
-              <button type="button" role="menuitem" class="knowledge-table__menu-delete" @click="chooseAction($event, 'delete', item)">删除</button>
+              <button type="button" role="menuitem" :disabled="canAction && !canAction('rename', item)" @click="chooseAction($event, 'rename', item)">重命名</button>
+              <button type="button" role="menuitem" :disabled="canAction && !canAction('permission', item)" @click="chooseAction($event, 'permission', item)">权限管理</button>
+              <button type="button" role="menuitem" class="knowledge-table__menu-delete" :disabled="canAction && !canAction('delete', item)" :title="canAction && !canAction('delete', item) ? '需要可管理权限' : ''" @click="chooseAction($event, 'delete', item)">删除</button>
             </div>
           </span>
         </div>
@@ -220,9 +222,9 @@ onBeforeUnmount(() => {
               >
                 <Eye :size="14" />预览
               </button>
-              <button type="button" role="menuitem" @click="chooseAction($event, 'rename', node)">重命名</button>
-              <button type="button" role="menuitem" @click="chooseAction($event, 'permission', node)">权限管理</button>
-              <button type="button" role="menuitem" class="knowledge-table__menu-delete" @click="chooseAction($event, 'delete', node)">删除</button>
+              <button type="button" role="menuitem" :disabled="canAction && !canAction('rename', node)" @click="chooseAction($event, 'rename', node)">重命名</button>
+              <button type="button" role="menuitem" :disabled="canAction && !canAction('permission', node)" @click="chooseAction($event, 'permission', node)">权限管理</button>
+              <button type="button" role="menuitem" class="knowledge-table__menu-delete" :disabled="canAction && !canAction('delete', node)" :title="canAction && !canAction('delete', node) ? '需要可管理权限' : ''" @click="chooseAction($event, 'delete', node)">删除</button>
             </div>
           </span>
         </div>

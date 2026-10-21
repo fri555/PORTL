@@ -1,20 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
-import {
-  ArrowUpLeft,
-  BookOpen,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ExternalLink,
-  FileText,
-  Globe2,
-  List,
-  LoaderCircle,
-  RefreshCw,
-  X,
-} from 'lucide-vue-next';
+import { ArrowUpLeft, BookOpen, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, FileText, Globe2, LoaderCircle, RefreshCw, X } from 'lucide-vue-next';
+import KnowledgeDownloadAction from '@/components/knowledge/source-clone/KnowledgeDownloadAction.vue';
 import {
   safeCitationUrl,
   type CitedParagraph,
@@ -470,6 +458,7 @@ defineExpose({ closePanel });
               <ChevronRight :size="16" />
             </button>
           </div>
+          <KnowledgeDownloadAction v-if="canRead && active.source.type === 'knowledge'" :role="active.source.permissionRole" :download-url="active.source.downloadUrl" :file-name="active.source.title" />
           <a v-if="originalUrl" :href="originalUrl" target="_blank" rel="noopener noreferrer"
             >{{ active.source.type === 'web' ? '打开原网页' : '打开原文件'
             }}<ExternalLink :size="14" /></a

@@ -3,11 +3,12 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { getActivePinia } from 'pinia'
 import { useAppStore } from '@/stores/app'
 import { useRoute } from 'vue-router'
-import { Bot, ChevronDown, FileText, FolderPlus, PanelLeftOpen, Plus, Search, Upload, X } from 'lucide-vue-next'
+import { Bot, FileText, FolderPlus, PanelLeftOpen, Plus, Search, Upload, X } from 'lucide-vue-next'
 import KnowledgeDialogs from '@/components/knowledge/source-clone/KnowledgeDialogs.vue'
 import KnowledgeQaPanel from '@/components/knowledge/source-clone/KnowledgeQaPanel.vue'
 import KnowledgeSidebar from '@/components/knowledge/source-clone/KnowledgeSidebar.vue'
 import KnowledgeTable from '@/components/knowledge/source-clone/KnowledgeTable.vue'
+import KnowledgeDownloadAction from '@/components/knowledge/source-clone/KnowledgeDownloadAction.vue'
 import KnowledgeAccessPanel from '@/components/knowledge/source-clone/KnowledgeAccessPanel.vue'
 import DingTalkDocumentImport from '@/components/knowledge/source-clone/DingTalkDocumentImport.vue'
 import { boundDingTalkIdentity, getPrototypeScenario, personalDingTalkDocuments, prototypeCanWriteKnowledge, type ImportableDocument } from '@/components/knowledge/source-clone/dingtalkPrototype'
@@ -15,6 +16,7 @@ import { dingTalkImportTaskFixtures, scopedDingTalkImportTasks } from '@/mock/di
 import { sourceKnowledgeBases } from '@/mock/knowledge-source'
 import type {
   DingTalkImportTask,
+  DingTalkDocumentMapping,
   DingTalkSyncFrequency,
   KnowledgeDestination,
   KnowledgeDialogKind,
@@ -22,11 +24,24 @@ import type {
   SourceKnowledgeBase,
   SourceKnowledgeNavigation,
   SourceKnowledgeNode,
+  KnowledgePermissionSnapshot,
 } from '@/types/knowledge-source'
+import { canConfigureKnowledge, canDeleteKnowledge, canRetrieveKnowledge, knowledgeRoleForPerson, type KnowledgeRole } from '@/types/knowledge-permission'
+import { canImportDingTalkSource, initializeDingTalkPermissions } from '@/utils/dingtalkPermissionInitialization'
+import { applyKnowledgeOwnershipTransfer } from '@/utils/knowledgeOwnership'
+import type { KnowledgeOwnershipTransfer } from '@/types/knowledge-source'
+import { toast } from 'vue-sonner'
 
 const items = ref<SourceKnowledgeBase[]>(JSON.parse(JSON.stringify(sourceKnowledgeBases)) as SourceKnowledgeBase[])
 const route = useRoute()
+const roleValues: KnowledgeRole[] = ['OWNER', 'MANAGER', 'EDITOR', 'DOWNLOADER', 'READER']
+const prototypeRole = computed<KnowledgeRole>(() => roleValues.includes(route?.query.permissionRole as KnowledgeRole) ? route.query.permissionRole as KnowledgeRole : appStore?.user?.role === 'admin' ? 'OWNER' : 'DOWNLOADER')
+const systemKnowledgeAdmin = computed(() => !route?.query.permissionRole && appStore?.user?.role === 'admin')
 const appStore = getActivePinia() ? useAppStore() : null
+const localDepartmentMembers = computed<Record<string, readonly string[]>>(() => {
+  const user = appStore?.user
+  return user?.department ? { [user.department]: [user.displayName] } : {}
+})
 const scenario = getPrototypeScenario()
 const createMenuOpen = ref(route?.query.menu === 'open')
 const createMenuRoot = ref<HTMLElement | null>(null)
@@ -60,9 +75,19 @@ const dingTalkIdentity = computed(() => boundDingTalkIdentity(appStore?.user, de
 const importTasks = ref<DingTalkImportTask[]>(structuredClone(dingTalkImportTaskFixtures))
 const visibleImportTasks = computed(() => scopedDingTalkImportTasks(importTasks.value, appStore?.user?.id, appStore?.user?.role))
 const writableDestinations = computed<KnowledgeDestination[]>(() => scenario === 'no-write-target' ? [] : items.value
-  .filter(item => prototypeCanWriteKnowledge(item.id, appStore?.user?.role))
-  .flatMap(item => [{ id: item.id, name: item.name, kind: 'kb' as const, path: item.name },
-    ...(item.nodes ?? []).filter(node => node.kind === 'folder').map(node => ({ id: node.id, name: node.name, kind: 'folder' as const, parentId: item.id, path: item.name + ' / ' + node.name }))]))
+  .filter(item => Boolean(appStore?.user) && (item.space === 'personal' ? prototypeCanWriteKnowledge(item.id, appStore?.user?.role) : Boolean(effectiveResourceRole(item) && canConfigureKnowledge(effectiveResourceRole(item)!))))
+  .flatMap(item => [{ id: item.id, name: item.name, kind: 'kb' as const, path: item.name, space: item.space },
+    ...(item.nodes ?? []).filter(node => node.kind === 'folder' && (item.space === 'personal' || Boolean(effectiveResourceRole(node) && canConfigureKnowledge(effectiveResourceRole(node)!)))).map(node => ({ id: node.id, name: node.name, kind: 'folder' as const, parentId: item.id, path: item.name + ' / ' + node.name, space: item.space }))]))
+const importedSourceIds = computed<Record<string, string[]>>(() => {
+  const byKnowledgeBase: Record<string, string[]> = {}
+  for (const task of importTasks.value) {
+    const destination = writableDestinations.value.find(item => item.id === task.destinationId)
+    if (!destination) continue
+    const root = destination.parentId ?? destination.id
+    byKnowledgeBase[root] = [...new Set([...(byKnowledgeBase[root] ?? []), ...task.documentMappings.filter(item => item.localFileId && item.status === '成功').map(item => item.sourceDocumentId)])]
+  }
+  return Object.fromEntries(writableDestinations.value.map(item => [item.id, byKnowledgeBase[item.parentId ?? item.id] ?? []]))
+})
 watch(canImportDingTalk, allowed => { if (!allowed) personalImportOpen.value = false })
 const canManageKnowledgeAccess = computed(() => appStore?.user?.role === 'admin')
 const activeSpace = ref<KnowledgeSpace>('public')
@@ -77,6 +102,12 @@ const nodePath = ref<SourceKnowledgeNode[]>([])
 const previewNode = ref<SourceKnowledgeNode | null>(null)
 const dialog = ref<KnowledgeDialogKind>(null)
 const dialogTarget = ref<SourceKnowledgeBase | SourceKnowledgeNode | null>(null)
+const currentResourceRole = computed(() => {
+  const resource = previewNode.value ?? nodePath.value.at(-1) ?? selected.value
+  return resource ? effectiveResourceRole(resource) : activeSpace.value === 'personal' ? 'OWNER' : prototypeRole.value
+})
+const dialogActorRole = computed(() => dialogTarget.value ? effectiveResourceRole(dialogTarget.value) ?? 'READER' : currentResourceRole.value ?? 'READER')
+const canRetrieveCurrentKnowledge = computed(() => canRetrieveKnowledge(currentResourceRole.value))
 const query = ref('')
 watch(() => appStore?.user?.id, (next, previous) => {
   if (next === previous) return
@@ -110,7 +141,9 @@ const currentNodes = computed(() => {
 const selectedTreeId = computed(() => nodePath.value.at(-1)?.id ?? selected.value?.id)
 const uploadDestinations = writableDestinations
 const currentDestinationId = computed(() => nodePath.value.at(-1)?.id ?? selected.value?.id ?? '')
-const mayWriteCurrent = computed(() => !selected.value || writableDestinations.value.some(item => item.id === currentDestinationId.value))
+const mayWriteCurrent = computed(() => selected.value
+  ? Boolean(currentResourceRole.value && canConfigureKnowledge(currentResourceRole.value)) && writableDestinations.value.some(item => item.id === currentDestinationId.value)
+  : writableDestinations.value.some(item => item.space === activeSpace.value))
 const canCreateFolderHere = computed(() => nodePath.value.length === 0 && mayWriteCurrent.value)
 function openDialog(
   kind: Exclude<KnowledgeDialogKind, null>,
@@ -153,7 +186,7 @@ function authorizeCurrentDingTalkIdentity() {
   if (boundDingTalkIdentity(appStore?.user).status === 'bound') demoIdentityAuthorized.value = true
 }
 function openDingTalkImport() {
-  if (!canImportDingTalk.value) return
+  if (!canImportDingTalk.value || !mayWriteCurrent.value) return
   closeCreateMenu()
   personalImportOpen.value = true
   qaOpen.value = false
@@ -163,28 +196,46 @@ function completeDingTalkImport(payload: { destinationId: string; documents: Imp
   if (!appStore?.user || payload.platformUserId !== appStore.user.id) return
   const destination = writableDestinations.value.find(item => item.id === payload.destinationId)
   if (!destination || !payload.documents.length) return
+  if (payload.documents.some(document => importedSourceIds.value[destination.id]?.includes(document.id))) return
   const currentDocuments = personalDingTalkDocuments(dingTalkIdentity.value, scenario)
-  if (payload.documents.some(document => !currentDocuments.some(source => source.id === document.id && source.exportable))) return
   const nodes = findUploadDestination(destination.id)
   if (!nodes) return
   const existingNames = new Set(nodes.map(node => node.name))
   const now = Date.now()
   const importTaskId = 'DT-' + now + '-' + (importTasks.value.length + 1)
-  const mappings = payload.documents.map((document, index) => {
+  const mappings: DingTalkDocumentMapping[] = payload.documents.map((document, index) => {
+    let permission: KnowledgePermissionSnapshot
+    try {
+      const current = currentDocuments.find(source => source.id === document.id)
+      if (!current?.exportable || !canImportDingTalkSource(current.sourceRole)) throw new Error('源文档查看或下载权限已变更')
+      permission = destination.space === 'public'
+        ? initializeDingTalkPermissions(appStore.user!.displayName, current.initialPermissions)
+        : { owner: appStore.user!.displayName, members: [], roles: {}, inheritParent: false, revision: 1 }
+    } catch (error) {
+      return { sourceDocumentId: document.id, sourceName: sourceDocumentPath(document), localFileId: '', status: '失败', contentResult: '失败', permissionResult: '失败',
+        failureReason: error instanceof Error ? error.message : '权限成员未完整获取，本次未导入，请重试。' }
+    }
     const baseName = document.name + '.' + document.format.toLowerCase()
     let name = baseName
     let suffix = 2
     while (existingNames.has(name)) name = document.name + '（' + suffix++ + '）.' + document.format.toLowerCase()
     existingNames.add(name)
     const localFileId = 'dingtalk-import-' + now + '-' + (importTasks.value.length + 1) + '-' + index
-    nodes.push({ id: localFileId, name, kind: 'file', owner: appStore.user!.displayName, updatedAt: '刚刚 · 钉钉导入', format: document.format, size: '钉钉转存 · 演示' })
-    return { sourceDocumentId: document.id, sourceName: sourceDocumentPath(document), localFileId, status: '成功' as const }
+    nodes.push({ id: localFileId, name, kind: 'file', owner: appStore.user!.displayName, updatedAt: '刚刚 · 钉钉导入', format: document.format, size: '钉钉转存 · 演示', sourceDocumentId: document.id,
+      permission })
+    return { sourceDocumentId: document.id, sourceName: sourceDocumentPath(document), localFileId, status: '成功' as const,
+      sourceModifiedAt: document.updatedAt, lastSuccessfulModifiedAt: document.updatedAt, contentResult: '已更新' as const,
+      permissionResult: destination.space === 'public' ? '首次初始化' as const : '后续不更新' as const,
+      permissionSyncedAt: destination.space === 'public' ? '刚刚' : undefined,
+      permissionMemberCount: permission.members.length + 1 }
   })
+  const successfulCount = mappings.filter(mapping => mapping.status === '成功').length
   const base = items.value.find(item => item.id === (destination.parentId ?? destination.id))
-  if (base?.count !== undefined) base.count += payload.documents.length
+  if (base?.count !== undefined) base.count += successfulCount
   importTasks.value.unshift({ importTaskId, platformUserId: appStore.user.id, userAlias: appStore.user.displayName,
     destinationId: destination.id, destinationPath: destination.path ?? destination.name,
-    frequency: payload.frequency ?? '不自动同步', schedule: payload.schedule ?? '—', latestSyncAt: '刚刚', status: '同步成功', documentMappings: mappings })
+    frequency: payload.frequency ?? '不自动同步', schedule: payload.schedule ?? '—', latestSyncAt: '刚刚',
+    status: successfulCount === mappings.length ? '同步成功' : successfulCount ? '部分失败' : '同步失败', documentMappings: mappings })
 }
 function sourceDocumentPath(document: ImportableDocument) {
   const paths: Record<string, string> = { onboarding: '集团制度知识库 / 人事制度', attendance: '集团制度知识库 / 人事制度', expense: '集团制度知识库', catalog: '商品运营知识库', launch: '商品运营知识库' }
@@ -195,6 +246,7 @@ function updateImportTaskSchedule(importTaskId: string, frequency: DingTalkSyncF
   if (task) { task.frequency = frequency; task.schedule = schedule }
 }
 function openUploadDialog() {
+  if (!mayWriteCurrent.value) return
   openDialog('upload', nodePath.value.at(-1) ?? selected.value)
 }
 
@@ -212,12 +264,47 @@ function handleAction(payload: {
   kind: 'preview' | 'rename' | 'permission' | 'delete'
   target: SourceKnowledgeBase | SourceKnowledgeNode
 }) {
+  if (!canResourceAction(payload.kind, payload.target)) return
   if (payload.kind === 'preview' && 'kind' in payload.target) {
     previewNode.value = payload.target
     qaOpen.value = false
     return
   }
   openDialog(payload.kind as 'rename' | 'permission' | 'delete', payload.target)
+}
+function canResourceAction(action: string, target: SourceKnowledgeBase | SourceKnowledgeNode) {
+  const publicResource = ('space' in target ? target.space : selected.value?.space ?? activeSpace.value) === 'public'
+  if (systemKnowledgeAdmin.value && publicResource) return true
+  const role = effectiveResourceRole(target)
+  if (!role) return false
+  if (action === 'preview') return true
+  if (action === 'delete') {
+    return canDeleteKnowledge(role, 'space' in target || target.permission?.inheritParent === false)
+  }
+  return canConfigureKnowledge(role)
+}
+
+function effectiveResourceRole(target: SourceKnowledgeBase | SourceKnowledgeNode): KnowledgeRole | null {
+  const base = 'space' in target ? target : items.value.find(item => Boolean(findNodePath(item.nodes ?? [], target.id)))
+  if (base?.space === 'personal') return prototypeCanWriteKnowledge(base.id, appStore?.user?.role) ? 'OWNER' : null
+  if (route?.query.permissionRole) return prototypeRole.value
+  if (systemKnowledgeAdmin.value) return 'MANAGER'
+  if (!appStore?.user) return null
+  const path = 'space' in target ? [] : findNodePath(base?.nodes ?? [], target.id) ?? [target]
+  const chain: (SourceKnowledgeBase | SourceKnowledgeNode)[] = [...path].reverse()
+  if (base) chain.push(base)
+  let strongest: KnowledgeRole | null = null
+  let hasSnapshot = false
+  const rank: Record<KnowledgeRole, number> = { OWNER: 3, MANAGER: 3, EDITOR: 2, DOWNLOADER: 2, READER: 1 }
+  for (const resource of chain) {
+    if (resource.owner === appStore.user.displayName) return 'MANAGER'
+    if (!resource.permission) continue
+    hasSnapshot = true
+    const role = knowledgeRoleForPerson(resource.permission, appStore.user.displayName, localDepartmentMembers.value)
+    if (role && (!strongest || rank[role] > rank[strongest])) strongest = role
+    if (!resource.permission.inheritParent) break
+  }
+  return strongest ?? (hasSnapshot ? null : prototypeRole.value)
 }
 
 function findNodePath(nodes: SourceKnowledgeNode[], nodeId: string, path: SourceKnowledgeNode[] = []): SourceKnowledgeNode[] | null {
@@ -233,6 +320,7 @@ function findNodePath(nodes: SourceKnowledgeNode[], nodeId: string, path: Source
 function navigateNode(node: SourceKnowledgeNode) {
   if (!selected.value) return
   if (node.kind === 'file') {
+    if (!canResourceAction('preview', node)) return
     previewNode.value = node
     qaOpen.value = false
     return
@@ -283,10 +371,12 @@ function goBreadcrumb(index: number) {
 }
 
 function createKnowledge(payload: { name: string; space: KnowledgeSpace }) {
+  const owner = appStore?.user?.displayName ?? '当前用户'
   items.value.unshift({
     id: `local-${Date.now()}`,
     name: payload.name,
-    owner: '当前用户',
+    owner,
+    permission: { owner, members: [], roles: {}, inheritParent: false, revision: 1 },
     createdAt: '刚刚',
     space: payload.space,
     nodes: [],
@@ -328,11 +418,13 @@ function createFolder(payload: { name: string; kb: string }) {
   const destination = items.value.find(item => item.id === payload.kb)
   if (!destination || !writableDestinations.value.some(item => item.id === payload.kb && !item.parentId)) return
   const nodes = destination.nodes ?? (destination.nodes = [])
+  const owner = appStore?.user?.displayName ?? '当前用户'
   nodes.push({
     id: `local-folder-${Date.now()}`,
     name: payload.name,
     kind: 'folder',
-    owner: '当前用户',
+    owner,
+    permission: { owner, members: [], roles: {}, inheritParent: true, revision: 1 },
     updatedAt: '刚刚',
     children: [],
   })
@@ -343,11 +435,13 @@ function uploadFiles(files: File[], destinationId: string, options: { monthlyRep
   if (!writableDestinations.value.some(item => item.id === destinationId)) return
   const destination = findUploadDestination(destinationId)
   if (!destination) return
+  const owner = appStore?.user?.displayName ?? '当前用户'
   const next = files.map<SourceKnowledgeNode>((file, index) => ({
     id: `local-file-${Date.now()}-${index}`,
     name: file.name,
     kind: 'file',
-    owner: '当前用户',
+    owner,
+    permission: { owner, members: [], roles: {}, inheritParent: true, revision: 1 },
     updatedAt: '刚刚',
     format: file.name.split('.').pop()?.toUpperCase() ?? 'FILE',
     size: `${Math.max(1, Math.round(file.size / 1024))} KB${options.monthlyReport && /\.xlsx?$/i.test(file.name) ? ' · 月报解析' : /\.pptx?$/i.test(file.name) ? ' · PPT解析' : ''}`,
@@ -386,7 +480,26 @@ onMounted(() => {
   }
   if (route?.query.upload === 'true') openUploadDialog()
 })
-function savePermission() {
+function savePermission(payload: KnowledgePermissionSnapshot & { resourceId: string; ownershipTransfer?: KnowledgeOwnershipTransfer }) {
+  if (dialogTarget.value?.id === payload.resourceId) {
+    if (payload.ownershipTransfer) {
+      if (payload.owner !== payload.ownershipTransfer.newOwner) return
+      try {
+        applyKnowledgeOwnershipTransfer(dialogTarget.value, payload.ownershipTransfer)
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : '所有权转交失败，请重试')
+        return
+      }
+    }
+    const { members, roles, owner, inheritParent, revision } = payload
+    const subjectKinds = payload.subjectKinds ?? dialogTarget.value.permission?.subjectKinds
+    const initialPermissionSubjects = payload.initialPermissionSubjects ?? dialogTarget.value.permission?.initialPermissionSubjects ?? Object.keys(dialogTarget.value.permission?.syncedRoles ?? {})
+    dialogTarget.value.permission = structuredClone({ members, roles, owner, inheritParent, revision,
+      initialPermissionSubjects: [...new Set(initialPermissionSubjects)].filter(subject => members.includes(subject) && subject !== owner),
+      ...(subjectKinds ? { subjectKinds: Object.fromEntries(Object.entries(subjectKinds).filter(([subject]) => members.includes(subject))) } : {}),
+    })
+    dialogTarget.value.owner = payload.owner
+  }
   closeDialog()
 }
 </script>
@@ -464,7 +577,7 @@ function savePermission() {
               </div>
             </div>
             <button
-              v-if="!qaOpen"
+              v-if="!qaOpen && canRetrieveCurrentKnowledge"
               class="source-button qa"
               aria-label="小智问答"
               @click="previewNode = null; qaOpen = true"
@@ -479,13 +592,14 @@ function savePermission() {
           :items="visibleItems"
           :detail="selected"
           :nodes="currentNodes"
+          :can-action="canResourceAction"
           @select="selectItem"
           @navigate-node="navigateNode"
           @action="handleAction"
         />
       </section>
 
-      <KnowledgeQaPanel v-if="qaOpen" @close="qaOpen = false" />
+      <KnowledgeQaPanel v-if="qaOpen && canRetrieveCurrentKnowledge" @close="qaOpen = false" />
 
       <aside v-if="previewNode" class="knowledge-preview" data-testid="knowledge-file-preview" aria-label="文件预览">
         <header>
@@ -493,23 +607,26 @@ function savePermission() {
           <div><strong>{{ previewNode.name }}</strong><small>{{ previewNode.format }} · {{ previewNode.size }}</small></div>
           <button type="button" aria-label="关闭文件预览" title="关闭" @click="previewNode = null"><X :size="18" /></button>
         </header>
+        <div class="preview-actions"><KnowledgeDownloadAction :role="currentResourceRole" :download-url="previewNode.downloadUrl" :file-name="previewNode.name" /></div>
         <div class="preview-paper">
           <small>{{ selected?.name }}</small>
           <h2>{{ previewNode.name.replace(/\.[^.]+$/, '') }}</h2>
           <p>这是由本地 mock 数据生成的文件预览，用于完整演示知识库、文件夹和文件之间的导航关系。</p>
           <section>
             <h3>文件信息</h3>
-            <dl><dt>所有者</dt><dd>{{ previewNode.owner }}</dd><dt>更新时间</dt><dd>{{ previewNode.updatedAt }}</dd><dt>文件大小</dt><dd>{{ previewNode.size }}</dd></dl>
+            <dl><dt>创建者</dt><dd>{{ previewNode.owner }}</dd><dt>更新时间</dt><dd>{{ previewNode.updatedAt }}</dd><dt>文件大小</dt><dd>{{ previewNode.size }}</dd></dl>
           </section>
         </div>
       </aside>
     </div>
 
-    <DingTalkDocumentImport v-if="personalImportOpen && canImportDingTalk" :key="dingTalkIdentity.platformUserId" :identity="dingTalkIdentity" :destinations="writableDestinations" :default-destination-id="currentDestinationId" :application-available="!['credentials-expired', 'permission-denied', 'unknown', 'disconnected'].includes(scenario)" @close="personalImportOpen = false" @authorize="authorizeCurrentDingTalkIdentity" @complete="completeDingTalkImport" />
+    <DingTalkDocumentImport v-if="personalImportOpen && canImportDingTalk" :key="dingTalkIdentity.platformUserId" :identity="dingTalkIdentity" :space="activeSpace" :destinations="writableDestinations" :existing-source-ids="importedSourceIds" :default-destination-id="currentDestinationId" :application-available="!['credentials-expired', 'permission-denied', 'unknown', 'disconnected'].includes(scenario)" @close="personalImportOpen = false" @authorize="authorizeCurrentDingTalkIdentity" @complete="completeDingTalkImport" @failed="completeDingTalkImport" />
     <KnowledgeDialogs
       :kind="dialog"
       :target="dialogTarget"
       :destinations="uploadDestinations"
+      :actor-role="dialogActorRole"
+      :system-admin="systemKnowledgeAdmin && activeSpace === 'public'"
       @close="closeDialog"
       @create="createKnowledge"
       @folder="createFolder"
@@ -733,6 +850,7 @@ function savePermission() {
     transition: none;
   }
 }
+.preview-actions{display:flex;justify-content:flex-end;padding:12px 18px 0}.preview-actions:empty{display:none}
 </style>
 
 

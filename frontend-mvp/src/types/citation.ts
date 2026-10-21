@@ -1,3 +1,5 @@
+import type { KnowledgeRole } from './knowledge-permission';
+
 export interface CitationFragment {
   id: string;
   location: string;
@@ -15,6 +17,9 @@ export interface CitationSource {
   /** Web search summary, not a saved or located copy of the webpage body. */
   summary?: string;
   access: 'allowed' | 'forbidden' | 'deleted';
+  /** Current knowledge permission, independently checked from preview access. */
+  permissionRole?: KnowledgeRole;
+  downloadUrl?: string;
   offline?: boolean;
   /** Knowledge document excerpts only. Web cards do not load or display fragments. */
   fragments: CitationFragment[];

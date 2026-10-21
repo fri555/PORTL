@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { useAppStore } from '@/stores/app'
 import { mockUser } from '@/mock/user'
 import KnowledgeBaseView from '@/views/KnowledgeBaseView.vue'
+import KnowledgeDialogs from '@/components/knowledge/source-clone/KnowledgeDialogs.vue'
 
 describe('KnowledgeBaseView source clone', () => {
   let wrapper: ReturnType<typeof mount>
@@ -22,14 +23,27 @@ describe('KnowledgeBaseView source clone', () => {
     const rows = wrapper.findAll('[data-testid="knowledge-kb-row"]')
     expect(rows).toHaveLength(12)
     expect(rows[0].text()).toContain('集团制度知识库')
-    expect(rows[0].text()).toContain('集团运营')
+    expect(rows[0].text()).toContain('朝暮')
     expect(rows[11].text()).toContain('人力培训知识库')
     expect(wrapper.text()).not.toContain('权限04')
     expect(wrapper.get('[data-testid="knowledge-table-header"]').text()).toContain('名称')
-    expect(wrapper.get('[data-testid="knowledge-table-header"]').text()).toContain('所有者')
+    expect(wrapper.get('[data-testid="knowledge-table-header"]').text()).toContain('创建者')
     expect(wrapper.get('[data-testid="knowledge-table-header"]').text()).toContain('创建时间')
     expect(wrapper.get('[data-testid="knowledge-table-header"]').text()).toContain('操作')
     expect(wrapper.get('[data-testid="knowledge-table-header"]').text()).not.toContain('最近访问')
+  })
+
+  it('does not resurrect removed legacy source grants after saving platform permissions', async () => {
+    await wrapper.get('button[aria-label="集团制度知识库操作菜单"]').trigger('click')
+    await wrapper.get('[role="menu"]').findAll('[role="menuitem"]').find(item => item.text().includes('权限'))!.trigger('click')
+    const dialog = wrapper.getComponent(KnowledgeDialogs)
+    const target = dialog.props('target')!
+    target.permission = { owner: '朝暮', members: ['向阳'], roles: { 向阳: 'READER' }, syncedRoles: { 清晖: 'MANAGER' }, inheritParent: false, revision: 1 }
+    dialog.vm.$emit('permission', { resourceId: target.id, owner: '朝暮', members: ['向阳'], roles: { 向阳: 'READER' }, inheritParent: false, revision: 2 })
+    await flushPromises()
+    expect(target.permission?.syncedRoles).toBeUndefined()
+    expect(target.permission?.roles).toEqual({ 向阳: 'READER' })
+    expect(target.permission?.members).not.toContain('清晖')
   })
 
   it('opens the exact source sidebar and switches spaces', async () => {
@@ -97,10 +111,12 @@ describe('KnowledgeBaseView source clone', () => {
     expect(wrapper.get('[role="dialog"]').text()).not.toContain('权限继承方式')
     expect(wrapper.find('input[aria-label="继承上级权限"]').exists()).toBe(false)
     expect(wrapper.get('button[aria-label="添加成员"]').attributes()).not.toHaveProperty('disabled')
-    expect(wrapper.find('button[aria-label="管理层权限"]').exists()).toBe(false)
+    expect(wrapper.get('button[aria-label="管理层权限"]').attributes()).not.toHaveProperty('disabled')
+    expect(wrapper.find('button[aria-label="移除管理层直接设置"]').exists()).toBe(false)
+    await wrapper.get('button[aria-label="管理层权限"]').trigger('click')
     expect(wrapper.get('button[aria-label="移除管理层直接设置"]').attributes()).not.toHaveProperty('disabled')
     await wrapper.get('button[aria-label="添加成员"]').trigger('click')
-    expect(wrapper.get('[data-testid="add-member-dialog"]').text()).toContain('已选：150个')
+    expect(wrapper.get('[data-testid="add-member-dialog"]').text()).toContain('已选：10个')
   })
 
   it('inherits parent permissions for folders and lets administrators break inheritance', async () => {
@@ -115,12 +131,14 @@ describe('KnowledgeBaseView source clone', () => {
     expect((inheritParent.element as HTMLInputElement).checked).toBe(true)
     expect(dialog.text()).toContain('来自上级')
     expect(dialog.text()).toContain('管理层')
-    expect(dialog.find('button[aria-label="管理层权限"]').exists()).toBe(false)
+    expect(dialog.get('button[aria-label="管理层权限"]').attributes()).toHaveProperty('disabled')
     expect(dialog.text()).toContain('人力资源中心')
     const directMember = dialog.findAll('.member-area li').find((item) => item.text().includes('人力资源中心'))!
     expect(directMember.text()).toContain('直接设置')
     expect(directMember.text()).not.toContain('来自上级')
-    expect(directMember.find('button[aria-label="移除人力资源中心直接设置"]').exists()).toBe(true)
+    expect(directMember.find('button[aria-label="移除人力资源中心直接设置"]').exists()).toBe(false)
+    await directMember.get('button[aria-label="人力资源中心权限"]').trigger('click')
+    expect(wrapper.get('[aria-label="人力资源中心权限选项"]').find('button[aria-label="移除人力资源中心直接设置"]').exists()).toBe(true)
     expect(dialog.text()).not.toContain('下载权限')
 
     await inheritParent.setValue(false)
@@ -150,7 +168,7 @@ describe('KnowledgeBaseView source clone', () => {
     const dualSourceRow = wrapper.findAll('.member-area li').find((item) => item.text().includes('管理层'))!
     expect(dualSourceRow.text()).toContain('来自上级')
     expect(dualSourceRow.text()).toContain('直接设置')
-    expect(dualSourceRow.find('button[aria-label="管理层权限"]').exists()).toBe(false)
+    expect(dualSourceRow.get('button[aria-label="管理层权限"]').attributes()).toHaveProperty('disabled')
     expect(dualSourceRow.find('button[aria-label="移除管理层直接设置"]').exists()).toBe(false)
   })
 
@@ -159,18 +177,18 @@ describe('KnowledgeBaseView source clone', () => {
     await wrapper.get('[role="menu"]').findAll('[role="menuitem"]')[1].trigger('click')
 
     const permission = wrapper.get('.permission-form')
-    const memberSearch = permission.get('input[aria-label="搜索部门/人员..."]')
+    const memberSearch = permission.get('input[aria-label="搜索部门/人员"]')
     await memberSearch.setValue('数字')
     await flushPromises()
     expect((memberSearch.element as HTMLInputElement).value).toBe('数字')
     expect(wrapper.get('.permission-form').text()).toContain('数字营销中心')
     expect(wrapper.get('.permission-form').text()).not.toContain('团购销售部')
-    await permission.get('input[aria-label="搜索部门/人员..."]').setValue('')
+    await permission.get('input[aria-label="搜索部门/人员"]').setValue('')
 
     await permission.get('button[aria-label="添加成员"]').trigger('click')
     const picker = wrapper.get('[data-testid="add-member-dialog"]')
     await picker.get('button[aria-label="选择仓储部"]').trigger('click')
-    expect(wrapper.get('[data-testid="add-member-dialog"]').text()).toContain('已选：151个')
+    expect(wrapper.get('[data-testid="add-member-dialog"]').text()).toContain('已选：11个')
     await picker.findAll('button').find((button) => button.text() === '取消')!.trigger('click')
     expect(wrapper.get('.permission-form').text()).not.toContain('仓储部')
 
@@ -184,7 +202,7 @@ describe('KnowledgeBaseView source clone', () => {
     expect(wrapper.get('[data-testid="permission-impact-dialog"]').text()).toContain(
       '本次变更将影响128个子资源的权限',
     )
-    expect(wrapper.get('[data-testid="permission-impact-dialog"]').text()).toContain('可查看对象：11个')
+    expect(wrapper.get('[data-testid="permission-impact-dialog"]').text()).toContain('全部成员：12项（含创建者）')
     expect(wrapper.get('[data-testid="permission-impact-dialog"]').text()).not.toContain('下载权限')
     await wrapper.get('button[aria-label="关闭影响确认"]').trigger('click')
     expect(wrapper.find('[data-testid="permission-impact-dialog"]').exists()).toBe(false)
@@ -194,6 +212,7 @@ describe('KnowledgeBaseView source clone', () => {
   it('rolls back main-dialog edits on cancel and persists only after final confirmation without standalone markers', async () => {
     await wrapper.get('button[aria-label="集团制度知识库操作菜单"]').trigger('click')
     await wrapper.get('[role="menu"]').findAll('[role="menuitem"]')[1].trigger('click')
+    await wrapper.get('button[aria-label="管理层权限"]').trigger('click')
     await wrapper.get('button[aria-label="移除管理层直接设置"]').trigger('click')
     expect(wrapper.find('button[aria-label="移除管理层直接设置"]').exists()).toBe(false)
     await wrapper.get('.permission-form').findAll('button').find((button) => button.text() === '取消')!.trigger('click')

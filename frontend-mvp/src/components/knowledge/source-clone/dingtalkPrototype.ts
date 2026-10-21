@@ -1,3 +1,5 @@
+import type { DingTalkInitialPermissions, DingTalkSourceRole } from '@/utils/dingtalkPermissionInitialization'
+
 export type CredentialStatus = 'valid' | 'invalid' | 'unknown'
 export type PermissionStatus = 'normal' | 'abnormal' | 'unknown'
 
@@ -130,6 +132,19 @@ export interface ImportableDocument {
   updatedAt: string
   exportable: boolean
   exportReason?: string
+  sourceRole?: DingTalkSourceRole
+  initialPermissions?: DingTalkInitialPermissions
+}
+// Resolved identity fixtures retain departments and skip source groups.
+const initialPermissionFixture: DingTalkInitialPermissions = {
+  complete: true,
+  grants: [
+    { kind: 'person', subject: '清晖', role: 'OWNER' },
+    { kind: 'person', subject: '向阳', role: 'EDITOR' },
+    { kind: 'person', subject: '知夏', role: 'READER' },
+    { kind: 'department', subject: '人力资源中心', role: 'MANAGER' },
+    { kind: 'group', subject: '天马AI项目群', role: 'DOWNLOADER' },
+  ],
 }
 const personalDocumentFixtures: ImportableDocument[] = [
   { id: 'onboarding', name: '新员工入职指南', format: 'DOCX', updatedAt: '2026-10-08 09:30', exportable: true },
@@ -144,7 +159,8 @@ export function personalDingTalkDocuments(identity: BoundDingTalkIdentity, scena
   const binding = prototypeIdentityBindings[identity.platformUserId]
   if (!binding || binding.dingUserId !== identity.dingUserId) return []
   return personalDocumentFixtures.filter(document => binding.readableIds.includes(document.id) || document.id === 'native-table')
-    .map(document => scenario === 'export-unavailable' && document.exportable ? { ...document, exportable: false, exportReason: '当前身份无导出权限' } : { ...document })
+    .map(document => ({ ...document, sourceRole: 'DOWNLOADER' as const, initialPermissions: structuredClone(initialPermissionFixture),
+      ...(scenario === 'export-unavailable' && document.exportable ? { exportable: false, exportReason: '当前身份无导出权限' } : {}) }))
 }
 /** Explicit fixture grants; app credentials are never a grant to ordinary users. */
 export function prototypeCanWriteKnowledge(id: string, role: string | undefined) {

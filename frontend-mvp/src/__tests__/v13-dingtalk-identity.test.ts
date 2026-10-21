@@ -67,6 +67,23 @@ describe('M3 current-user permissions and import boundaries', () => {
     expect(w.emitted('complete')).toBeUndefined()
     expect(w.get('[aria-label="已选钉钉文档"]').findAll('article')).toHaveLength(0)
   })
+  it('requires confirmation before importing into a public destination', async () => {
+    vi.useFakeTimers(); const w = dialog()
+    await w.setProps({ destinations: [{ ...destinations[0], space: 'public' }] })
+    await selectFirst(w); await button(w, '确认导入')
+    expect(w.text()).toContain('确认同步文档到公共空间中吗')
+    await vi.advanceTimersByTimeAsync(500)
+    expect(w.emitted('complete')).toBeUndefined()
+    await button(w, '确认'); await vi.advanceTimersByTimeAsync(500)
+    expect(w.emitted('complete')).toHaveLength(1)
+  })
+  it('blocks a source document already imported to the destination knowledge base', async () => {
+    const w = dialog(); await selectFirst(w)
+    await w.setProps({ existingSourceIds: { 'kb-personal-1': ['onboarding'] } })
+    expect(w.text()).toContain('当前知识库已存在同份文档')
+    expect(w.findAll('button').find(item => item.text() === '确认导入')!.attributes('disabled')).toBeDefined()
+    expect(w.emitted('complete')).toBeUndefined()
+  })
   it('rechecks write permission and app availability before in-flight import completes', async () => {
     for (const changed of [{ destinations: [] }, { applicationAvailable: false }]) {
       vi.useFakeTimers(); const w = dialog(); await selectFirst(w); await button(w, '确认导入')

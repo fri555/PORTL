@@ -26,7 +26,7 @@ function kb(
 }
 
 export const publicKnowledgeBases: SourceKnowledgeBase[] = [
-  kb('kb-public-1', '集团制度知识库', '集团运营', '2026-06-15', 128, 'public', [
+  kb('kb-public-1', '集团制度知识库', '朝暮', '2026-06-15', 128, 'public', [
     folder('policy-hr', '人事制度', '人力中心', '2026-06-15', [
       folder('policy-attendance', '考勤与休假', '人力中心', '2026-06-15', [
         file('policy-attendance-v3', '考勤管理制度_v3.pdf', '人力中心', '2026-06-15', 'PDF', '2.4 MB'),

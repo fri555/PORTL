@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { documents, selectScope, getPrototypeScenario, syncSchedule, type SyncInterval } from './dingtalkPrototype'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import { CheckCircle2, Info, LockKeyhole, ShieldCheck } from 'lucide-vue-next'
+import { CheckCircle2, Info, ShieldCheck } from 'lucide-vue-next'
 import {
   ElAlert,
   ElButton,
