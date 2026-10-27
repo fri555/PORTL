@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import {
-  ThumbsDown, ThumbsUp, Download, Search, ChevronDown, Eye, Lightbulb, MessageSquare,
-  AlertTriangle, X, Filter, TrendingUp, Clock, User,
-} from 'lucide-vue-next'
+import { ThumbsDown, ThumbsUp, Download, Search, Eye, Lightbulb, AlertTriangle, X, Clock, User } from 'lucide-vue-next'
 
 // === Hard feedback (赞/踩) ===
 interface HardFeedback { id: string; timestamp: number; userName: string; department: string; solutionName: string; type: 'like' | 'dislike'; reasons: string[]; comment: string; conversationId: string; conversationPreview: string }

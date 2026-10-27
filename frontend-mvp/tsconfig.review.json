@@ -1,1 +1,0 @@
-{"extends":"./tsconfig.json","exclude":["src/**/*.sync-conflict-*","src/**/*.sync-conflict-*.vue","src/**/*.sync-conflict-*.ts"]}

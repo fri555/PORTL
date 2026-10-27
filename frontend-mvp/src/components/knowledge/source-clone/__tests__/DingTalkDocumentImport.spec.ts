@@ -31,7 +31,7 @@ describe('DingTalk import initial permissions', () => {
     ;(wrapper.vm as unknown as { frequency: string; weekDay: string }).frequency = '每周'
     ;(wrapper.vm as unknown as { frequency: string; weekDay: string }).weekDay = '周三'
     await wrapper.vm.$nextTick()
-    expect(wrapper.get('[aria-label="同步周期"]').exists()).toBe(true)
+    expect(wrapper.find('[aria-label="同步周期"]').exists()).toBe(true)
     await choose(wrapper)
     await click(wrapper, '确认导入')
     await click(wrapper, '确认')

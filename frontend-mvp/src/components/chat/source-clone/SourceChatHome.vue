@@ -50,7 +50,16 @@ function setMode(mode: 'daily' | 'expert') {
   currentMode.value = mode
   emit('mode-changed', mode)
 }
-const approvalMode = ref<ApprovalMode>(props.initialApprovalMode === 'autonomous' ? 'autonomous' : 'default')
+const savedApprovalMode = typeof localStorage !== 'undefined' ? localStorage.getItem('expert_approval_mode_snapshot') : null
+// Migrate legacy 'default' value to 'autonomous'
+if (savedApprovalMode === 'default') {
+  localStorage.setItem('expert_approval_mode_snapshot', 'autonomous')
+}
+const approvalMode = ref<ApprovalMode>(
+  props.initialApprovalMode === 'autonomous' || props.initialApprovalMode === 'default'
+    ? props.initialApprovalMode
+    : (savedApprovalMode === 'autonomous' ? 'autonomous' : 'autonomous'),
+)
 const selectedExpert = ref<Agent | null>(null)
 const selectedDepartment = ref('全部')
 const expertQuery = ref('')
@@ -70,7 +79,18 @@ watch(
   { immediate: true },
 )
 
+watch(approvalMode, (mode) => {
+  localStorage.setItem('expert_approval_mode_snapshot', mode)
+})
+
 const dailyPrompts = [
+  {
+    id: 'chat-summary',
+    title: '聊天消息总结',
+    text: '通过钉钉DWS功能，帮我总结昨日和今日钉钉聊天消息内容，输出一份可视化报告',
+    icon: MessageSquareText,
+    badge: '自定义',
+  },
   {
     id: 'message',
     title: '发消息',
@@ -80,13 +100,13 @@ const dailyPrompts = [
   {
     id: 'todo',
     title: '建待办',
-    text: '给我建个钉钉待办：「标题」「内容」，「时间」前完成',
+    text: '给我建个钉钉待办：「标题」「内容」「执行人」，「时间」前完成（拼音模糊搜索）',
     icon: ClipboardCheck,
   },
   {
     id: 'calendar-create',
     title: '建日程',
-    text: '跟「花名」约钉钉会议：「时间」开「主题」会',
+    text: '跟「人员」约钉钉会议日程：「园区」空会议室，「时间时长」开「主题」会（拼音模糊搜索）',
     icon: CalendarPlus,
   },
   { id: 'calendar-search', title: '查日程', text: '查下我今天的钉钉日程', icon: CalendarSearch },
@@ -129,7 +149,7 @@ const filteredExperts = computed(() => {
 const placeholder = computed(() => {
   if (currentMode.value === 'expert' && selectedExpert.value) return `向${selectedExpert.value.name}描述你的任务…`
   if (currentMode.value === 'expert') return '请在下方选择合适的专家。耶虎会匹配任务托付给他/她高效完成…'
-  return '描述你的任务，输入 @ 可快捷选择专家…'
+  return '耶虎在线，随时向我提问或上传文件...'
 })
 const canSend = computed(() => !!prompt.value.trim() && (currentMode.value === 'daily' || !!selectedExpert.value))
 
@@ -210,7 +230,7 @@ function deleteQuickPrompt(id: string) {
       <!-- 模式切换胶囊按钮 -->
       <div class="source-chat-home__modes">
         <button type="button" :class="{ active: currentMode === 'daily' }" @click="setMode('daily')">日常办公</button>
-        <button type="button" :class="{ active: currentMode === 'expert' }" @click="setMode('expert')">专家模式</button>
+        <button type="button" :class="{ active: currentMode === 'expert' }" @click="setMode('expert')">业务专家</button>
       </div>
 
       <div class="source-chat-home__composer" data-testid="hero-composer">
@@ -245,7 +265,7 @@ function deleteQuickPrompt(id: string) {
           >
             <Plus :size="19" />
           </button>
-          <ApprovalModeControl v-model="approvalMode" />
+          <ApprovalModeControl v-if="currentMode === 'expert'" v-model="approvalMode" />
           <button
             type="button"
             class="source-chat-home__network"

@@ -18,12 +18,14 @@ import {
   CheckCircle2,
   XCircle,
   MessageSquareText,
+  MessageCircle,
+  Send,
   Search,
   X,
 } from 'lucide-vue-next'
 import { isExpertAvailable } from '@/composables/useExpertCatalog'
 import { FIXED_USAGE_NOTICE, usageFormFromContent } from '@/utils/agentUsage'
-import { ElDialog, ElNotification } from 'element-plus'
+import { ElDialog, ElMessageBox, ElNotification } from 'element-plus'
 import { homeDraft } from '@/composables/useHomeDraft'
 import ExpertSystemTags from '@/components/expert/ExpertSystemTags.vue'
 import { expertDateLabel, expertFileFormats, expertKnowledgeEntries, expertMatchesSearch, expertOwnerLabel, expertSystemTags } from '@/utils/expertPresentation'
@@ -51,9 +53,50 @@ function headerAction(event: Event) {
   if (action === 'toggle-sidebar') sidebarOpen.value = !sidebarOpen.value
   else if (action === 'new' || action === 'search') openChatAction(action)
 }
-onMounted(() => window.addEventListener('tianma:chat-action', headerAction))
+onMounted(() => {
+  window.addEventListener('tianma:chat-action', headerAction)
+})
 onBeforeUnmount(() => window.removeEventListener('tianma:chat-action', headerAction))
 const searchQuery = ref('')
+
+async function applyPermission(agent: Agent) {
+  try {
+    await ElMessageBox.confirm(
+      '此智能体权限暂未向你开放，确认向负责人发送申请吗',
+      '申请权限',
+      {
+        confirmButtonText: '确认',
+        cancelButtonText: '取消',
+        type: 'info',
+      },
+    )
+
+    // 模拟发送消息给负责人
+    await new Promise<void>((resolve, reject) => {
+      setTimeout(() => {
+        if (Math.random() > 0.1) {
+          resolve()
+        } else {
+          reject(new Error('发送失败'))
+        }
+      }, 1500)
+    })
+
+    ElNotification({
+      title: '申请已发送',
+      message: `已发送权限申请给负责人 ${agent.developerName || '负责人'}，请与负责人进行沟通说明`,
+      type: 'success',
+    })
+  } catch (err: any) {
+    if (err !== 'cancel') {
+      ElNotification({
+        title: '发送失败',
+        message: '消息发送失败，请稍后重试',
+        type: 'error',
+      })
+    }
+  }
+}
 const activeCategory = ref<AgentCategory | 'all'>('all')
 
 const detailAgent = ref<Agent | null>(route.query.detail === '1' ? (agents[0] ?? null) : null)
@@ -96,12 +139,14 @@ const DEPT_TO_BUSINESS: Record<string, string> = {
 // 当前用户部门（mock）
 const currentUserDepartment = ref('品牌中心')
 
-// 推荐专家列表
-const recommendedAgents = computed(() => {
-  const dept = currentUserDepartment.value
-  const business = DEPT_TO_BUSINESS[dept]
-  if (!business) return []
-  return filteredAgents.value.filter(a => a.category === business).slice(0, 6)
+// 可用专家列表（有权限）
+const availableAgents = computed(() => {
+  return filteredAgents.value.filter(a => a.usePermission !== false)
+})
+
+// 无权限专家列表
+const unauthorizedAgents = computed(() => {
+  return filteredAgents.value.filter(a => a.usePermission === false)
 })
 
 function permissionLabel(agent: Agent) {
@@ -119,9 +164,6 @@ function categoryColor(category: AgentCategory) {
   return AGENT_CATEGORY_META[category]?.color ?? '#5b6b82'
 }
 
-function applyPermission(agent: Agent) {
-  ElNotification({ type: 'success', title: '权限申请已发送', message: '已发送权限申请给负责人 ' + (agent.developerName || '未配置'), duration: 2000 })
-}
 async function useAgent(agent: Agent, prompt = '') {
   const current = agents.find(item => item.id === agent.id)
   if (!current || !isExpertAvailable(current)) return
@@ -165,28 +207,31 @@ function fileFormatInfo(format: string) {
       @delete-session="id => openChatAction('delete', id)"
     />
     <section class="expert-market">
-      <header class="market-header">
-        <h1>专家中心</h1>
-        <label class="market-search"><Search :size="17" /><input v-model="searchQuery" aria-label="搜索专家" placeholder="搜索名称或简介" maxlength="60" /><button v-if="searchQuery" aria-label="清空搜索" @click="searchQuery = ''"><X :size="15" /></button></label>
-      </header>
-      <section class="catalogue">
-      <div class="filters">
-        <div class="category-tabs">
-          <button
-            v-for="tab in categoryTabs"
-            :key="tab.key"
-            :class="{ active: activeCategory === tab.key }"
-            @click="activeCategory = tab.key"
-          >
-            {{ tab.label }}
-          </button>
+      <div class="expert-sticky-header">
+        <header class="market-header">
+          <h1>专家中心</h1>
+          <label class="market-search"><Search :size="17" /><input v-model="searchQuery" aria-label="搜索专家" placeholder="搜索名称或简介" maxlength="60" /><button v-if="searchQuery" aria-label="清空搜索" @click="searchQuery = ''"><X :size="15" /></button></label>
+        </header>
+        <section class="catalogue">
+        <div class="filters">
+          <div class="category-tabs">
+            <button
+              v-for="tab in categoryTabs"
+              :key="tab.key"
+              :class="{ active: activeCategory === tab.key }"
+              @click="activeCategory = tab.key"
+            >
+              {{ tab.label }}
+            </button>
+          </div>
         </div>
+        </section>
       </div>
-      <section v-if="recommendedAgents.length > 0" class="recommend-section">
-        <h2 class="section-title">推荐</h2>
+      <section v-if="availableAgents.length > 0" class="recommend-section">
+        <h2 class="section-title">可用</h2>
         <div class="agent-grid">
           <article
-            v-for="agent in recommendedAgents"
+            v-for="agent in availableAgents"
             :key="agent.id"
             class="agent-card"
             :class="{ 'no-permission': agent.usePermission === false }"
@@ -211,20 +256,20 @@ function fileFormatInfo(format: string) {
               <p :title="agent.description?.trim() || '默认智能体'">{{ agent.description?.trim() || '默认智能体' }}</p>
             </div>
             <ExpertSystemTags :tags="expertSystemTags(agent)" />
-            <button v-if="agent.usePermission === false" data-testid="expert-primary-action" class="card-primary apply-btn" @click.stop="applyPermission(agent)">
-              申请
+            <button v-if="agent.usePermission !== false" data-testid="expert-primary-action" class="card-primary chat-btn" @click.stop="useAgent(agent)">
+              <MessageCircle :size="14" />召唤
             </button>
-            <button v-else data-testid="expert-primary-action" class="card-primary" :disabled="!isExpertAvailable(agent)" :title="!isExpertAvailable(agent) ? (agent.status === 'maintenance' ? '维护中，暂不可用' : '已下线，暂不可用') : undefined" @click.stop="useAgent(agent)">
-              <MessageSquareText :size="14" />对话
+            <button v-else data-testid="expert-primary-action" class="card-primary apply-btn" @click.stop="applyPermission(agent)">
+              <Send :size="14" />申请
             </button>
           </article>
         </div>
       </section>
-      <section v-if="filteredAgents.length" class="more-section">
+      <section v-if="unauthorizedAgents.length" class="more-section">
         <h2 class="section-title">更多</h2>
         <div class="agent-grid">
         <article
-          v-for="agent in filteredAgents"
+          v-for="agent in unauthorizedAgents"
           :key="agent.id"
           class="agent-card"
           :class="{ 'no-permission': agent.usePermission === false }"
@@ -249,21 +294,20 @@ function fileFormatInfo(format: string) {
             <p :title="agent.description?.trim() || '默认智能体'">{{ agent.description?.trim() || '默认智能体' }}</p>
           </div>
           <ExpertSystemTags :tags="expertSystemTags(agent)" />
-          <button v-if="agent.usePermission === false" data-testid="expert-primary-action" class="card-primary apply-btn" @click.stop="applyPermission(agent)">
-            申请
+          <button v-if="agent.usePermission !== false" data-testid="expert-primary-action" class="card-primary chat-btn" @click.stop="useAgent(agent)">
+            <MessageCircle :size="14" />召唤
           </button>
-          <button v-else data-testid="expert-primary-action" class="card-primary" :disabled="!isExpertAvailable(agent)" :title="!isExpertAvailable(agent) ? (agent.status === 'maintenance' ? '维护中，暂不可用' : '已下线，暂不可用') : undefined" @click.stop="useAgent(agent)">
-            <MessageSquareText :size="14" />对话
+          <button v-else data-testid="expert-primary-action" class="card-primary apply-btn" @click.stop="applyPermission(agent)">
+            <Send :size="14" />申请
           </button>
         </article>
       </div>
       </section>
-      <div v-else class="empty">
+      <div v-if="!availableAgents.length && !unauthorizedAgents.length" class="empty">
         <Search :size="28" />
         <h3>没有找到匹配的专家</h3>
         <p>尝试更换关键词或分类。</p>
       </div>
-      </section>
     </section>
 
     <ElDialog
@@ -346,20 +390,18 @@ function fileFormatInfo(format: string) {
           <footer class="modal-footer">
             <div>
               <button
-                v-if="detailAgent.usePermission === false"
+                v-if="detailAgent.usePermission !== false"
                 class="primary"
-                @click="applyPermission(detailAgent)"
+                @click="useAgent(detailAgent)"
               >
-                申请权限<ArrowRight :size="15" />
+                立即使用<ArrowRight :size="15" />
               </button>
               <button
                 v-else
                 class="primary"
-                :disabled="detailAgent.status !== 'online' || !detailAgent.isPublished"
-                @click="useAgent(detailAgent)"
+                @click="applyPermission(detailAgent)"
               >
-                {{ detailAgent.status === 'online' ? '立即使用' : '暂不可用'
-                }}<ArrowRight :size="15" />
+                申请<ArrowRight :size="15" />
               </button>
             </div>
           </footer>
@@ -372,19 +414,20 @@ function fileFormatInfo(format: string) {
 <style scoped>
 .expert-workspace { display:flex; height:calc(100vh - 65px); min-height:620px; margin:0 8px 8px; overflow:hidden; border:1px solid #ededed; border-radius:8px; background:#f8f9fa; }
 .expert-market { min-width:0; flex:1; overflow-y:auto; color:#202631; font-family:system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif; }
-.market-header { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:30px 28px 22px; }
+.expert-sticky-header { position:sticky; top:0; z-index:10; background:#f8f9fa; }
+.market-header { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:30px 28px 22px; background:#f8f9fa; }
 .market-header h1 { margin:0; font-size:22px; font-weight:600; letter-spacing:-.5px; }
 .market-search { display:flex; width:300px; height:38px; flex:0 1 300px; align-items:center; gap:8px; border:1px solid #e0e4e8; border-radius:10px; padding:0 12px; background:#fff; color:#8993a1; }
 .market-search:focus-within { border-color:#93b9ef; box-shadow:0 0 0 2px #eff6ff; }
 .market-search input { min-width:0; flex:1; border:0; outline:0; font:13px inherit; color:#334155; background:transparent; }
 .market-search button { display:grid; border:0; background:transparent; color:#8893a2; cursor:pointer; }
-.catalogue { padding:0 28px 32px; }
-.filters { border-bottom:1px solid #e3e6ea; margin-bottom:22px; padding-bottom:12px; }
+.catalogue { padding:0 28px 0; }
+.catalogue .filters { border-bottom:1px solid #e3e6ea; margin-bottom:0; padding-bottom:12px; background:#f8f9fa; }
 .category-tabs { display:flex; gap:8px; overflow:auto; }
 .category-tabs button { height:30px; flex-shrink:0; border:0; border-radius:7px; background:transparent; padding:0 13px; color:#6b7280; font:13px inherit; cursor:pointer; }
 .category-tabs button.active { background:#e9edf1; color:#111827; font-weight:500; }
-.recommend-section { margin-bottom:24px; }
-.more-section { margin-top:8px; }
+.recommend-section { margin-bottom:24px; padding:22px 28px 0; }
+.more-section { margin-top:8px; padding:0 28px 32px; }
 .section-title { display:flex; align-items:center; margin:0 0 14px; font-size:16px; font-weight:600; color:#202631; }
 .recommend-badge { font-size:12px; font-weight:normal; background:#f0f9ff; color:#0284c7; padding:2px 8px; border-radius:12px; margin-left:8px; }
 .agent-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; }
@@ -403,11 +446,14 @@ function fileFormatInfo(format: string) {
 .owner-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:12px; font-size:11px; background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; }
 .dept-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:12px; font-size:11px; background:#f9fafb; color:#6b7280; border:1px solid #e5e7eb; }
 .agent-card.no-permission { border-color:#d1d5db; background:#fafafa; }
-.apply-btn { border-color:#176fd1!important; background:#1677e8!important; color:#fff!important; cursor:pointer!important; }
-.apply-btn:hover { background:#1265c8!important; }
+.apply-btn { border-color:#176fd1!important; background:#2563eb!important; color:#fff!important; cursor:pointer!important; }
+.apply-btn:hover { background:#1d4ed8!important; }
+
+.chat-btn { background:#22c55e!important; color:#fff!important; border-color:#22c55e!important; border-radius:10px; font-size:13px; font-weight:500; }
+.chat-btn:hover { background:#16a34a!important; border-color:#16a34a!important; }
 .card-primary { display:flex; width:100%; min-height:34px; margin-top:auto; align-items:center; justify-content:center; gap:6px; border:1px solid #dfe4ea; border-radius:18px; background:#fff; color:#465569; font:12px inherit; cursor:pointer; }
 .card-primary:hover { border-color:#c2d4e9; background:#f4f8fe; }
-.empty { display:flex; min-height:260px; flex-direction:column; align-items:center; justify-content:center; color:#9ba3ad; }
+.empty { display:flex; min-height:260px; flex-direction:column; align-items:center; justify-content:center; color:#9ba3ad; padding:0 28px; }
 .empty h3 { margin:10px 0 4px; color:#4a5564; font-size:14px; }
 .empty p { margin:0; font-size:12px; }
 .empty button { margin-top:10px; border:0; background:transparent; color:#2673ca; cursor:pointer; }
@@ -497,7 +543,7 @@ function fileFormatInfo(format: string) {
 @media (max-width:620px) { .basic-grid,.capability-cards { grid-template-columns:1fr; } }
 button:disabled { opacity:.45; cursor:not-allowed; }
 .agent-card:focus-visible,button:focus-visible { outline:2px solid #1677ff; outline-offset:3px; }
-@media (max-width:900px) { .catalogue { padding:0 18px 30px; } .market-header { padding:24px 18px 20px; } .agent-grid { grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; } }
+@media (max-width:900px) { .catalogue { padding:0 18px 0; } .market-header { padding:24px 18px 20px; } .recommend-section { padding:22px 18px 0; } .more-section { padding:0 18px 30px; } .empty { padding:0 18px; } .agent-grid { grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; } }
 @media (max-width:620px) { .market-header { flex-wrap:wrap; } .market-search { width:100%; flex-basis:100%; } .agent-grid { grid-template-columns:1fr; } .usage-field { grid-template-columns:1fr; gap:4px; } .usage-intro span { display:none; } }
 @media (prefers-reduced-motion:reduce) { .agent-card { transition:none; } }
 </style>

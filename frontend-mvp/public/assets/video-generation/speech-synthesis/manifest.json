@@ -1,0 +1,88 @@
+{
+    "prototypeDemo":  true,
+    "title":  "语音合成原型示例",
+    "text":  "欢迎使用天马智擎语音合成。输入文案，选择音色，即可为视频制作配音。这是原型示例音频，实际合成将在正式接入后开放。",
+    "duration":  15.2885,
+    "sampleRate":  24000,
+    "channels":  1,
+    "bitDepth":  16,
+    "source":  "Offline Windows System.Speech; Microsoft Huihui Desktop; zh-CN; rate 0",
+    "notice":  "固定原型示例音频，由本机离线音色生成；不代表所选火山音色，不对应用户输入文案。",
+    "previewUrl":  "/assets/video-generation/speech-synthesis/demo.mp3",
+    "subtitleUrl":  "/assets/video-generation/speech-synthesis/demo.srt",
+    "subtitleFormat":  "SRT",
+    "subtitles":  [
+                      {
+                          "index":  1,
+                          "start":  0,
+                          "end":  3.6245,
+                          "text":  "欢迎使用天马智擎语音合成。"
+                      },
+                      {
+                          "index":  2,
+                          "start":  3.6245,
+                          "end":  9.249,
+                          "text":  "输入文案，选择音色，即可为视频制作配音。"
+                      },
+                      {
+                          "index":  3,
+                          "start":  9.249,
+                          "end":  15.2885,
+                          "text":  "这是原型示例音频，实际合成将在正式接入后开放。"
+                      }
+                  ],
+    "files":  {
+                  "mp3":  {
+                              "filename":  "demo.mp3",
+                              "url":  "/assets/video-generation/speech-synthesis/demo.mp3",
+                              "codec":  "mp3",
+                              "container":  "mp3",
+                              "duration":  15.289958,
+                              "sampleRate":  24000,
+                              "channels":  1,
+                              "bitDepth":  null,
+                              "bitRate":  64000,
+                              "targetBitRate":  64000,
+                              "bytes":  123117
+                          },
+                  "wav":  {
+                              "filename":  "demo.wav",
+                              "url":  "/assets/video-generation/speech-synthesis/demo.wav",
+                              "codec":  "pcm_s16le",
+                              "container":  "wav",
+                              "duration":  15.2885,
+                              "sampleRate":  24000,
+                              "channels":  1,
+                              "bitDepth":  16,
+                              "bitRate":  384000,
+                              "targetBitRate":  null,
+                              "bytes":  733926
+                          },
+                  "ogg":  {
+                              "filename":  "demo.ogg",
+                              "url":  "/assets/video-generation/speech-synthesis/demo.ogg",
+                              "codec":  "opus",
+                              "container":  "ogg",
+                              "duration":  15.295,
+                              "sampleRate":  48000,
+                              "channels":  1,
+                              "bitDepth":  null,
+                              "bitRate":  null,
+                              "targetBitRate":  64000,
+                              "bytes":  129831
+                          },
+                  "pcm":  {
+                              "filename":  "demo.pcm",
+                              "url":  "/assets/video-generation/speech-synthesis/demo.pcm",
+                              "codec":  "pcm_s16le",
+                              "container":  "s16le",
+                              "duration":  15.288503,
+                              "sampleRate":  24000,
+                              "channels":  1,
+                              "bitDepth":  16,
+                              "bitRate":  384000,
+                              "targetBitRate":  null,
+                              "bytes":  733848
+                          }
+              }
+}

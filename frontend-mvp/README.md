@@ -1,132 +1,72 @@
-# 天马 AI · 智能工作门户（Demo）
+# 天马 AI 工作门户
 
-南京天马集团 AI 门户前端 Demo，聚焦「首页文化阵地 + AI 资讯与竞对情报」。以资讯、竞对情报为文化引擎，让全员建立 AI 紧迫感与行业视野。所有数据为 Mock，不接后端。
+Vue 3、TypeScript、Vite、TailwindCSS 与 Element Plus 构成前端；FastAPI 提供会话和上传接口。部分页面仍使用本地示例数据，历史会话和专家配置保存在浏览器中。
 
-> 技术栈：Vue 3 + TypeScript + Vite + TailwindCSS + shadcn-vue（reka-ui）+ lucide-vue-next，主色阿里橙。
+## 安装与运行
 
-## 功能特性
-
-- **钉钉扫码登录**：mock 状态机（点击二维码或「模拟扫码登录」即可进入），未登录自动重定向。
-- **首页（6 区）**：Hero 头条焦点 + AI 热榜、竞对情报条、部门 AI 价值榜 + 需求之声、行业前沿、集团动态 + 推荐课程、AI 工具箱快捷条。骨架屏加载。
-- **资讯列表页**：分类 Tab（竞对/行业/集团/技术/产品）、搜索、最新/最热排序、热门标签、分页。
-- **竞对情报页**：威胁预警横幅、竞品卡片网格、行业对标看板（我司行阿里橙高亮，凸显与竞对差距）。
-- **文章详情页**：富文本正文、点赞/收藏（localStorage 持久化）/分享复制链接、标签、相关资讯。
-- 一致的设计系统：克制配色、完整交互状态、无死路由（未做页统一 Tooltip「即将上线」）。
-
-## 快速开始
-
-### 环境要求
-
-- Node.js ≥ 20（开发环境为 Node 24）
-- pnpm ≥ 10
-
-### 安装
+使用 Node.js 22.13 以上的 22.x 或 Node.js 24 以上版本，统一通过 npm 和 package-lock.json 安装。Node 23 不在当前 jsdom 支持范围内。
 
 ```bash
-pnpm install
+npm ci
+npm run dev
 ```
 
-> 若 `pnpm install` 因构建脚本报错，已通过 `pnpm-workspace.yaml` 的 `dangerouslyAllowAllBuilds: true` 放行；包源默认走 npmmirror 镜像（见 `.npmrc`）。
+开发端口为 5176；页面基路径默认 /PORTL/。生产模式默认使用 hash 路由；VITE_ROUTER_MODE 可覆盖。登录页保留当前模拟登录行为，尚未替换为生产 SSO。
 
-### 开发
+在仓库根目录安装根依赖并配置 backend 的 Python 3.12 环境后，可通过 npm run dev 同时启动前后端；也可以单独使用 npm run dev:fe 和 npm run dev:be。后端依赖在 backend/requirements.txt，配置示例在 backend/.env.example。
+
+## 验证与构建
 
 ```bash
-pnpm dev
+npm run typecheck
+npm test
+npm run build
+npm run preview
 ```
 
-默认打开 `http://localhost:5173`，未登录会重定向到 `/auth/login`。点击二维码或「模拟扫码登录」按钮即以 mock 用户（张三 / 营销部）进入首页。
+npm test 保留完整 Vitest 退出状态。2026-10-13 首次备份时存在 132 个失败断言；保留执行期间的 8 个原项目源码改动后，当前原目录复测有 147 个失败断言及一个空测试文件收集错误。逐项对照确认本次精简没有新增失败，主要涉及旧工作台和近期交互断言；它们没有在精简中被删除或放宽。仓库根目录的 npm run test:regression 会运行全套测试，再按 test-baseline.json 对比原通过项、已知失败和测试发现集合；它只证明没有新增回归，并会明确输出仍存在的失败。完整报告保存在 .local/test-results.json。
 
-### 构建
+GitHub Actions 同时保存原始测试报告并校验基线，新增失败、跳过已知失败或缺失原测试均会阻止后续构建。生产构建输出 dist/。
 
-```bash
-pnpm build      # vue-tsc 类型检查 + vite 生产构建，产物在 dist/
-```
+## 当前页面
 
-### 预览构建产物
+| 路径 | 用途 |
+| --- | --- |
+| /auth/login | 登录 |
+| /chat、/chat/:sessionId | 日常/专家对话与历史会话 |
+| /workspace/chat | 原工作区对话 |
+| /files | 任务文件 |
+| /portals | 企业系统入口 |
+| /dashboards | 仪表盘 |
+| /knowledge | 知识中心 |
+| /agent-square | 专家市场 |
+| /settings/agents | 智能体管理 |
+| /settings/usage、/settings/audit | 用量与日志 |
+| /admin/feedback | 建议箱 |
+| /automation | 自动化 |
 
-```bash
-pnpm preview
-```
+根路径与未匹配路径跳转到 /chat；原设置子路由重定向保留。路由定义以 src/router/index.ts 为准。
 
-### 测试
+## 模块职责
 
-```bash
-pnpm test           # 运行单元测试 + 集成冒烟测试
-pnpm test:watch     # 监听模式
-pnpm typecheck      # 仅类型检查（vue-tsc --noEmit）
-```
+- src/views：路由页面与页面级协调。
+- src/components：可复用界面；settings/insights 承载拆分后的用量/日志子界面。
+- src/composables：响应式业务状态；settings 下组织用量/日志状态与动作。
+- src/types、src/mock：类型与示例数据，避免塞入页面文件。
+- src/utils：纯工具和历史状态兼容；legacy 专家映射保留用于历史会话。
+- server：Vite 服务插件，承载钉钉工作台、邮件摘要与待办提取。
+- ../backend/app/api：HTTP 适配；services：业务与 SSE 事件处理；models/schemas/core：数据库、接口类型与基础配置。
 
-## 常用脚本
+2026-10-14 根据用户授权删除 19 个无路由旧页面及其专用代码，共 126 个无引用源码文件。当前 12 个路由页面、现有工作区聊天、共享历史数据和服务插件保留。旧工作台的 49 项失效测试退役，原有效测试保留并增加当前系统入口页验证；剩余 98 项既有失败继续公开记录。详见 ../docs/folder-cleanup-2026-10-14.md。
 
-| 命令 | 说明 |
-|------|------|
-| `pnpm dev` | 启动开发服务器 |
-| `pnpm build` | 类型检查 + 生产构建 |
-| `pnpm preview` | 预览构建产物 |
-| `pnpm test` | 运行测试 |
-| `pnpm typecheck` | 类型检查 |
+## 服务与部署边界
 
-## 路由
+server/dws-workbench.ts、server/todo-extraction.ts、server/email-summary.ts 有实际用途，imapflow/mailparser 也是服务依赖。Vite 配置读取前端环境以及 backend 的 AI 环境配置。开发服务与静态 dist 不等价：仅由 configureServer 提供的接口不会随 GitHub Pages 静态部署运行，邮件服务的 preview 钩子也不会成为 Pages API。
 
-| 路径 | 页面 | 说明 |
-|------|------|------|
-| `/auth/login` | 登录页 | 钉钉扫码登录（mock） |
-| `/` | 首页 | 文化阵地，6 区组成 |
-| `/news` | 资讯列表 | 支持 `?category=`、`?q=`、`?tag=` 查询参数 |
-| `/news/competitor` | 竞对情报 | 威胁预警 + 对标看板 |
-| `/news/:id` | 文章详情 | 富文本 + 互动 |
+Docker 的前端使用 npm ci 和隔离 node_modules 数据卷。后端 PostgreSQL 配置仍有缺少显式数据库驱动的既存问题，需单独处理；本次精简未更换数据库、外部服务或运行模式。
 
-路由守卫：未登录访问受保护页面 → 重定向 `/auth/login?redirect=...`。
+## 本轮备份与架构说明
 
-## 项目结构
+原项目 .backups/2026-10-13-architecture-before/ 包含约 2 GB 的修改前归档、逐文件验证记录、数据库一致快照和 quarantine 清单。备份不进入 Git；恢复时先解压到新的空目录，再按需恢复。
 
-```
-src/
-├── components/
-│   ├── ui/              # shadcn-vue 原子组件（button/card/badge/input/avatar/tabs/table 等）
-│   ├── common/          # AppHeader/AppFooter/PageContainer/SearchBar/EmptyState/CategoryBadge/SectionHeader
-│   ├── auth/            # DingTalkQR
-│   ├── home/            # HeroHeadline/TrendingSidebar/CompetitorTicker/RankShowcase/DemandVoices/NewsFeed/InternalDynamic/CourseRecommend/ToolShortcutBar
-│   ├── competitor/      # CompetitorCard/ThreatAlert/BenchmarkTable
-│   └── news/            # ArticleCard/CategoryTabs
-├── composables/         # useAuth/useHome/useNews/useCompetitors/useArticle（mock 数据接入层）
-├── mock/                # articles/competitors/home/user（类型化 mock 数据）
-├── stores/app.ts        # Pinia：当前用户 + 点赞/收藏（localStorage 持久化）
-├── layouts/             # DefaultLayout / AuthLayout
-├── views/               # HomeView/NewsListView/CompetitorIntelView/ArticleDetailView/LoginView
-├── router/index.ts      # 路由 + 鉴权守卫
-├── lib/                 # utils(cn)/constants(分类元数据)/placeholder(SVG占位图)/format(时间/数字)
-├── types/               # article/competitor/home/user 类型定义
-└── assets/styles/globals.css   # shadcn CSS 变量（阿里橙 primary）
-```
-
-## 设计系统
-
-- **主色**：阿里橙 `hsl(25 100% 50%)` ≈ `#FF6A00`，仅用于主操作、当前选中、状态指示。
-- **中性基底**：shadcn `zinc`，内容区 `bg-muted/30` 与白色卡片分层。
-- **语义分类色**：竞对/威胁=red、行业=blue、集团=emerald、技术=violet、产品=amber。
-- **字体**：系统无衬线栈（PingFang SC / Microsoft YaHei），标题 24/20/16px，正文 14px。
-- 详见 `DESIGN.md`，产品定位见 `PRODUCT.md`。
-
-## Mock 数据
-
-- `src/mock/articles.ts`：24 篇资讯，覆盖 5 个分类（含 8 篇竞对情报，带威胁等级与竞对名称），1 篇头条。
-- `src/mock/competitors.ts`：5 个竞品档案 + 我司档案（对标看板用）。
-- `src/mock/home.ts`：首页 6 区聚合数据。
-- 封面图统一用本地生成 SVG 渐变占位（`src/lib/placeholder.ts`），离线、确定性、无外网依赖。
-
-## 接入真实 API
-
-数据全部通过 `src/composables/` 暴露，替换为真实接口只需改动 composable 内部实现（如把 `useNews` 的 `filterArticles` 换成后端分页请求），上层组件无需改动。API 契约可参考 `D:\AI项目\Aigc\docs\需求文档\AI工作门户.md` 第 4 节。
-
-## 相关文档
-
-- 设计文档：`docs/superpowers/specs/2026-06-21-ai-portal-news-competitor-demo-design.md`
-- 实现计划：`docs/superpowers/plans/2026-06-21-ai-portal-news-competitor-demo.md`
-- 产品需求：`D:\AI项目\Aigc\docs\需求文档\AI工作门户.md`
-
-## 说明
-
-本仓库为前端 Demo，数据均为 Mock，未对接真实 SSO/钉钉 OAuth 后端。真实钉钉登录走 `login.dingtalk.com/oauth2/auth` 跳转 + `authCode` 回调换用户信息，Demo 模拟该流程。
-
-© 2026 南京天马集团 · AI 项目组
+架构方案及执行记录位于仓库根 docs/superpowers/specs/2026-10-13-portal-architecture-cleanup-design.md 和 docs/superpowers/plans/2026-10-13-portal-architecture-cleanup.md。

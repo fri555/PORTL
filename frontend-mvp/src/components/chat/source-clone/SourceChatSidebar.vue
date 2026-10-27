@@ -9,14 +9,12 @@ import {
   ChevronDown,
   Coffee,
   FolderPlus,
-  Globe2,
   MoreHorizontal,
   PanelLeftClose,
   Pin,
   PinOff,
   Pencil,
   Search,
-  Sparkles,
   SquarePen,
   Trash2,
 } from 'lucide-vue-next'
@@ -176,18 +174,6 @@ onBeforeUnmount(() => document.removeEventListener('click', closeMenu))
       <span class="source-chat-sidebar__files-label"><Bot :size="16" :stroke-width="1.7" />专家中心</span>
     </button>
 
-    <div class="source-chat-sidebar__feature-group">
-      <div class="source-chat-sidebar__feature-heading">功能体验</div>
-      <button class="source-chat-sidebar__feature" type="button" title="网页引用溯源" @click="router.push('/chat/citation-default')">
-        <span class="source-chat-sidebar__feature-label"><Globe2 :size="15" :stroke-width="1.7" />网页引用溯源</span>
-        <span class="source-chat-sidebar__feature-badge">溯源</span>
-      </button>
-      <button class="source-chat-sidebar__feature" type="button" title="思维链展示" @click="router.push('/workspace/chat')">
-        <span class="source-chat-sidebar__feature-label"><Sparkles :size="15" :stroke-width="1.7" />思维链展示</span>
-        <span class="source-chat-sidebar__feature-badge">思考</span>
-      </button>
-    </div>
-
     <div class="source-chat-sidebar__scroll">
       <section v-for="group in groups" :key="group.id" class="source-chat-sidebar__section" :class="{'pinned-group':group.id==='pinned'}" :data-testid="group.id==='pinned'?'pinned-group':group.id+'-group'">
         <div class="source-chat-sidebar__heading" :id="group.id+'-session-heading'"><button class="group-toggle" :aria-label="groupAriaLabel(group.id)" :aria-expanded="groupIsOpen(group.id)" @click="toggleGroup(group.id)"><span>{{group.title}}</span><span class="pinned-count">{{group.items.length}}</span><ChevronDown :size="12" :class="{closed:groupIsClosed(group.id)}"/></button></div>
@@ -295,54 +281,6 @@ onBeforeUnmount(() => document.removeEventListener('click', closeMenu))
 
 .source-chat-sidebar__files:hover {
   background: #f7f7f7;
-}
-
-.source-chat-sidebar__feature-group {
-  margin: 12px 12px 0;
-  padding: 10px 0 4px;
-  border-top: 1px solid #f0f0f0;
-}
-
-.source-chat-sidebar__feature-heading {
-  padding: 0 12px 6px;
-  font-size: 11px;
-  color: #a0a0a0;
-  letter-spacing: 0.02em;
-}
-
-.source-chat-sidebar__feature {
-  display: flex;
-  width: 100%;
-  height: 34px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 8px;
-  color: #444;
-  background: transparent;
-  font-size: 13px;
-  line-height: 20px;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.source-chat-sidebar__feature:hover {
-  background: #f5f5f5;
-}
-
-.source-chat-sidebar__feature-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.source-chat-sidebar__feature-badge {
-  font-size: 10px;
-  color: #999;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: #f0f0f0;
 }
 
 .source-chat-sidebar__files-label {

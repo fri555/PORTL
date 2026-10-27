@@ -6,6 +6,8 @@ import { codeInspectorPlugin } from 'code-inspector-plugin'
 import { dwsWorkbenchPlugin } from './server/dws-workbench'
 import { emailSummaryPlugin } from './server/email-summary'
 import { todoExtractionPlugin } from './server/todo-extraction'
+import { elementReplacementPlugin } from './server/element-replacement'
+import { uploadElementReplacementMedia } from './server/element-replacement-media'
 
 export default defineConfig(({ command, mode }) => {
   const frontendEnv = loadEnv(mode, __dirname, '')
@@ -15,6 +17,25 @@ export default defineConfig(({ command, mode }) => {
   plugins: [
     vue(),
     dwsWorkbenchPlugin(),
+    elementReplacementPlugin({
+      storageDir: path.resolve(__dirname, '.local/element-replacement'),
+      getConfig: () => {
+        const local = loadEnv(mode, __dirname, '')
+        const backend = loadEnv(mode, path.resolve(__dirname, '../backend'), '')
+        const value = (key: string) => process.env[key] || local[key] || backend[key] || ''
+        return {
+          apiKey: value('LAS_API_KEY'),
+          apiBase: value('LAS_API_BASE') || undefined,
+          fileUploadUrl: value('LAS_FILE_UPLOAD_URL') || undefined,
+          modelOverrides: {
+            ...(value('LAS_MODEL_2_0') ? { 'seedance-2.0': value('LAS_MODEL_2_0') } : {}),
+            ...(value('LAS_MODEL_2_0_FAST') ? { 'seedance-2.0-fast': value('LAS_MODEL_2_0_FAST') } : {}),
+            ...(value('LAS_MODEL_2_0_MINI') ? { 'seedance-2.0-mini': value('LAS_MODEL_2_0_MINI') } : {}),
+          },
+        }
+      },
+      uploadMedia: (config, bytes, name, kind) => uploadElementReplacementMedia(config, bytes, name, kind),
+    }),
     todoExtractionPlugin({
       aiApiKey: frontendEnv.AI_API_KEY || backendEnv.AI_API_KEY,
       aiApiBase: frontendEnv.AI_API_BASE || backendEnv.AI_API_BASE,

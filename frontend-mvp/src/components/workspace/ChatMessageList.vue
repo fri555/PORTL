@@ -3,10 +3,7 @@ import { computed, nextTick } from 'vue'
 import { useAIChat, stripModePrefix } from '@/composables/useAIChat'
 import { useChatController } from '@/composables/useWorkspaceChat'
 import ExpertPicker from '@/components/workspace/ExpertPicker.vue'
-import {
-  BookOpen, Check, Copy, Database, FileText, Loader2, Quote, RefreshCw,
-  Sparkles, ThumbsDown, ThumbsUp, User,
-} from 'lucide-vue-next'
+import { BookOpen, Copy, Database, FileText, Loader2, Quote, RefreshCw, Sparkles, ThumbsDown, ThumbsUp, User } from 'lucide-vue-next'
 
 const ai = useAIChat()
 const chat = useChatController()

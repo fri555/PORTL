@@ -35,6 +35,7 @@ import InlineExecutionTrace from './InlineExecutionTrace.vue'
 import ExpertTodoProgress from './ExpertTodoProgress.vue'
 import { citationSources, citedParagraphs, dailySource } from '@/mock/citations'
 import type { CitationPreviewLoader } from '@/types/citation'
+import type { KnowledgeRole } from '@/types/knowledge-permission'
 import FollowUpPlan from './FollowUpPlan.vue'
 import TaskStallReminder from './TaskStallReminder.vue'
 import ApprovalModeControl, { type ApprovalMode } from './ApprovalModeControl.vue'
@@ -49,11 +50,14 @@ const taskFilesOpen = ref(false)
 const citationPanelOpen = ref(false)
 const citationExplorer = ref<InstanceType<typeof AnswerCitations> | null>(null)
 const isCitationDemo = computed(() => props.sessionId.startsWith('citation-'))
+const previewPermission = new URLSearchParams(window.location.search).get('permissionRole') as KnowledgeRole | null
+const knowledgePreviewRole: KnowledgeRole = ['OWNER', 'MANAGER', 'EDITOR', 'DOWNLOADER', 'READER'].includes(previewPermission ?? '') ? previewPermission! : 'DOWNLOADER'
 const answerSources = computed(() => {
-  if (!isCitationDemo.value) return [dailySource]
+  if (!isCitationDemo.value) return [{ ...dailySource, permissionRole: knowledgePreviewRole }]
   if (props.sessionId === 'citation-empty') return []
   return citationSources.filter((_, index) => props.sessionId !== 'citation-missing-metadata' || index !== 0).map((source, index) => ({
     ...source,
+    ...(source.type === 'knowledge' ? { permissionRole: knowledgePreviewRole } : {}),
     ...(props.sessionId === 'citation-web-missing' && source.type === 'web' ? { title:'', origin:'', url:'', publishedAt:'', capturedAt:'', summary:'' } : {}),
     access: props.sessionId === 'citation-restricted' && index === 0 ? 'forbidden' as const : source.access,
   }))
@@ -174,7 +178,15 @@ const dwsStage = ref<'auth' | 'confirm' | 'done' | 'cancelled'>(savedPlan?.dwsSt
 const isDwsAction = computed(() => props.sessionId.includes('dws-action'))
 
 // A conversation keeps the mode selected at creation, including subsequent prop updates.
-const normalizedApprovalMode = ref<ApprovalMode>(props.approvalMode === 'autonomous' ? 'autonomous' : 'default')
+// Restore persisted approval mode snapshot; default to 'autonomous' when no saved value.
+const savedApprovalMode = typeof localStorage !== 'undefined' ? localStorage.getItem('expert_approval_mode_snapshot') : null
+const normalizedApprovalMode = ref<ApprovalMode>(
+  (savedApprovalMode === 'default' || savedApprovalMode === 'autonomous' ? savedApprovalMode : 'autonomous')
+)
+// Persist approval mode changes
+watch(normalizedApprovalMode, (mode) => {
+  localStorage.setItem('expert_approval_mode_snapshot', mode)
+})
 const isExpert = computed(
   () => props.sessionId.includes('expert') || props.sessionId.includes('bswjqns'),
 )
@@ -275,7 +287,7 @@ const processHeadline = computed(() => {
 const processingDuration = computed(() => durationText(executionSteps.value.reduce((total, step) => total + (parseFloat(step.duration) || 0) * 1000, 0)))
 function durationText(milliseconds: number) { return (Math.max(0, milliseconds) / 1000).toFixed(1) + ' 秒' }
 function handleDwsAuthorized() {
-  if (dwsStage.value === 'auth') dwsStage.value = normalizedApprovalMode.value === 'autonomous' && !humanAuthorizationRequired ? 'done' : 'confirm'
+  if (dwsStage.value === 'auth') dwsStage.value = !humanAuthorizationRequired ? 'done' : 'confirm'
 }
 
 const title = computed(() =>
@@ -296,11 +308,8 @@ const placeholder = computed(() =>
 
 function preparePlan() {
   if (!isExpert.value || !['waiting','awaiting_clarification'].includes(planStatus.value)) return
+  if (missingRequiredClarification.value) { planStatus.value = 'awaiting_clarification'; return }
   if (normalizedApprovalMode.value === 'autonomous') {
-    clarifications.value = clarifications.value.map(item => item.required || item.value.trim() ? { ...item } : {
-      ...item, value: item.defaultValid === true && typeof item.defaultValue === 'string' ? item.defaultValue : '',
-    })
-    if (missingRequiredClarification.value) { planStatus.value = 'awaiting_clarification'; return }
     clarificationConfirmed.value = true
     planStatus.value = 'waiting'
     beginExecution()
@@ -337,7 +346,7 @@ function scheduleExecution() {
 function beginExecution(startedAt = Date.now()) {
   if (!['waiting','failed','awaiting_confirmation'].includes(planStatus.value) || followUpRunning.value || followUpBlocked.value || missingRequiredClarification.value) return
   if (authorizationRequired && !authorizationConfirmed.value) {
-    if (normalizedApprovalMode.value === 'autonomous' && !humanAuthorizationRequired) authorizationConfirmed.value = true
+    if (!humanAuthorizationRequired) authorizationConfirmed.value = true
     else { planStatus.value = 'awaiting_confirmation'; return }
   }
   executionStartedAt.value = startedAt
@@ -445,7 +454,7 @@ onMounted(() => {
   if (isExpert.value && planStatus.value === 'running') {
     if (executionStartedAt.value === null) executionStartedAt.value = Date.now()
     scheduleExecution()
-  } else if (planStatus.value === 'awaiting_confirmation' && normalizedApprovalMode.value === 'autonomous' && authorizationRequired && !humanAuthorizationRequired) beginExecution()
+  } else if (planStatus.value === 'awaiting_confirmation' && authorizationRequired && !humanAuthorizationRequired) beginExecution()
   else preparePlan()
   savePrototypePlan()
 })
@@ -486,7 +495,7 @@ onBeforeUnmount(() => {
             :attempt="executionAttempt"
           />
           <template v-if="isDwsAction">
-            <TaskStallReminder v-if="normalizedApprovalMode === 'autonomous'" :task-id="sessionId" :title="title" :agent-name="expertName" :detail-url="'/PORTL/chat/' + encodeURIComponent(sessionId)" :state="dwsStage === 'auth' ? 'dws_auth' : dwsStage === 'confirm' ? 'awaiting_confirmation' : dwsStage" :progress-key="dwsStage" />
+            <TaskStallReminder v-if="isDwsAction" :task-id="sessionId" :title="title" :agent-name="expertName" :detail-url="'/PORTL/chat/' + encodeURIComponent(sessionId)" :state="dwsStage === 'auth' ? 'dws_auth' : dwsStage === 'confirm' ? 'awaiting_confirmation' : dwsStage" :progress-key="dwsStage" />
             <p>创建待办属于钉钉写操作。首次使用需要本人完成账号授权；自主执行可在授权完成后自动同意本轮操作确认。</p>
 
             <section
@@ -525,7 +534,7 @@ onBeforeUnmount(() => {
 
             <template v-else>
               <div v-if="dwsStage !== 'cancelled'" class="dws-success" data-testid="dws-auth-success">
-                <CheckCircle2 :size="16" />{{ dwsStage === 'done' ? normalizedApprovalMode === 'autonomous' && !humanAuthorizationRequired ? '账号已授权，已按自主执行规则同意本轮操作。' : '账号已授权，操作已由你确认。' : '账号授权成功，操作仍需你确认。' }}
+                <CheckCircle2 :size="16" />{{ dwsStage === 'done' ? !humanAuthorizationRequired ? '账号已授权，已自动同意本轮操作。' : '账号已授权，操作已由你确认。' : '账号授权成功，操作仍需你确认。' }}
               </div>
               <section
                 v-if="dwsStage === 'confirm'"
@@ -582,11 +591,11 @@ onBeforeUnmount(() => {
                   <div>
                     <strong>{{ planTitle }}</strong>
                     <p v-if="planStatus === 'waiting'">
-                      默认权限：请确认计划后点击「立即执行」。所有授权仍需人工确认。
+                      {{ normalizedApprovalMode === 'autonomous' ? '已跳过计划确认，直接执行。' : '请确认计划后点击「立即执行」。' }}
                     </p>
                     <p v-else-if="planStatus === 'awaiting_clarification'">{{ missingRequiredClarification ? '缺少必填信息，补充后才能执行。' : '请确认非必填信息，可保留空值。' }}</p>
                     <p v-else-if="planStatus === 'running'">
-                      {{ normalizedApprovalMode === 'autonomous' ? '正在自主执行，已自动同意可代办的执行审批。' : '正在模拟执行，审批授权按现有流程确认。' }}
+                      {{ normalizedApprovalMode === 'autonomous' ? '正在自动处理需求澄清、审批执行等请求。' : '等待你确认需求澄清、审批执行等请求。' }}
                     </p>
                     <p v-else-if="planStatus === 'awaiting_confirmation'">{{ authorizationKind }}前需要你确认，本次操作尚未执行。</p>
                     <p v-else-if="planStatus === 'unknown'">执行结果尚未核实，不能重复启动或显示成功。</p>
@@ -618,10 +627,10 @@ onBeforeUnmount(() => {
                 <button v-if="planStatus === 'failed'" type="button" class="run-now" @click="retryPlan">重试执行</button>
               </footer>
             </section>
-            <TaskStallReminder v-if="normalizedApprovalMode === 'autonomous'" :key="sessionId" :task-id="'task-' + sessionId" :title="title" :agent-name="expertName" :detail-url="'/PORTL/chat/' + encodeURIComponent(sessionId)" :executed-at="new Date(executionStartedAt ?? Date.now()).toLocaleString('sv-SE', { timeZone: 'Asia/Shanghai' })" :failure-reason="planStatus === 'failed' ? '资料读取失败，请重试或检查数据源权限。' : ''" :state="planStatus" :progress-key="planStatus + '-' + completedExecutionSteps" :demo-waiting="demoQuery.get('reminderDemo') === '1'" />
+            <TaskStallReminder :key="sessionId" :task-id="'task-' + sessionId" :title="title" :agent-name="expertName" :detail-url="'/PORTL/chat/' + encodeURIComponent(sessionId)" :executed-at="new Date(executionStartedAt ?? Date.now()).toLocaleString('sv-SE', { timeZone: 'Asia/Shanghai' })" :failure-reason="planStatus === 'failed' ? '资料读取失败，请重试或检查数据源权限。' : ''" :state="planStatus" :progress-key="planStatus + '-' + completedExecutionSteps" :demo-waiting="demoQuery.get('reminderDemo') === '1'" />
             <section v-if="planStatus === 'awaiting_clarification'" class="clarification-card" data-testid="clarification-card">
               <strong>请补充任务信息</strong>
-              <label v-for="item in clarifications.filter(item => normalizedApprovalMode === 'default' || item.required)" :key="item.id">
+              <label v-for="item in clarifications" :key="item.id">
                 <span>{{ item.label }}（{{ item.required ? '必填' : '非必填' }}）</span>
                 <input v-model="item.value" data-testid="clarification-input" :aria-label="item.label" :placeholder="item.defaultValid && item.defaultValue ? '默认值：' + item.defaultValue : '可填写任务信息'" />
               </label>
@@ -792,9 +801,9 @@ onBeforeUnmount(() => {
         <button v-if="uploadedTemplateName" type="button" aria-label="移除PPT模板" @click="clearPptTemplate"><X :size="14" /></button>
         <button type="button" :disabled="['running','awaiting_clarification','awaiting_confirmation','unknown'].includes(planStatus)||followUpRunning||followUpBlocked" @click="templateInput?.click()"><UploadCloud :size="14" />{{ uploadedTemplateName ? '更换' : '上传模板' }}</button>
       </div>
-      <ExpertTodoProgress v-if="isExpert && executionSteps.length" :steps="executionSteps" />
       <div class="detail-input-line" data-testid="expert-inline-input">
-      <button type="button" class="composer-plus-btn" aria-label="上传文件" title="上传文件">
+        <ExpertTodoProgress v-if="isExpert && executionSteps.length" :steps="executionSteps" />
+        <button type="button" class="composer-plus-btn" aria-label="上传文件" title="上传文件">
         <Plus :size="20" />
       </button>
       <div v-if="pendingExpertId || isExpert" class="next-expert-chip" data-testid="selected-expert-chip"><span>{{ pendingExpertName || expertName }}</span><button v-if="pendingExpertId" type="button" aria-label="移除所选专家" @click="pendingExpertId = ''; input?.focus()"><X :size="13" /></button></div>
@@ -810,7 +819,7 @@ onBeforeUnmount(() => {
         rows="1"
       />
       </div>
-      <ApprovalModeControl v-model="normalizedApprovalMode" />
+      <ApprovalModeControl v-if="isExpert" v-model="normalizedApprovalMode" />
       <button type="button" class="composer-globe-btn" aria-label="联网搜索" title="联网搜索">
         <Globe2 :size="18" />
       </button>
@@ -1664,7 +1673,7 @@ button:disabled {
   cursor: not-allowed;
 }
 .compact-composer .template-tip{position:absolute;bottom:calc(100% + 10px);left:0;right:0;margin:0;box-shadow:0 4px 16px #00000008}.compact-composer .template-tip button{width:auto;flex-shrink:0}.compact-composer .template-tip button:last-child{position:static}
-.detail-input-line{display:flex;align-items:center;gap:6px;min-width:0}.detail-input-line textarea{min-width:0;width:0;flex:1;padding-top:4px}.composer-plus-btn,.composer-globe-btn{flex-shrink:0;color:#666;transition:color .15s}.composer-plus-btn:hover,.composer-globe-btn:hover{color:#111}.next-expert-chip{display:flex;flex:0 1 auto;max-width:45%;align-items:center;gap:6px;white-space:nowrap;border-radius:6px;background:#edf5ff;color:#246ec9;padding:4px 8px;font-size:12px}.next-expert-chip span{overflow:hidden;text-overflow:ellipsis}.next-expert-chip button{width:18px!important;height:18px!important;display:grid;place-items:center;background:transparent!important;color:inherit!important}.follow-up-routing{padding:14px;background:#f4f7fb;border-radius:9px;font-size:13px;color:#567}
+.detail-input-line{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0}.detail-input-line>.expert-todo-progress{width:100%;flex-basis:100%;margin-bottom:2px}.detail-input-line textarea{min-width:0;width:0;flex:1;padding-top:4px}.composer-plus-btn,.composer-globe-btn{flex-shrink:0;color:#666;transition:color .15s}.composer-plus-btn:hover,.composer-globe-btn:hover{color:#111}.next-expert-chip{display:flex;flex:0 1 auto;max-width:45%;align-items:center;gap:6px;white-space:nowrap;border-radius:6px;background:#edf5ff;color:#246ec9;padding:4px 8px;font-size:12px}.next-expert-chip span{overflow:hidden;text-overflow:ellipsis}.next-expert-chip button{width:18px!important;height:18px!important;display:grid;place-items:center;background:transparent!important;color:inherit!important}.follow-up-routing{padding:14px;background:#f4f7fb;border-radius:9px;font-size:13px;color:#567}
 
 @media(min-width:1100px){
   .detail-shell--preview .conversation{width:calc(100% - 430px);padding-right:24px;padding-left:36px;box-sizing:border-box}

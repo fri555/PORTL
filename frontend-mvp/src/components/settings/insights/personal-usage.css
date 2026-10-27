@@ -1,0 +1,253 @@
+.personal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+.personal-head h1 {
+  margin: 0;
+  font-size: 20px;
+}
+.personal-breadcrumb {
+  display: block;
+  margin-bottom: 6px;
+  color: #888;
+  font-size: 11px;
+}
+.personal-head p {
+  margin: 5px 0 0;
+  color: #8b8b92;
+  font-size: 12px;
+}
+.personal-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.segmented {
+  display: flex;
+  height: 34px;
+  align-items: center;
+  border-radius: 18px;
+  background: #f1f1f3;
+  padding: 2px;
+}
+.segmented button {
+  height: 30px;
+  border: 0;
+  border-radius: 16px;
+  padding: 0 15px;
+  background: transparent;
+  color: #4d4d53;
+  font: 12px inherit;
+  cursor: pointer;
+}
+.segmented button[aria-selected='true'] {
+  background: #fff;
+  color: #111;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  font-weight: 600;
+}
+.personal-date {
+  display: flex;
+  height: 34px;
+  align-items: center;
+  gap: 7px;
+  border-radius: 18px;
+  background: #f5f5f6;
+  padding: 0 12px;
+  color: #999;
+}
+.personal-date input {
+  width: 118px;
+  border: 0;
+  background: transparent;
+  color: #333;
+  font: 12px inherit;
+  outline: none;
+}
+.personal-metrics {
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  margin-top: 22px;
+}
+.personal-ledger {
+  margin-top: 14px;
+  overflow: hidden;
+  border-radius: 18px;
+}
+.personal-ledger table {
+  min-width: 1120px;
+}
+.personal-ledger th {
+  height: 54px;
+  background: #fff;
+  color: #3f3f46;
+}
+.personal-ledger td {
+  height: 82px;
+}
+.request-cell {
+  display: grid;
+  width: 280px;
+  gap: 5px;
+}
+.request-cell strong,
+.request-cell small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.request-cell strong {
+  font-weight: 500;
+}
+.request-cell small {
+  color: #a1a1aa;
+  font-size: 11px;
+}
+.secondary-button {
+  display: inline-flex;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 7px;
+  padding: 0 13px;
+  font: 13px inherit;
+  cursor: pointer;
+}
+.secondary-button {
+  border: 1px solid #dedfe2;
+  background: #fff;
+  color: #3f3f46;
+}
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(140px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+.metric-card {
+  min-width: 0;
+  border: 1px solid #e2e3e6;
+  border-radius: 8px;
+  background: #fff;
+  padding: 14px;
+}
+.metric-card > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #71717a;
+  font-size: 11px;
+}
+.metric-card strong {
+  display: block;
+  margin-top: 13px;
+  overflow: hidden;
+  font-size: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.metric-card small {
+  display: block;
+  margin-top: 6px;
+  color: #a1a1aa;
+  font-size: 10px;
+}
+.metric-card.warning {
+  border-color: #f2c76f;
+  background: #fffbeb;
+}
+.metric-card.danger {
+  border-color: #ef9a9a;
+  background: #fff5f5;
+}
+.panel {
+  border: 1px solid #e2e3e6;
+  border-radius: 8px;
+  background: #fff;
+}
+.panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #eee;
+  padding: 14px 16px;
+}
+.panel h2 {
+  margin: 0;
+  font-size: 15px;
+}
+.panel header p {
+  margin: 4px 0 0;
+  color: #999;
+  font-size: 11px;
+}
+.table-scroll {
+  overflow: auto;
+}
+.panel table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.panel th {
+  height: 40px;
+  background: #fafafa;
+  color: #71717a;
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+}
+.panel td {
+  height: 56px;
+  border-top: 1px solid #ededee;
+  color: #52525b;
+  white-space: nowrap;
+}
+.panel th,
+.panel td {
+  padding: 0 14px;
+}
+.panel code {
+  border-radius: 4px;
+  background: #f3f3f4;
+  padding: 3px 6px;
+  font:
+    10px ui-monospace,
+    monospace;
+}
+dt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+@media (max-width: 1280px) {
+  .metric-grid {
+    grid-template-columns: repeat(3, minmax(140px, 1fr));
+  }
+  .personal-metrics {
+    grid-template-columns: repeat(4, minmax(140px, 1fr));
+  }
+  .personal-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+@media (max-width: 900px) {
+  .metric-grid {
+    grid-template-columns: repeat(2, minmax(140px, 1fr));
+  }
+  .personal-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .personal-date {
+    order: 3;
+  }
+  .personal-metrics {
+    grid-template-columns: repeat(2, minmax(140px, 1fr));
+  }
+}

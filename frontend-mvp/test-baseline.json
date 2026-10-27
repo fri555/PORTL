@@ -1,0 +1,2610 @@
+{
+  "version": 1,
+  "files": [
+    "server/dws-workbench.spec.ts",
+    "server/email-summary.spec.ts",
+    "server/information-digest.spec.ts",
+    "server/todo-extraction.spec.ts",
+    "src/services/dws-workbench.spec.ts",
+    "src/services/email-summary.spec.ts",
+    "src/__tests__/app.smoke.test.ts",
+    "src/__tests__/automation-review.test.ts",
+    "src/__tests__/autonomous-execution.test.ts",
+    "src/__tests__/dingtalk-tree-picker.test.ts",
+    "src/__tests__/execution-notice.test.ts",
+    "src/__tests__/expert-avatar-migration.test.ts",
+    "src/__tests__/expert-field-consistency.test.ts",
+    "src/__tests__/expert-history-protection.test.ts",
+    "src/__tests__/expert-market-oct12.test.ts",
+    "src/__tests__/expert-presentation-refresh.test.ts",
+    "src/__tests__/expert-send-recency.test.ts",
+    "src/__tests__/expert-settings-persistence.test.ts",
+    "src/__tests__/knowledge-create-menu.test.ts",
+    "src/__tests__/m3-import-oct12.test.ts",
+    "src/__tests__/oct12-chat-review.test.ts",
+    "src/__tests__/task-stall-reminder.test.ts",
+    "src/__tests__/usage-form-refresh.test.ts",
+    "src/__tests__/v13-access-permissions.test.ts",
+    "src/__tests__/v13-business-catalog.test.ts",
+    "src/__tests__/v13-chat-boundaries.test.ts",
+    "src/__tests__/v13-chat-experts-round3.test.ts",
+    "src/__tests__/v13-citations.test.ts",
+    "src/__tests__/v13-devqa.test.ts",
+    "src/__tests__/v13-dingtalk-identity.test.ts",
+    "src/__tests__/v13-expert-center-cards.test.ts",
+    "src/__tests__/v13-expert-center-revision.test.ts",
+    "src/__tests__/v13-experts-round2.test.ts",
+    "src/__tests__/v13-experts.test.ts",
+    "src/__tests__/v13-interactions.test.ts",
+    "src/__tests__/v13-knowledge-citations-round2.test.ts",
+    "src/__tests__/v13-review.test.ts",
+    "src/composables/__tests__/useAIChat.test.ts",
+    "src/composables/__tests__/useAuth.test.ts",
+    "src/composables/__tests__/useKnowledgePermissions.spec.ts",
+    "src/composables/__tests__/useNews.test.ts",
+    "src/composables/__tests__/useWorkbenchBoardState.spec.ts",
+    "src/mock/__tests__/knowledge-source.spec.ts",
+    "src/router/__tests__/v110Routes.spec.ts",
+    "src/views/__tests__/DashboardView.spec.ts",
+    "src/views/__tests__/KnowledgeBaseView.spec.ts",
+    "src/views/__tests__/SettingsInsightsView.spec.ts",
+    "src/views/__tests__/SettingsManagementView.spec.ts",
+    "src/views/__tests__/SourceChatFlows.spec.ts",
+    "src/views/__tests__/SystemPortalsView.spec.ts",
+    "src/components/common/__tests__/ResourcePermissionDialog.spec.ts",
+    "src/components/workbench/__tests__/DigestActionDialog.spec.ts",
+    "src/components/workbench/__tests__/EmailSummaryPanel.spec.ts",
+    "src/components/workbench/__tests__/InformationDigestPanel.spec.ts",
+    "src/components/workbench/__tests__/WorkbenchBoardHeader.spec.ts",
+    "src/components/chat/source-clone/__tests__/ExpertTodoProgress.spec.ts",
+    "src/components/chat/source-clone/__tests__/FollowUpPlan.spec.ts",
+    "src/components/chat/source-clone/__tests__/InlineExecutionTrace.spec.ts",
+    "src/components/chat/source-clone/__tests__/SourceChatTodoProgress.spec.ts",
+    "src/components/knowledge/source-clone/__tests__/DingTalkAccessForm.spec.ts",
+    "src/components/knowledge/source-clone/__tests__/KnowledgeDialogs.spec.ts"
+  ],
+  "assertions": [
+    {
+      "file": "server/dws-workbench.spec.ts",
+      "name": " DWS workbench snapshot mapping builds the real DingTalk custom-time reminder command",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "server/dws-workbench.spec.ts",
+      "name": " DWS workbench snapshot mapping maps the four UI priorities to DingTalk priority values",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "server/dws-workbench.spec.ts",
+      "name": " DWS workbench snapshot mapping reads the real DWS top-level contact search result and resolves an exact nickname",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "server/dws-workbench.spec.ts",
+      "name": " DWS workbench snapshot mapping does not guess when the enterprise directory contains duplicate exact names",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "server/dws-workbench.spec.ts",
+      "name": " DWS workbench snapshot mapping uses real live identity and recent DingTalk senders as contact suggestions",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "server/dws-workbench.spec.ts",
+      "name": " DWS workbench snapshot mapping keeps pending and completed todo cards with their role scopes",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "server/dws-workbench.spec.ts",
+      "name": " DWS workbench snapshot mapping reads and publishes DingTalk todo comments through DWS",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "server/dws-workbench.spec.ts",
+      "name": " DWS workbench snapshot mapping attaches a real AI minute only to a confidently matched calendar event",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "server/dws-workbench.spec.ts",
+      "name": " DWS workbench snapshot mapping does not mix todo or calendar data into the conversation digest",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "server/dws-workbench.spec.ts",
+      "name": " DWS workbench snapshot mapping maps nested DWS messages into scored v3.9 items",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "server/dws-workbench.spec.ts",
+      "name": " DWS workbench snapshot mapping does not map single chats into digest items",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "server/dws-workbench.spec.ts",
+      "name": " DWS workbench snapshot mapping passes watch rules into the real classifier",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "server/dws-workbench.spec.ts",
+      "name": " DWS workbench snapshot mapping follows DWS cursors and caps requests at 100 records",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "server/email-summary.spec.ts",
+      "name": " paginateEmailUids returns newest messages first and a cursor for the remaining history",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "server/email-summary.spec.ts",
+      "name": " paginateEmailUids continues before the cursor without duplicating the previous page",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "server/information-digest.spec.ts",
+      "name": " information digest scoring forces hard-rule risks to score 100 and the risk category",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "server/information-digest.spec.ts",
+      "name": " information digest scoring assigns one primary category using risk before decision",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "server/information-digest.spec.ts",
+      "name": " information digest scoring calculates decision factors and their weighted contribution",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "server/information-digest.spec.ts",
+      "name": " information digest scoring excludes single chats and duplicate message ids",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "server/information-digest.spec.ts",
+      "name": " information digest scoring marks conflicting values for the same business metric",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "server/information-digest.spec.ts",
+      "name": " information digest scoring uses a watch rule only after higher-priority categories do not match",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "server/todo-extraction.spec.ts",
+      "name": " todo extraction contract embeds the agreed machine-readable prompt without organization or invented people",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "server/todo-extraction.spec.ts",
+      "name": " todo extraction contract normalizes all four DingTalk priority levels without merging urgent and high",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "server/todo-extraction.spec.ts",
+      "name": " todo extraction contract normalizes complete fields and defaults an omitted deadline to today 18:00",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "server/todo-extraction.spec.ts",
+      "name": " todo extraction contract moves the default deadline to tomorrow after today 18:00",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "server/todo-extraction.spec.ts",
+      "name": " todo extraction contract keeps an explicit weekday deadline instead of replacing it with the default",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "server/todo-extraction.spec.ts",
+      "name": " todo extraction contract limits generated todo titles to ten characters",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/services/dws-workbench.spec.ts",
+      "name": " DWS workbench session cache returns cached data immediately without issuing another request",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/services/dws-workbench.spec.ts",
+      "name": " DWS workbench session cache deduplicates concurrent forced refreshes",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/services/dws-workbench.spec.ts",
+      "name": " DWS workbench session cache keeps the last successful cache when a forced refresh fails",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/services/dws-workbench.spec.ts",
+      "name": " DWS workbench session cache serializes at most twenty watch rules for live scoring",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/services/dws-workbench.spec.ts",
+      "name": " DWS workbench session cache searches the enterprise address book without exposing user ids",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/services/dws-workbench.spec.ts",
+      "name": " DWS workbench session cache loads real contact suggestions for the live workspace",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/services/email-summary.spec.ts",
+      "name": " fetchEmailSummaries sends pagination parameters and preserves the next-page contract",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/app.smoke.test.ts",
+      "name": " production-aligned prototype smoke flows keeps the production navigation order and opens personal usage from the account menu",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/app.smoke.test.ts",
+      "name": " production-aligned prototype smoke flows supports the production home sidebar, mode menu, quick prompts, and sending",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/app.smoke.test.ts",
+      "name": " production-aligned prototype smoke flows opens knowledge permissions from the row secondary menu",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/app.smoke.test.ts",
+      "name": " production-aligned prototype smoke flows renders the production agent table on settings",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/automation-review.test.ts",
+      "name": " automation review prototype defaults permissions and keeps the previous run unchanged when retrying",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/automation-review.test.ts",
+      "name": " automation review prototype stores selected permissions in each run and blocks invalid reminder thresholds",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/automation-review.test.ts",
+      "name": " automation review prototype shows missing record feedback for an invalid notification destination",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/autonomous-execution.test.ts",
+      "name": " expert execution permissions starts a complete autonomous plan immediately and input does not pause it",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/autonomous-execution.test.ts",
+      "name": " expert execution permissions keeps default permissions waiting for a manual start without a deadline",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/autonomous-execution.test.ts",
+      "name": " expert execution permissions skips optional-default and uses only a valid supplied default",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/autonomous-execution.test.ts",
+      "name": " expert execution permissions skips optional-empty and uses only a valid supplied default",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/autonomous-execution.test.ts",
+      "name": " expert execution permissions skips optional-invalid and uses only a valid supplied default",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/autonomous-execution.test.ts",
+      "name": " expert execution permissions blocks a missing required clarification until the user supplies it",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/autonomous-execution.test.ts",
+      "name": " expert execution permissions keeps optional clarification in the default manual flow",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/autonomous-execution.test.ts",
+      "name": " expert execution permissions requires account authorization before autonomously confirming the action",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/autonomous-execution.test.ts",
+      "name": " expert execution permissions keeps an explicitly non-delegable tool approval blocked",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/autonomous-execution.test.ts",
+      "name": " expert execution permissions keeps an explicitly non-delegable business approval blocked",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/autonomous-execution.test.ts",
+      "name": " expert execution permissions automatically agrees to an eligible tool execution approval",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/autonomous-execution.test.ts",
+      "name": " expert execution permissions automatically agrees to an eligible business execution approval",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/autonomous-execution.test.ts",
+      "name": " expert execution permissions keeps the creation mode fixed even if the conversation prop is changed",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/autonomous-execution.test.ts",
+      "name": " expert execution permissions resumes a known running plan after refresh and never starts a completed plan again",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/autonomous-execution.test.ts",
+      "name": " expert execution permissions does not retry or invent success with an invalid persisted start time undefined",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/autonomous-execution.test.ts",
+      "name": " expert execution permissions does not retry or invent success with an invalid persisted start time null",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/autonomous-execution.test.ts",
+      "name": " expert execution permissions does not retry or invent success with an invalid persisted start time invalid",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/autonomous-execution.test.ts",
+      "name": " expert execution permissions does not retry or invent success with an invalid persisted start time -1",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/autonomous-execution.test.ts",
+      "name": " expert execution permissions does not retry or invent success with an invalid persisted start time 1791597660000",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/autonomous-execution.test.ts",
+      "name": " expert execution permissions blocks new execution while a saved follow-up result remains unknown",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/autonomous-execution.test.ts",
+      "name": " expert execution permissions does not launch a concurrent follow-up while the current plan is running",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/dingtalk-tree-picker.test.ts",
+      "name": " DingTalk checkbox tree picker expands nested folders and imports only their concrete documents",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/dingtalk-tree-picker.test.ts",
+      "name": " DingTalk checkbox tree picker shows a half-selected folder after one child is unchecked",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/dingtalk-tree-picker.test.ts",
+      "name": " DingTalk checkbox tree picker retains search ancestors and excludes inaccessible documents",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/dingtalk-tree-picker.test.ts",
+      "name": " DingTalk checkbox tree picker discards draft selections on cancellation",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/dingtalk-tree-picker.test.ts",
+      "name": " DingTalk checkbox tree picker marks unsupported selections and blocks import",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/execution-notice.test.ts",
+      "name": " execution notifications does not link an agent to the wrong record when its conversation binding is missing",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/execution-notice.test.ts",
+      "name": " execution notifications links agent results to their exact conversation and omits failure text on success",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/execution-notice.test.ts",
+      "name": " execution notifications links todo failure to its run detail and preserves reason",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/execution-notice.test.ts",
+      "name": " execution notifications uses separate keys for each interruption and a single key for the terminal result",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-avatar-migration.test.ts",
+      "name": " business expert avatar cache migration updates only the known draft and published illustration for biz-01",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-avatar-migration.test.ts",
+      "name": " business expert avatar cache migration updates only the known draft and published illustration for biz-02",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-avatar-migration.test.ts",
+      "name": " business expert avatar cache migration updates only the known draft and published illustration for biz-03",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-avatar-migration.test.ts",
+      "name": " business expert avatar cache migration updates only the known draft and published illustration for biz-04",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-avatar-migration.test.ts",
+      "name": " business expert avatar cache migration updates only the known draft and published illustration for biz-05",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-avatar-migration.test.ts",
+      "name": " business expert avatar cache migration updates only the known draft and published illustration for biz-06",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-avatar-migration.test.ts",
+      "name": " business expert avatar cache migration updates only the known draft and published illustration for biz-07",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-avatar-migration.test.ts",
+      "name": " business expert avatar cache migration updates only the known draft and published illustration for biz-08",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-avatar-migration.test.ts",
+      "name": " business expert avatar cache migration updates only the known draft and published illustration for biz-09",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-avatar-migration.test.ts",
+      "name": " business expert avatar cache migration updates only the known draft and published illustration for biz-10",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-avatar-migration.test.ts",
+      "name": " business expert avatar cache migration updates only the known draft and published illustration for biz-11",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-avatar-migration.test.ts",
+      "name": " business expert avatar cache migration updates only the known draft and published illustration for biz-12",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-avatar-migration.test.ts",
+      "name": " business expert avatar cache migration updates only the known draft and published illustration for biz-13",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-avatar-migration.test.ts",
+      "name": " business expert avatar cache migration updates only the known draft and published illustration for biz-14",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-avatar-migration.test.ts",
+      "name": " business expert avatar cache migration updates only the known draft and published illustration for biz-15",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-avatar-migration.test.ts",
+      "name": " business expert avatar cache migration updates only the known draft and published illustration for biz-16",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-avatar-migration.test.ts",
+      "name": " business expert avatar cache migration updates only the known draft and published illustration for biz-17",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-avatar-migration.test.ts",
+      "name": " business expert avatar cache migration updates only the known draft and published illustration for biz-18",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-avatar-migration.test.ts",
+      "name": " business expert avatar cache migration preserves the custom draft avatar data:image/png;base64,dXNlci1hdmF0YXI= while migrating its old published illustration",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-avatar-migration.test.ts",
+      "name": " business expert avatar cache migration preserves the custom draft avatar https://example.com/my-tiger.png while migrating its old published illustration",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-avatar-migration.test.ts",
+      "name": " business expert avatar cache migration preserves the custom draft avatar /assets/uploads/user-tiger.png while migrating its old published illustration",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-avatar-migration.test.ts",
+      "name": " business expert avatar cache migration preserves the custom draft avatar /assets/agents-online/inspiration-king.png while migrating its old published illustration",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-avatar-migration.test.ts",
+      "name": " business expert avatar cache migration preserves the custom draft avatar /PORTL/assets/agents-online/data-analysis.png?custom=1 while migrating its old published illustration",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-avatar-migration.test.ts",
+      "name": " business expert avatar cache migration preserves a custom published avatar while migrating its old draft illustration",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-avatar-migration.test.ts",
+      "name": " business expert avatar cache migration keeps deleted records hidden, legacy history untouched, and favorites and conversation text unchanged",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-avatar-migration.test.ts",
+      "name": " business expert avatar cache migration finishes loading all records with new in-memory avatars when migration storage fails",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-avatar-migration.test.ts",
+      "name": " business expert avatar cache migration writes a changed cache once and does not rewrite already migrated or custom avatars",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-field-consistency.test.ts",
+      "name": " expert field publication and empty values blocks publication of a blank introduction without replacing the previous publication (\"\")",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-field-consistency.test.ts",
+      "name": " expert field publication and empty values blocks publication of a blank introduction without replacing the previous publication (\"   \")",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-field-consistency.test.ts",
+      "name": " expert field publication and empty values uses the existing platform icon and keeps a newly published expert owner unknown",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-field-consistency.test.ts",
+      "name": " expert field publication and empty values keeps an unknown applicable department distinct from the owner department (\"\")",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-field-consistency.test.ts",
+      "name": " expert field publication and empty values keeps an unknown applicable department distinct from the owner department (\"   \")",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-field-consistency.test.ts",
+      "name": " expert field publication and empty values uses the configured applicable department in basic information without exposing the version",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-field-consistency.test.ts",
+      "name": " expert field publication and empty values shows the historical introduction fallback in both the card and detail without rewriting the record",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-field-consistency.test.ts",
+      "name": " expert capability sources and new version validation does not enable internet from a basic or manual system label (manual=false)",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-field-consistency.test.ts",
+      "name": " expert capability sources and new version validation does not enable internet from a basic or manual system label (manual=true)",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-field-consistency.test.ts",
+      "name": " expert capability sources and new version validation follows enabling and removing the actual internet tool even when a system label remains",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-field-consistency.test.ts",
+      "name": " expert capability sources and new version validation keeps the existing capability state when only a system label changes (true)",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-field-consistency.test.ts",
+      "name": " expert capability sources and new version validation keeps the existing capability state when only a system label changes (false)",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-field-consistency.test.ts",
+      "name": " expert capability sources and new version validation keeps the existing capability state when only a system label changes (undefined)",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-field-consistency.test.ts",
+      "name": " expert capability sources and new version validation rejects an invalid new numeric version with focus and without saving (\"0\")",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-field-consistency.test.ts",
+      "name": " expert capability sources and new version validation rejects an invalid new numeric version with focus and without saving (\"-1\")",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-field-consistency.test.ts",
+      "name": " expert capability sources and new version validation rejects an invalid new numeric version with focus and without saving (\"1.5\")",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-field-consistency.test.ts",
+      "name": " expert capability sources and new version validation rejects an invalid new numeric version with focus and without saving (\"\")",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-field-consistency.test.ts",
+      "name": " expert capability sources and new version validation keeps the existing edit version text without applying the new numeric restriction (\"2.4.1-rc1\")",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-field-consistency.test.ts",
+      "name": " expert capability sources and new version validation keeps the existing edit version text without applying the new numeric restriction (\"\")",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-field-consistency.test.ts",
+      "name": " expert capability sources and new version validation uses the missing knowledge name fallback without losing its successful update (\"\")",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-field-consistency.test.ts",
+      "name": " expert capability sources and new version validation uses the missing knowledge name fallback without losing its successful update (\"   \")",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-field-consistency.test.ts",
+      "name": " expert capability tool selection order does not rewrite an unknown capability when only the existing tool selection order changes",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-history-protection.test.ts",
+      "name": " expert catalogue history protection keeps cached legacy publications and drafts out of the current catalogue",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-history-protection.test.ts",
+      "name": " expert catalogue history protection resolves a legacy default snapshot when no publication was saved",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-history-protection.test.ts",
+      "name": " expert catalogue history protection still adds a newly created expert only after a valid publication",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-history-protection.test.ts",
+      "name": " expert catalogue history protection makes the daily assistant editable without publishing it into the expert catalogue",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-history-protection.test.ts",
+      "name": " expert catalogue history protection keeps a cached former daily-assistant record out of both selectable and editable experts",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-history-protection.test.ts",
+      "name": " saved conversation expert selection shows the saved legacy publication name on the historical reply",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-history-protection.test.ts",
+      "name": " saved conversation expert selection preserves unavailable selection ag01 and draft when opening a daily task",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-history-protection.test.ts",
+      "name": " saved conversation expert selection preserves unavailable selection unknown-legacy-expert and draft when opening a daily task",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-history-protection.test.ts",
+      "name": " saved conversation expert selection clears an unavailable selection only after explicit removal and resumes daily conversation",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-history-protection.test.ts",
+      "name": " saved conversation expert selection replaces an unavailable selection through @ while keeping earlier reply names",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-history-protection.test.ts",
+      "name": " expert status persistence persists the daily assistant status without changing publication metadata or adding a selectable expert",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-history-protection.test.ts",
+      "name": " expert status persistence updates published availability without exposing unpublished content or rewriting dates",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-history-protection.test.ts",
+      "name": " expert status persistence leaves the stored and visible states unchanged if status persistence fails",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-market-oct12.test.ts",
+      "name": " expert market permission and public metadata keeps an unpermitted published expert visible and never applies from hovering",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-market-oct12.test.ts",
+      "name": " expert market permission and public metadata blocks unpermitted detail chat, hides technical lists, and handles missing owner",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-market-oct12.test.ts",
+      "name": " expert market permission and public metadata shows the formally published daily assistant without changing it into a business expert",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-market-oct12.test.ts",
+      "name": " expert market permission and public metadata does not simulate sending when the current applicant is unknown",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-market-oct12.test.ts",
+      "name": " expert market permission and public metadata excludes offline publications while keeping the published daily assistant",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-market-oct12.test.ts",
+      "name": " expert market permission and public metadata provides an isolated demo without changing supplied agent records",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-market-oct12.test.ts",
+      "name": " unlimited capability labels accepts more than eight labels and reads new and legacy descriptions",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-presentation-refresh.test.ts",
+      "name": " expert presentation and navigation searches only the name and introduction",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-presentation-refresh.test.ts",
+      "name": " expert presentation and navigation moves introduction and applicable departments into basic information and removes the version",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-presentation-refresh.test.ts",
+      "name": " expert presentation and navigation keeps manual system labels before inferred capability labels and reveals all labels from +N",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-presentation-refresh.test.ts",
+      "name": " expert presentation and navigation does not claim knowledge or internet from platform system labels when actual capabilities are absent (false)",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-presentation-refresh.test.ts",
+      "name": " expert presentation and navigation does not claim knowledge or internet from platform system labels when actual capabilities are absent (undefined)",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-presentation-refresh.test.ts",
+      "name": " expert presentation and navigation keeps empty boundaries and nonempty quick starts while hiding technical capability lists",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-presentation-refresh.test.ts",
+      "name": " expert presentation and navigation shows actual documents with local expansion instead of granting an entire library",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-presentation-refresh.test.ts",
+      "name": " expert presentation and navigation retains a library-level legacy binding with an explicit level marker and no invented document",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-presentation-refresh.test.ts",
+      "name": " expert presentation and navigation shows named format icons without exposing connector and skill metadata",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-presentation-refresh.test.ts",
+      "name": " expert presentation and navigation navigates without a prompt for use, and replaces the unsent draft for quick start without confirmation or sending",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-presentation-refresh.test.ts",
+      "name": " responsive system tag list leaves an empty card tag row blank while marking an unconfigured detail",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-presentation-refresh.test.ts",
+      "name": " responsive system tag list folds by actual row width and restores tags on a wider viewport",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-send-recency.test.ts",
+      "name": " expert recency follows successful sends ignores the old click-history key and does not record a candidate choice",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-send-recency.test.ts",
+      "name": " expert recency follows successful sends uses the current user send history and freezes its order until the next opening",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-send-recency.test.ts",
+      "name": " expert recency follows successful sends searches names and descriptions without matching a department-only keyword",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-send-recency.test.ts",
+      "name": " expert recency follows successful sends does not count browsing a composed expert page or an existing conversation",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-send-recency.test.ts",
+      "name": " expert recency follows successful sends records the expert bound to a successful first send, after entering the conversation",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-send-recency.test.ts",
+      "name": " expert recency follows successful sends does not record a first send if entering the conversation is rejected",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-send-recency.test.ts",
+      "name": " expert recency follows successful sends records only the selected expert of an accepted follow-up while preserving the old answer expert",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-send-recency.test.ts",
+      "name": " expert recency follows successful sends does not count a send blocked by the currently running plan",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-send-recency.test.ts",
+      "name": " expert recency follows successful sends keeps an accepted conversation usable when recording recency cannot persist",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-send-recency.test.ts",
+      "name": " expert recency follows successful sends records a continued send to the current expert without an at selection and advances at equal clock times",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-send-recency.test.ts",
+      "name": " expert recency follows successful sends does not record a send rejected by expert availability or a daily-office send",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-send-recency.test.ts",
+      "name": " expert candidates always stay above the composer shrinks into scrollable space above a high composer instead of moving below it",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-settings-persistence.test.ts",
+      "name": " source expert settings persistence edits the existing daily assistant using its existing avatar without uploading a new icon",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-settings-persistence.test.ts",
+      "name": " source expert settings persistence persists an explicit model and role change on an existing source expert",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-settings-persistence.test.ts",
+      "name": " source expert settings persistence loads source shortcuts and persists a user shortcut title and content across edit",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/expert-settings-persistence.test.ts",
+      "name": " source expert settings persistence deletes a published business expert and keeps its last publication available to history after reload",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-settings-persistence.test.ts",
+      "name": " source expert settings persistence does not restore the static daily row after deleting its persisted record",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-settings-persistence.test.ts",
+      "name": " source expert settings persistence keeps the visible and published expert if deletion cannot be persisted",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/expert-settings-persistence.test.ts",
+      "name": " source expert settings persistence rejects stale saves, publications and status changes for a deleted expert",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/knowledge-create-menu.test.ts",
+      "name": " knowledge create menu combines three operations under one toolbar button",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/knowledge-create-menu.test.ts",
+      "name": " knowledge create menu retains folder and DingTalk import actions for ordinary users",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/knowledge-create-menu.test.ts",
+      "name": " knowledge create menu closes on outside click and Escape and supports keyboard navigation",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/knowledge-create-menu.test.ts",
+      "name": " knowledge create menu keeps DingTalk import disabled without a logged-in user",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/m3-import-oct12.test.ts",
+      "name": " M3 context, tree destinations and task records scopes task data by logged-in user and role before the UI renders it",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/m3-import-oct12.test.ts",
+      "name": " M3 context, tree destinations and task records opens own sync records from the toolbar and hides all connection configuration",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/m3-import-oct12.test.ts",
+      "name": " M3 context, tree destinations and task records allows own schedule updates but rejects a forged other-user task update",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/m3-import-oct12.test.ts",
+      "name": " M3 context, tree destinations and task records blocks ordinary-user direct navigation to admin connection settings",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/m3-import-oct12.test.ts",
+      "name": " M3 context, tree destinations and task records shows four root actions, three KB actions and two folder actions",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/m3-import-oct12.test.ts",
+      "name": " M3 context, tree destinations and task records starts root import empty and defaults KB/folder import to its current writable node",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/m3-import-oct12.test.ts",
+      "name": " M3 context, tree destinations and task records uses the same single-select KB→folder tree for upload and import and hides nested folder creation",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/m3-import-oct12.test.ts",
+      "name": " M3 context, tree destinations and task records offers ordinary users only writable personal destinations including their folders",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/m3-import-oct12.test.ts",
+      "name": " M3 context, tree destinations and task records creates one task with two source-to-local mappings and saves into the selected folder",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/m3-import-oct12.test.ts",
+      "name": " M3 context, tree destinations and task records separates sources/destination, joins multiple document sources with semicolons, and searches alias/source/destination",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/m3-import-oct12.test.ts",
+      "name": " M3 context, tree destinations and task records creates a root folder only after selecting a writable knowledge base",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/oct12-chat-review.test.ts",
+      "name": " October 12 chat review requirements adds a top pinned group while retaining sessions in their original group",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/oct12-chat-review.test.ts",
+      "name": " October 12 chat review requirements renders date/time below both the user bubble and the AI answer",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/oct12-chat-review.test.ts",
+      "name": " October 12 chat review requirements keeps compact processing collapsed and offers the stalled reminder prototype",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/oct12-chat-review.test.ts",
+      "name": " October 12 chat review requirements differentiates website and knowledge references and uses a simple source list",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/task-stall-reminder.test.ts",
+      "name": " task interruption and result notifications notifies immediately for mandatory input without waiting for the stagnation timer",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/task-stall-reminder.test.ts",
+      "name": " task interruption and result notifications waits 60 seconds for running inactivity and replaces it with a terminal result",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/usage-form-refresh.test.ts",
+      "name": " usage instructions simplified form accepts each 500-character text independently and keeps optional systems empty",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/usage-form-refresh.test.ts",
+      "name": " usage instructions simplified form only removes confirmed automatic tags and retains real business-system labels",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/usage-form-refresh.test.ts",
+      "name": " usage instructions simplified form shows only manual systems in the settings form and preserves capability metadata on save",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/usage-form-refresh.test.ts",
+      "name": " usage instructions simplified form exposes 500-character limits and publishes an automatic-only expert without fictitious manual tags",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-access-permissions.test.ts",
+      "name": " knowledge access role boundary hides the entry and ignores direct configuration URLs for a normal user",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-access-permissions.test.ts",
+      "name": " knowledge access role boundary shows admin configuration and closes it immediately when the role is revoked",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-chat-boundaries.test.ts",
+      "name": " V1.3 conversation review fixes restores the fixed approval mode and expert after history/search re-entry and ignores query overrides",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-chat-boundaries.test.ts",
+      "name": " V1.3 conversation review fixes creates distinct conversations and resets a new conversation to default permissions",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-chat-boundaries.test.ts",
+      "name": " V1.3 conversation review fixes routes a preselected expert-mode home through the expert actually chosen before sending",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-chat-boundaries.test.ts",
+      "name": " V1.3 conversation review fixes isolates conversation mode records by current user",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-chat-boundaries.test.ts",
+      "name": " V1.3 conversation review fixes does not derive a completed daily process tone from the expert demo plan state",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-chat-boundaries.test.ts",
+      "name": " V1.3 conversation review fixes keeps the actual DingTalk action in its completed execution timeline after manual confirmation",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-chat-boundaries.test.ts",
+      "name": " V1.3 conversation review fixes lets the user expand and collapse the complete expert plan",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-chat-boundaries.test.ts",
+      "name": " V1.3 conversation review fixes collapses an expanded process when execution completes and allows reopening it",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-chat-boundaries.test.ts",
+      "name": " V1.3 conversation review fixes retains failed execution records when an explicit retry creates a new version",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-chat-boundaries.test.ts",
+      "name": " V1.3 conversation review fixes retains an immediately started autonomous execution after refreshing",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-chat-boundaries.test.ts",
+      "name": " V1.3 conversation review fixes keeps a default follow-up waiting until manual start regardless of draft activity",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-chat-boundaries.test.ts",
+      "name": " V1.3 conversation review fixes keeps a default expert follow-up waiting after @ selection without pausing it",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-chat-boundaries.test.ts",
+      "name": " V1.3 conversation review fixes keeps high-impact confirmation blocking autonomous execution and reports the actual plan state",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-chat-boundaries.test.ts",
+      "name": " V1.3 conversation review fixes cancels a default-mode tool confirmation without showing successful external results",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-chat-boundaries.test.ts",
+      "name": " V1.3 conversation review fixes retains the start and terminal result of a persisted autonomous follow-up plan",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-chat-boundaries.test.ts",
+      "name": " V1.3 conversation review fixes closes the approval picker when interacting outside or pressing Escape",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-chat-experts-round3.test.ts",
+      "name": " expert shortcut latest specification opens for every at sign including emails, numbers and the full-width sign",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-chat-experts-round3.test.ts",
+      "name": " expert shortcut latest specification loads five at a time and lets the keyboard move into the next batch",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-chat-experts-round3.test.ts",
+      "name": " expert shortcut latest specification replaces only the active token on repeated selection and preserves text after the caret",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-chat-experts-round3.test.ts",
+      "name": " expert shortcut latest specification sorts all experts only by the last successful send and resets the loaded batch on a new search",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-chat-experts-round3.test.ts",
+      "name": " expert shortcut latest specification does not confirm a selection while Chinese input is composing and Esc keeps the typed token",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-chat-experts-round3.test.ts",
+      "name": " expert shortcut latest specification loads from list scrolling without pagination buttons and renders only avatars and names",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-chat-experts-round3.test.ts",
+      "name": " expert send-time permissions blocks a selected expert when the catalogue was replaced with an unavailable release",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-citations.test.ts",
+      "name": " answer citations shows inline web citation hover information and opens the source directly",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-citations.test.ts",
+      "name": " answer citations lists references below the answer with clickable page titles",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-citations.test.ts",
+      "name": " answer citations keeps knowledge citations in the existing fragment preview",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-citations.test.ts",
+      "name": " answer citations deduplicates footer sources while preserving inline numbering",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-citations.test.ts",
+      "name": " answer citations shows a four-line-clamped web summary in the footer",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-citations.test.ts",
+      "name": " answer citations does not expose inaccessible source content",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-citations.test.ts",
+      "name": " answer citations does not render a references section when no source was used",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-citations.test.ts",
+      "name": " answer citations allows only safe public HTTP links",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-devqa.test.ts",
+      "name": " development and QA review boundaries selects an approval mode before sending and keeps it fixed in the conversation",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-devqa.test.ts",
+      "name": " development and QA review boundaries preserves explicit mandatory-human approval in both modes",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-devqa.test.ts",
+      "name": " development and QA review boundaries keeps reasoning collapsed and shows one tool call with the AI reply when expanded",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-devqa.test.ts",
+      "name": " development and QA review boundaries keeps the fixed approval mode in the current conversation share link",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-devqa.test.ts",
+      "name": " development and QA review boundaries does not reopen a copy fallback in another conversation after a late rejection",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-devqa.test.ts",
+      "name": " development and QA review boundaries does not restore a removed task to the pinned area",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-devqa.test.ts",
+      "name": " development and QA review boundaries does not select an official template from a negative instruction",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-devqa.test.ts",
+      "name": " development and QA review boundaries accepts a user PPT template through the template skill and uses its name in the plan",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-devqa.test.ts",
+      "name": " development and QA review boundaries preserves completed deliverables and every follow-up message",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-devqa.test.ts",
+      "name": " development and QA review boundaries closes mention candidates after keyboard selection leaves the trigger",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-devqa.test.ts",
+      "name": " development and QA review boundaries clears scope bound to old credentials when returning and changing credentials",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-devqa.test.ts",
+      "name": " development and QA review boundaries does not convert individually selected documents into a dynamic folder scope",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-devqa.test.ts",
+      "name": " development and QA review boundaries checks concurrent connection names again at final submission",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-devqa.test.ts",
+      "name": " development and QA review boundaries limits knowledge access settings to connection configuration and sync records",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-devqa.test.ts",
+      "name": " development and QA review boundaries allows an administrator to update a sync schedule from a record",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-devqa.test.ts",
+      "name": " development and QA review boundaries keeps the initiating user visible in every sync record",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-devqa.test.ts",
+      "name": " development and QA review boundaries reserves citation numbers before late source metadata arrives",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-devqa.test.ts",
+      "name": " development and QA review boundaries reloads the selected preview after access is restored",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-devqa.test.ts",
+      "name": " development and QA review boundaries closes the source panel and releases the layout when its source disappears",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-dingtalk-identity.test.ts",
+      "name": " M3 current-user permissions and import boundaries lists only source documents readable by the bound user and ignores supplied identity query values",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-dingtalk-identity.test.ts",
+      "name": " M3 current-user permissions and import boundaries keeps identity and credentials out of the ordinary-user import form",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-dingtalk-identity.test.ts",
+      "name": " M3 current-user permissions and import boundaries marks an unsupported file in the tree and selected panel and requires its removal before importing",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-dingtalk-identity.test.ts",
+      "name": " M3 current-user permissions and import boundaries requires a bound identity and available application connection",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-dingtalk-identity.test.ts",
+      "name": " M3 current-user permissions and import boundaries submits one batch with target, current user and synchronization schedule",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-dingtalk-identity.test.ts",
+      "name": " M3 current-user permissions and import boundaries cancels pending import and source selections if the logged identity changes",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-dingtalk-identity.test.ts",
+      "name": " M3 current-user permissions and import boundaries rechecks write permission and app availability before in-flight import completes",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-dingtalk-identity.test.ts",
+      "name": " M3 current-user permissions and import boundaries has no admin-management interface for ordinary users",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-dingtalk-identity.test.ts",
+      "name": " M3 current-user permissions and import boundaries computes daily schedules in Beijing time and rejects invalid hours",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-expert-center-cards.test.ts",
+      "name": " opens structured details in a centered dialog and keeps the action footer separate from the scrolling body",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-expert-center-revision.test.ts",
+      "name": " publication missing field presentation highlights and focuses a missing required field without error copy",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-expert-center-revision.test.ts",
+      "name": " publication missing field presentation still blocks an oversized optional field with a clear length error",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-experts-round2.test.ts",
+      "name": " expert field and mention review preserves paragraphs when a saved usage form is reopened",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-experts-round2.test.ts",
+      "name": " expert field and mention review preserves unstructured legacy text including colons",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-experts-round2.test.ts",
+      "name": " expert field and mention review validates optional text and draft lengths without silently truncating tags",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-experts-round2.test.ts",
+      "name": " expert field and mention review does not invent capability metadata from generic tools or creation time",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-experts-round2.test.ts",
+      "name": " expert field and mention review uses explicit capabilities and publication timestamps in the detail drawer",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-experts-round2.test.ts",
+      "name": " expert field and mention review retains first publication time and updates only the successful release time",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-experts-round2.test.ts",
+      "name": " expert field and mention review never removes changed draft text using a stale mention range",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-experts-round2.test.ts",
+      "name": " expert settings publication closure keeps automatic systems out of the manual usage form",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-experts-round2.test.ts",
+      "name": " expert settings publication closure publishes capability selections and restores them on edit",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-experts-round2.test.ts",
+      "name": " mention menu viewport placement stays above and shrinks the scrollable list when there is more room below",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-experts-round2.test.ts",
+      "name": " mention menu viewport placement keeps a bottom composer menu above the input without crossing the top safe area",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-experts-round2.test.ts",
+      "name": " expert version and local date preservation keeps the current semantic version when publishing only usage changes",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-experts-round2.test.ts",
+      "name": " expert version and local date preservation renders a UTC evening publication timestamp as the next Beijing date",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-experts.test.ts",
+      "name": " expert favorite, instructions and mention closure uses the agreed business groups and filters store experts",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-experts.test.ts",
+      "name": " expert favorite, instructions and mention closure keeps selection history separate and moves an expert forward only after a successful send",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-experts.test.ts",
+      "name": " expert favorite, instructions and mention closure filters through the composer while keeping the expert list free of search chrome",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-experts.test.ts",
+      "name": " expert favorite, instructions and mention closure renders the exact saved usage text, preserving legacy unstructured instructions",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-experts.test.ts",
+      "name": " expert favorite, instructions and mention closure replaces only the mention token, keeps the draft, and allows removing the expert",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-experts.test.ts",
+      "name": " expert favorite, instructions and mention closure triggers for email at signs but never submits empty results or a Chinese IME confirmation",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-experts.test.ts",
+      "name": " expert favorite, instructions and mention closure keeps the old conversation identity when another expert is selected for the next message",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-interactions.test.ts",
+      "name": " V1.3 approved interaction paths carries the selected expert and prompt into the composer without sending",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-interactions.test.ts",
+      "name": " V1.3 approved interaction paths opens the expert drawer by keyboard and sends the chosen prompt to the composer route",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-interactions.test.ts",
+      "name": " V1.3 approved interaction paths does not expose unpublished experts in discovery",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-interactions.test.ts",
+      "name": " V1.3 approved interaction paths keeps default permissions manual when whitespace is typed and cleared",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-interactions.test.ts",
+      "name": " V1.3 approved interaction paths starts once after manual confirmation, allows explicit PPT choice, and labels demo outputs",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-interactions.test.ts",
+      "name": " V1.3 approved interaction paths keeps management edits cancellable and prevents a pending sync from reconnecting after disconnect",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-interactions.test.ts",
+      "name": " V1.3 approved interaction paths reaches completion on clipboard success and rejects stalled attempts after three seconds",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-knowledge-citations-round2.test.ts",
+      "name": " knowledge and citation review recovery refreshes an opened knowledge preview when late excerpt data arrives",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-knowledge-citations-round2.test.ts",
+      "name": " knowledge and citation review recovery hides unresolved-source counts after citations are removed",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-knowledge-citations-round2.test.ts",
+      "name": " knowledge and citation review recovery renders nothing for direct admin navigation without permission",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-knowledge-citations-round2.test.ts",
+      "name": " knowledge and citation review recovery keeps admin settings limited to connection and synchronization records",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-knowledge-citations-round2.test.ts",
+      "name": " knowledge and citation review recovery records the initiating user for every synchronization job",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-review.test.ts",
+      "name": " review changes round-trips the concise usage form into the published text format",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/__tests__/v13-review.test.ts",
+      "name": " review changes pins directly without opening a task, keeps five rows, and reorders on unpin",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/__tests__/v13-review.test.ts",
+      "name": " review changes does not expose a saved draft until publication and validates the required usage fields",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/composables/__tests__/useAIChat.test.ts",
+      "name": " AI chat display helpers hides run-mode prefixes from user-facing text",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/composables/__tests__/useAIChat.test.ts",
+      "name": " AI chat display helpers summarizes conversation titles without brackets or long prompts",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/composables/__tests__/useAuth.test.ts",
+      "name": " useAuth state machine starts in pending",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/composables/__tests__/useAuth.test.ts",
+      "name": " useAuth state machine confirmMock jumps to confirmed",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/composables/__tests__/useAuth.test.ts",
+      "name": " useAuth state machine reset returns to pending from confirmed",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/composables/__tests__/useAuth.test.ts",
+      "name": " useAuth state machine scan only transitions from pending",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/composables/__tests__/useKnowledgePermissions.spec.ts",
+      "name": " knowledge permission transaction model resolves inherited subjects while a break fully replaces its parent",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/composables/__tests__/useKnowledgePermissions.spec.ts",
+      "name": " knowledge permission transaction model resolves download separately and still requires view authority",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/composables/__tests__/useKnowledgePermissions.spec.ts",
+      "name": " knowledge permission transaction model rolls back unconfirmed editor and member-picker changes",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/composables/__tests__/useKnowledgePermissions.spec.ts",
+      "name": " knowledge permission transaction model only applies member-picker selection to the editor draft after confirmation",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/composables/__tests__/useKnowledgePermissions.spec.ts",
+      "name": " knowledge permission transaction model rejects a break draft without at least one view subject",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/composables/__tests__/useKnowledgePermissions.spec.ts",
+      "name": " knowledge permission transaction model counts only descendants whose effective permission would change",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/composables/__tests__/useKnowledgePermissions.spec.ts",
+      "name": " knowledge permission transaction model rejects a stale save and refreshes the draft from the latest revision",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/composables/__tests__/useKnowledgePermissions.spec.ts",
+      "name": " knowledge permission transaction model rejects save when administrator authority is lost after editing begins",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/composables/__tests__/useNews.test.ts",
+      "name": " filterArticles returns all articles with \"all\" category",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/composables/__tests__/useNews.test.ts",
+      "name": " filterArticles filters by category=competitor",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/composables/__tests__/useNews.test.ts",
+      "name": " filterArticles filters by tag",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/composables/__tests__/useNews.test.ts",
+      "name": " filterArticles filters by search term in title/summary",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/composables/__tests__/useNews.test.ts",
+      "name": " filterArticles sorts pinned first, then latest by default",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/composables/__tests__/useNews.test.ts",
+      "name": " filterArticles sorts by hot (viewCount) with pinned first",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/composables/__tests__/useNews.test.ts",
+      "name": " filterArticles paginates correctly",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/composables/__tests__/useNews.test.ts",
+      "name": " filterArticles clamps page beyond total to last page",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/composables/__tests__/useWorkbenchBoardState.spec.ts",
+      "name": " useWorkbenchBoardState uses session data without loading until manual refresh",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/composables/__tests__/useWorkbenchBoardState.spec.ts",
+      "name": " useWorkbenchBoardState keeps stale data after a failed refresh",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/composables/__tests__/useWorkbenchBoardState.spec.ts",
+      "name": " useWorkbenchBoardState does not execute duplicate refreshes",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/composables/__tests__/useWorkbenchBoardState.spec.ts",
+      "name": " useWorkbenchBoardState persists appended board data in the current browser session",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/mock/__tests__/knowledge-source.spec.ts",
+      "name": " local knowledge-source fixtures uses the local product-domain knowledge base names instead of copied production names",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/mock/__tests__/knowledge-source.spec.ts",
+      "name": " local knowledge-source fixtures provides folder-backed trees for at least six public and two personal libraries",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/mock/__tests__/knowledge-source.spec.ts",
+      "name": " local knowledge-source fixtures limits local folders to one level beneath each knowledge base",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/mock/__tests__/knowledge-source.spec.ts",
+      "name": " local knowledge-source fixtures uses stable unique resource ids and complete file metadata",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/router/__tests__/v110Routes.spec.ts",
+      "name": " V1.1.0 settings routes routes usage and audit through the current settings area",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/DashboardView.spec.ts",
+      "name": " DashboardView shows the Guandata menu and enforces administrator permission",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/views/__tests__/KnowledgeBaseView.spec.ts",
+      "name": " KnowledgeBaseView source clone renders local mock knowledge bases in the captured four-column shell",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/KnowledgeBaseView.spec.ts",
+      "name": " KnowledgeBaseView source clone opens the exact source sidebar and switches spaces",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/KnowledgeBaseView.spec.ts",
+      "name": " KnowledgeBaseView source clone matches the create, upload, and folder dialog copy and disabled states",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/KnowledgeBaseView.spec.ts",
+      "name": " KnowledgeBaseView source clone keeps knowledge-base permissions compatible with the previous release",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/KnowledgeBaseView.spec.ts",
+      "name": " KnowledgeBaseView source clone inherits parent permissions for folders and lets administrators break inheritance",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/KnowledgeBaseView.spec.ts",
+      "name": " KnowledgeBaseView source clone allows an inherited member to be selected again while keeping the dual-source row read-only",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/KnowledgeBaseView.spec.ts",
+      "name": " KnowledgeBaseView source clone supports transactional member picking, search and impact confirmation",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/KnowledgeBaseView.spec.ts",
+      "name": " KnowledgeBaseView source clone rolls back main-dialog edits on cancel and persists only after final confirmation without standalone markers",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/KnowledgeBaseView.spec.ts",
+      "name": " KnowledgeBaseView source clone places a row action menu above a trigger near the viewport bottom so it remains visible",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/KnowledgeBaseView.spec.ts",
+      "name": " KnowledgeBaseView source clone uses a right-side Q&A panel and supports deterministic local chat",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/KnowledgeBaseView.spec.ts",
+      "name": " KnowledgeBaseView source clone navigates a one-level knowledge folder and previews a local file",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/KnowledgeBaseView.spec.ts",
+      "name": " KnowledgeBaseView source clone creates a folder in the current local mock location",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/SettingsInsightsView.spec.ts",
+      "name": " SettingsInsightsView shows personal cost and quota without administrator navigation",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/views/__tests__/SettingsInsightsView.spec.ts",
+      "name": " SettingsInsightsView shows a personal consumption ledger with quick periods and export",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/views/__tests__/SettingsInsightsView.spec.ts",
+      "name": " SettingsInsightsView combines usage and quota into one filter-driven tree table",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/views/__tests__/SettingsInsightsView.spec.ts",
+      "name": " SettingsInsightsView applies filters on query and keeps metric cards synchronized",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/views/__tests__/SettingsInsightsView.spec.ts",
+      "name": " SettingsInsightsView drills directly from person to requests titled with conversation and time",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/views/__tests__/SettingsInsightsView.spec.ts",
+      "name": " SettingsInsightsView sets quota only for a person and displays one low-quota warning",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/views/__tests__/SettingsInsightsView.spec.ts",
+      "name": " SettingsInsightsView opens usage detail in a centered modal with token breakdown",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/views/__tests__/SettingsInsightsView.spec.ts",
+      "name": " SettingsInsightsView exports the currently filtered usage rows",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/SettingsInsightsView.spec.ts",
+      "name": " SettingsInsightsView uses one audit page with the agreed filters, schema and centered detail modal",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/views/__tests__/SettingsManagementView.spec.ts",
+      "name": " SettingsManagementView opens the agent management workspace from /settings/agents",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/SettingsManagementView.spec.ts",
+      "name": " SettingsManagementView keeps the production list controls compact and interactive",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/SettingsManagementView.spec.ts",
+      "name": " SettingsManagementView opens the production-aligned four-step agent editor",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/views/__tests__/SettingsManagementView.spec.ts",
+      "name": " SettingsManagementView edits usage instructions as four plain labeled fields without grouped cards",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/SettingsManagementView.spec.ts",
+      "name": " SettingsManagementView keeps the sidebar selection synced with settings sub-routes",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/views/__tests__/SourceChatFlows.spec.ts",
+      "name": " authenticated source chat flows navigates histories, task files, and new conversation as distinct routes",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/SourceChatFlows.spec.ts",
+      "name": " authenticated source chat flows opens the existing conversation search when forwarded from expert center",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/SourceChatFlows.spec.ts",
+      "name": " authenticated source chat flows forwards rename and deletion to confirmations without deleting the session",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/SourceChatFlows.spec.ts",
+      "name": " authenticated source chat flows shows the M10 DingTalk authorization and write-confirmation flow in the conversation",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/views/__tests__/SourceChatFlows.spec.ts",
+      "name": " authenticated source chat flows renders daily and expert session detail actions and task files",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/SourceChatFlows.spec.ts",
+      "name": " authenticated source chat flows expands a task group and opens a working preview drawer",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/SourceChatFlows.spec.ts",
+      "name": " authenticated source chat flows exposes hover help on icon-only controls",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/SourceChatFlows.spec.ts",
+      "name": " authenticated source chat flows opens session search and all secondary menu states",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/views/__tests__/SourceChatFlows.spec.ts",
+      "name": " authenticated source chat flows searches message content with cascading conversation filters, loads older results, and opens the matching message",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/SourceChatFlows.spec.ts",
+      "name": " authenticated source chat flows opens a create dialog and places the saved quick prompt before system cards",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/SourceChatFlows.spec.ts",
+      "name": " authenticated source chat flows shows the newest saved quick prompt first",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/SourceChatFlows.spec.ts",
+      "name": " authenticated source chat flows matches the production home hierarchy and exposes the added product lookup card",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/views/__tests__/SourceChatFlows.spec.ts",
+      "name": " authenticated source chat flows isolates newly created quick prompts by mode",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/views/__tests__/SourceChatFlows.spec.ts",
+      "name": " authenticated source chat flows shows three contextual follow-ups and consumes them after a click",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/SystemPortalsView.spec.ts",
+      "name": " workbench routes keeps knowledge, workbench, and settings routes available",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/views/__tests__/SystemPortalsView.spec.ts",
+      "name": " SystemPortalsView stores task statuses and priorities with the product vocabulary",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/common/__tests__/ResourcePermissionDialog.spec.ts",
+      "name": " ResourcePermissionDialog keeps changes as a draft, deduplicates members, and saves the full permission list",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/common/__tests__/ResourcePermissionDialog.spec.ts",
+      "name": " ResourcePermissionDialog omits the knowledge retrieval message for intelligent agents",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/workbench/__tests__/DigestActionDialog.spec.ts",
+      "name": " DigestActionDialog shows recipient and content without a message title",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/workbench/__tests__/DigestActionDialog.spec.ts",
+      "name": " DigestActionDialog shows the complete DingTalk todo fields",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/workbench/__tests__/DigestActionDialog.spec.ts",
+      "name": " DigestActionDialog submits DingTalk urgent priority without collapsing it into high priority",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/workbench/__tests__/DigestActionDialog.spec.ts",
+      "name": " DigestActionDialog submits description, priority, participants, and reminder time with a todo",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/workbench/__tests__/DigestActionDialog.spec.ts",
+      "name": " DigestActionDialog emits the selected target reference and editable message content",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/workbench/__tests__/DigestActionDialog.spec.ts",
+      "name": " DigestActionDialog offers common message shortcuts and keeps the button type scale below the title",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/workbench/__tests__/DigestActionDialog.spec.ts",
+      "name": " DigestActionDialog searches and selects a recipient from the enterprise address book",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/workbench/__tests__/EmailSummaryPanel.spec.ts",
+      "name": " EmailSummaryPanel shows read state returned by the mailbox without changing it",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/workbench/__tests__/EmailSummaryPanel.spec.ts",
+      "name": " EmailSummaryPanel requests the next page and prevents repeated requests while loading",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/workbench/__tests__/InformationDigestPanel.spec.ts",
+      "name": " InformationDigestPanel v3.9 renders the five PRD tabs in order",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/workbench/__tests__/InformationDigestPanel.spec.ts",
+      "name": " InformationDigestPanel v3.9 shows only five items before the first lazy-load boundary",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/workbench/__tests__/InformationDigestPanel.spec.ts",
+      "name": " InformationDigestPanel v3.9 shows a concise bound detail after hovering the source-count icon",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/workbench/__tests__/InformationDigestPanel.spec.ts",
+      "name": " InformationDigestPanel v3.9 opens an action-only dialog without opening details",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/workbench/__tests__/InformationDigestPanel.spec.ts",
+      "name": " InformationDigestPanel v3.9 uses directed empty copy for risk and watch",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/workbench/__tests__/InformationDigestPanel.spec.ts",
+      "name": " InformationDigestPanel v3.9 emits refresh without changing the active tab",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/workbench/__tests__/InformationDigestPanel.spec.ts",
+      "name": " InformationDigestPanel v3.9 removes a dismissed item from the current view",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/workbench/__tests__/InformationDigestPanel.spec.ts",
+      "name": " InformationDigestPanel v3.9 reveals the next batch near the scroll bottom",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/workbench/__tests__/InformationDigestPanel.spec.ts",
+      "name": " InformationDigestPanel v3.9 keeps a visible conflict example in the default mock data",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/workbench/__tests__/WorkbenchBoardHeader.spec.ts",
+      "name": " WorkbenchBoardHeader places refresh beside the title and search at the far right",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/workbench/__tests__/WorkbenchBoardHeader.spec.ts",
+      "name": " WorkbenchBoardHeader clears search and disables duplicate refresh while loading",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/chat/source-clone/__tests__/ExpertTodoProgress.spec.ts",
+      "name": " ExpertTodoProgress shows one-line progress and reveals task details on hover",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/chat/source-clone/__tests__/ExpertTodoProgress.spec.ts",
+      "name": " ExpertTodoProgress keeps the completed summary available above the composer",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/chat/source-clone/__tests__/FollowUpPlan.spec.ts",
+      "name": " follow-up plan execution modes keeps a default plan waiting until the user explicitly runs it",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/chat/source-clone/__tests__/FollowUpPlan.spec.ts",
+      "name": " follow-up plan execution modes allows manual execution while the next message has a draft",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/chat/source-clone/__tests__/FollowUpPlan.spec.ts",
+      "name": " follow-up plan execution modes starts an active autonomous plan immediately despite a draft",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/chat/source-clone/__tests__/FollowUpPlan.spec.ts",
+      "name": " follow-up plan execution modes does not automatically run an inactive autonomous plan",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/chat/source-clone/__tests__/FollowUpPlan.spec.ts",
+      "name": " follow-up plan execution modes starts at most once when the run button receives repeated clicks",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/chat/source-clone/__tests__/FollowUpPlan.spec.ts",
+      "name": " follow-up plan execution modes restores a completed plan without starting it again in autonomous mode",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/chat/source-clone/__tests__/FollowUpPlan.spec.ts",
+      "name": " follow-up plan execution modes resumes a running plan from its original start time after refresh",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/chat/source-clone/__tests__/FollowUpPlan.spec.ts",
+      "name": " follow-up plan execution modes keeps a stopped plan cancelled after refresh",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/chat/source-clone/__tests__/FollowUpPlan.spec.ts",
+      "name": " follow-up plan execution modes migrates a paused legacy plan to manual waiting and ignores its deadline",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/chat/source-clone/__tests__/FollowUpPlan.spec.ts",
+      "name": " follow-up plan execution modes does not infer completion for a running plan with a 'missing' start time",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/chat/source-clone/__tests__/FollowUpPlan.spec.ts",
+      "name": " follow-up plan execution modes does not infer completion for a running plan with a 'null' start time",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/chat/source-clone/__tests__/FollowUpPlan.spec.ts",
+      "name": " follow-up plan execution modes does not infer completion for a running plan with a 'invalid text' start time",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/chat/source-clone/__tests__/FollowUpPlan.spec.ts",
+      "name": " follow-up plan execution modes does not infer completion for a running plan with a 'negative' start time",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/chat/source-clone/__tests__/FollowUpPlan.spec.ts",
+      "name": " follow-up plan execution modes does not infer completion for a running plan with a 'future' start time",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/chat/source-clone/__tests__/FollowUpPlan.spec.ts",
+      "name": " follow-up plan execution modes does not restart a persisted unknown plan after refresh",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/chat/source-clone/__tests__/FollowUpPlan.spec.ts",
+      "name": " follow-up plan execution modes does not restart a persisted unrecognized plan after refresh",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/chat/source-clone/__tests__/FollowUpPlan.spec.ts",
+      "name": " follow-up plan execution modes keeps an edited default plan waiting for manual execution",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/chat/source-clone/__tests__/FollowUpPlan.spec.ts",
+      "name": " approval mode locking ignores a stale selection event after the conversation mode becomes readonly",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/components/chat/source-clone/__tests__/InlineExecutionTrace.spec.ts",
+      "name": " InlineExecutionTrace uses an inline narrative and an expanded scrollable command group while running",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/chat/source-clone/__tests__/InlineExecutionTrace.spec.ts",
+      "name": " InlineExecutionTrace collapses the command group after completion and keeps it available for review",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/chat/source-clone/__tests__/SourceChatTodoProgress.spec.ts",
+      "name": " SourceChatDetail expert todo progress mounts the progress line immediately above the active input in an expert conversation",
+      "occurrence": 1,
+      "status": "failed"
+    },
+    {
+      "file": "src/components/knowledge/source-clone/__tests__/DingTalkAccessForm.spec.ts",
+      "name": " DingTalk access prototype validates configuration, preserves selection on back, and completes a demo import",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/knowledge/source-clone/__tests__/DingTalkAccessForm.spec.ts",
+      "name": " DingTalk access prototype invalidates a pending credential check after editing credentials",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/knowledge/source-clone/__tests__/KnowledgeDialogs.spec.ts",
+      "name": " KnowledgeDialogs upload requires a destination and files before enabling confirmation",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/knowledge/source-clone/__tests__/KnowledgeDialogs.spec.ts",
+      "name": " KnowledgeDialogs upload accepts valid selected files, deduplicates them and allows individual removal",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/knowledge/source-clone/__tests__/KnowledgeDialogs.spec.ts",
+      "name": " KnowledgeDialogs upload supports dropped files and reports unsupported and oversized files inline",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/knowledge/source-clone/__tests__/KnowledgeDialogs.spec.ts",
+      "name": " KnowledgeDialogs upload emits the selected destination together with pasted files",
+      "occurrence": 1,
+      "status": "passed"
+    },
+    {
+      "file": "src/components/knowledge/source-clone/__tests__/KnowledgeDialogs.spec.ts",
+      "name": " KnowledgeDialogs upload enables monthly parsing only when the batch contains Excel and submits the option",
+      "occurrence": 1,
+      "status": "passed"
+    }
+  ],
+  "collectionErrors": [
+    {
+      "file": "src/__tests__/v13-business-catalog.test.ts",
+      "message": "No test suite found in file src/__tests__/v13-business-catalog.test.ts"
+    }
+  ],
+  "generatedOn": "2026-10-13",
+  "provenance": "Current original checkout, before applying cleanup; 8 concurrent source edits preserved. Initial baseline and raw reports retained in local backup.",
+  "retirements": [
+    {
+      "date": "2026-10-14",
+      "file": "src/views/__tests__/SystemPortalsView.spec.ts",
+      "count": 49,
+      "reason": "User explicitly authorized retirement of obsolete workbench UI; replaced with current system-directory contracts; route coverage retained."
+    }
+  ]
+}

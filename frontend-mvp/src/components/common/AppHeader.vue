@@ -18,12 +18,14 @@ const logo = `${import.meta.env.BASE_URL}assets/figma/tianma-logo.png`
 const sourceAvatar = `${import.meta.env.BASE_URL}assets/production-home/user-avatar.jpg`
 const workbenchLogo = `${import.meta.env.BASE_URL}assets/production-home/header-logo-workbench.png`
 const isWorkbench = computed(() => route.path === '/portals')
+const isVideo = computed(() => route.path.startsWith('/video-gen'))
 const isChat = computed(() => route.path.startsWith('/chat') || route.path === '/agent-square')
 const mobileNavOpen = ref(false)
 
 const navItems = computed(() => [
   { label: '天马智擎', to: '/chat' },
-  { label: '自动化', to: '/portals?view=automation' },
+  { label: '视频生成', to: '/video-gen/capability-square' },
+  { label: '自动化', to: '/automation' },
   { label: '工作台', to: '/portals' },
   { label: '仪表盘', to: '/dashboards' },
   { label: '知识中心', to: '/knowledge' },
@@ -32,7 +34,8 @@ const navItems = computed(() => [
 
 const chatNavItems = computed(() => [
   { label: '天马智擎', to: '/chat' },
-  { label: '自动化', to: '/portals?view=automation' },
+  { label: '视频生成', to: '/video-gen/capability-square' },
+  { label: '自动化', to: '/automation' },
   { label: '工作台', to: '/portals' },
   { label: '仪表盘', to: '/dashboards' },
   { label: '知识中心', to: '/knowledge' },
@@ -41,6 +44,9 @@ const chatNavItems = computed(() => [
 
 function dispatchChatAction(action: 'new' | 'search' | 'toggle-sidebar') {
   window.dispatchEvent(new CustomEvent('tianma:chat-action', { detail: action }))
+}
+function dispatchVideoSidebar() {
+  window.dispatchEvent(new Event('tianma:video-sidebar'))
 }
 
 function logout() {
@@ -89,6 +95,19 @@ function openPersonalUsage() {
         </DropdownMenu>
       </div>
     </div>
+    <template v-else-if="isVideo">
+      <div class="flex h-14 items-center gap-5 px-4">
+        <RouterLink to="/chat" class="shrink-0" aria-label="天马智擎首页"><img :src="workbenchLogo" alt="AI工作台" class="h-7 w-[106px] object-contain" /></RouterLink>
+        <button class="ml-auto grid h-8 w-8 place-items-center rounded-lg hover:bg-[#edeef1] min-[1000px]:ml-[72px]" aria-label="展开或收起视频侧边栏" @click="dispatchVideoSidebar"><PanelLeft class="h-4 w-4" /></button>
+        <nav class="hidden h-full items-center gap-7 min-[1000px]:flex" aria-label="主导航">
+          <RouterLink v-for="item in navItems" :key="item.label" :to="item.to" class="flex items-center gap-1 whitespace-nowrap text-[14px] text-[#666]" :class="item.label === '视频生成' ? '!font-medium !text-black' : ''">{{ item.label }}<span v-if="item.label === '天马智擎'" class="rounded-full bg-[#00adf4] px-1.5 text-[10px] font-semibold italic text-white">AI Agent</span></RouterLink>
+        </nav>
+        <div class="ml-auto hidden min-[1000px]:block"></div>
+        <DropdownMenu><DropdownMenuTrigger as-child><button data-testid="header-user-anchor" class="grid h-8 w-8 place-items-center overflow-hidden rounded-full" :aria-label="`${store.user?.displayName ?? '用户'} 的菜单`"><Avatar class="h-8 w-8"><AvatarImage :src="sourceAvatar" /><AvatarFallback>{{ store.user?.displayName?.[0] ?? '?' }}</AvatarFallback></Avatar></button></DropdownMenuTrigger><DropdownMenuContent align="end" class="w-36"><DropdownMenuItem @select="openPersonalUsage"><CircleDollarSign class="mr-2 h-4 w-4" />我的用量</DropdownMenuItem><DropdownMenuItem @select="logout"><LogOut class="mr-2 h-4 w-4" />退出登录</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+        <button class="grid h-8 w-8 place-items-center min-[1000px]:hidden" aria-label="移动端导航" @click="mobileNavOpen = !mobileNavOpen"><X v-if="mobileNavOpen" class="h-[18px] w-[18px]" /><Menu v-else class="h-[18px] w-[18px]" /></button>
+      </div>
+      <nav v-if="mobileNavOpen" class="absolute left-0 right-0 top-14 border-b bg-white p-3 shadow-lg min-[1000px]:hidden" aria-label="移动端主导航"><RouterLink v-for="item in navItems" :key="item.label" :to="item.to" class="flex h-10 items-center rounded-lg px-3 text-sm" @click="mobileNavOpen = false">{{ item.label }}</RouterLink></nav>
+    </template>
     <template v-else>
     <div class="flex h-14 items-center px-3 min-[641px]:px-3 lg:px-4">
       <RouterLink

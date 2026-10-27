@@ -1,25 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, watch } from 'vue'
-import {
-  Check,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  CircleHelp,
-  CirclePlus,
-  Copy,
-  Download,
-  FileText,
-  ImageIcon,
-  MoreHorizontal,
-  Plus,
-  Search,
-  Settings2,
-  Trash2,
-  Upload,
-  WandSparkles,
-  X,
-} from 'lucide-vue-next'
+import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, CirclePlus, Copy, FileText, ImageIcon, MoreHorizontal, Plus, Search, Settings2, Trash2, WandSparkles, X } from 'lucide-vue-next'
 import { createUsageForm, usageContentFromForm, usageFormFromContent, validateUsageForm, validateUsageInstructions, normalizeSystemTags, stripAutomaticSystemTags, USAGE_TEXT_MAX_LENGTH, USAGE_TEMPLATE } from '@/utils/agentUsage'
 import { expertDrafts, getExpertDraft, publishExpertDraft, setExpertStatus, deleteExpert, isExpertDeleted } from '@/utils/expertPrototypeStore'
 import { AGENT_CATEGORY_META, type Agent } from '@/types/agent'

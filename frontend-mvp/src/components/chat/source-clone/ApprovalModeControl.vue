@@ -31,13 +31,13 @@ const modes: { value: ApprovalMode; label: string; description: string; icon: un
   {
     value: 'default',
     label: '默认权限',
-    description: '澄清、计划和授权按现有流程人工确认',
+    description: '需要你确认需求澄清，审批执行等请求',
     icon: Hand,
   },
   {
     value: 'autonomous',
     label: '自主执行',
-    description: '自动执行计划、跳过非必填澄清并同意可代办的执行审批；必填信息及本人授权仍需处理',
+    description: '系统将自动处理需求澄清、审批执行等请求，请谨慎操作',
     icon: Sparkles,
   },
 ]
@@ -58,7 +58,7 @@ function select(value: ApprovalMode) {
       data-testid="approval-mode-trigger"
       aria-haspopup="menu"
       :aria-expanded="open"
-      :title="modelValue === 'autonomous' ? '自动执行计划、跳过非必填澄清并同意可代办的执行审批；必填信息及本人授权仍需处理' : '本会话按现有规则逐项确认'"
+      :title="modelValue === 'autonomous' ? '系统将自动处理需求澄清、审批执行等请求，请谨慎操作' : '需要你确认需求澄清，审批执行等请求'"
       @click="open = !open"
       @keydown.esc="open = false"
     >

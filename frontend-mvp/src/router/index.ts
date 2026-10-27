@@ -15,6 +15,8 @@ const routes = [
   { path: '/portals', name: 'portals', component: () => import('@/views/SystemPortalsView.vue'), meta: { title: '工作台' } },
   { path: '/dashboards', name: 'dashboards', component: () => import('@/views/DashboardView.vue'), meta: { title: '仪表盘' } },
   { path: '/knowledge', name: 'knowledge', component: () => import('@/views/KnowledgeBaseView.vue'), meta: { title: '知识中心' } },
+  { path: '/video-gen', redirect: '/video-gen/capability-square' },
+  { path: '/video-gen/:capability', name: 'video-generation', component: () => import('@/views/VideoGenerationView.vue'), meta: { title: '视频生成' } },
   { path: '/agent-square', name: 'agent-square', component: () => import('@/views/AgentSquareView.vue'), meta: { title: '专家市场' } },
   { path: '/settings', name: 'settings', redirect: '/settings/agents', meta: { title: '设置' } },
   { path: '/settings/usage', name: 'settings-usage', component: SettingsInsightsView, meta: { title: '用量管理' } },

@@ -1,6 +1,6 @@
 import type { Agent } from '@/types/agent'
 import { knowledgeBases } from '@/mock/knowledge'
-import { normalizeSystemTags, stripAutomaticSystemTags, usageFormFromContent } from '@/utils/agentUsage'
+import { normalizeSystemTags, usageFormFromContent } from '@/utils/agentUsage'
 
 export function expertDateLabel(value?: string) {
   if (!value || !Number.isFinite(Date.parse(value))) return '未提供'
