@@ -75,6 +75,63 @@ describe('element replacement input and media recovery', () => {
     demo.sourceVideo!.url = 'local-video:expired'
     expect(validateElementReplacement(demo).join(' ')).toContain('源视频')
   })
+  it('rejects repeated original descriptions after trimming without changing the draft', () => {
+    const input = getDemoElementReplacementInput()
+    input.groups[1]!.description = `  ${input.groups[0]!.description}  `
+    const before = JSON.stringify(input)
+
+    expect(validateElementReplacement(input)).toEqual(['第2组原元素说明与第1组重复'])
+    expect(JSON.stringify(input)).toBe(before)
+  })
+  it('rejects a reused material ID even when its display name and URL differ', () => {
+    const input = getDemoElementReplacementInput()
+    input.groups[0]!.reference = { id: 'material-42', name: '商品原图', kind: 'image', source: 'material', url: 'https://example.com/old.png' }
+    input.groups[1]!.reference = { id: 'material-42', name: '商品新图', kind: 'image', source: 'material', url: 'https://example.com/new.png' }
+
+    expect(validateElementReplacement(input)).toEqual(['第2组目标参考图与第1组重复'])
+  })
+  it('rejects materials with distinct IDs that share the same image URL', () => {
+    const input = getDemoElementReplacementInput()
+    input.groups[0]!.reference = { id: 'material-one', name: '素材一', kind: 'image', source: 'material', url: 'https://example.com/target.png' }
+    input.groups[1]!.reference = { id: 'material-two', name: '素材二', kind: 'image', source: 'material', url: 'https://EXAMPLE.com:443/target.png#preview' }
+
+    expect(validateElementReplacement(input)).toEqual(['第2组目标参考图与第1组重复'])
+  })
+  it('rejects a material and link that point to the same target', () => {
+    const input = getDemoElementReplacementInput()
+    input.groups[0]!.reference = { id: 'material-one', name: '素材', kind: 'image', source: 'material', url: 'https://example.com/target.png' }
+    input.groups[1]!.reference = { id: 'link-two', name: '链接', kind: 'image', source: 'url', url: 'https://example.com/target.png' }
+
+    expect(validateElementReplacement(input)).toEqual(['第2组目标参考图与第1组重复'])
+  })
+  it('rejects the same linked target after URL canonicalization', () => {
+    const input = getDemoElementReplacementInput()
+    input.groups[0]!.reference = { id: 'link-one', name: '链接一', kind: 'image', source: 'url', url: 'https://EXAMPLE.com:443/target.png#preview' }
+    input.groups[1]!.reference = { id: 'link-two', name: '链接二', kind: 'image', source: 'url', url: 'https://example.com/target.png' }
+
+    expect(validateElementReplacement(input)).toEqual(['第2组目标参考图与第1组重复'])
+  })
+  it('validates repeated restored relative image paths without throwing', () => {
+    const input = getDemoElementReplacementInput()
+    input.groups[0]!.reference = { id: 'relative-one', name: '本地引用一', kind: 'image', source: 'url', url: '/assets/reference.png' }
+    input.groups[1]!.reference = { id: 'relative-two', name: '本地引用二', kind: 'image', source: 'url', url: '/assets/reference.png' }
+
+    expect(validateElementReplacement(input)).toEqual(['第2组目标参考图与第1组重复'])
+  })
+  it('rejects repeated uploaded image content despite distinct IDs and filenames', () => {
+    const input = getDemoElementReplacementInput()
+    input.groups[0]!.reference = { id: 'upload-one', name: 'first.png', kind: 'image', source: 'upload', url: 'data:image/png;base64,YQ==' }
+    input.groups[1]!.reference = { id: 'upload-two', name: 'second.png', kind: 'image', source: 'upload', url: 'data:image/png;base64,YQ==' }
+
+    expect(validateElementReplacement(input)).toEqual(['第2组目标参考图与第1组重复'])
+  })
+  it('rejects uploaded images with different local content but the same remote reference', () => {
+    const input = getDemoElementReplacementInput()
+    input.groups[0]!.reference = { id: 'upload-one', name: 'first.png', kind: 'image', source: 'upload', url: 'data:image/png;base64,YQ==', remoteUrl: 'asset://target-image' }
+    input.groups[1]!.reference = { id: 'upload-two', name: 'second.png', kind: 'image', source: 'upload', url: 'data:image/png;base64,Yg==', remoteUrl: 'asset://target-image' }
+
+    expect(validateElementReplacement(input)).toEqual(['第2组目标参考图与第1组重复'])
+  })
   it('renumbers reference images after deleting or reordering mapping groups', () => {
     const input = getDemoElementReplacementInput()
     input.groups.reverse()

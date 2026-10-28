@@ -13,6 +13,10 @@ export interface VideoTask {
   name: string
   status: VideoTaskStatus
   createdAt: string
+  startedAt?: string | null
+  completedAt?: string
+  revision?: number
+  prototypeQueue?: { order: number; queuedAt: string; durationMs: number }
   input: Record<string, any>
   remoteJob?: import('./element-replacement-job').ElementReplacementJob
 }

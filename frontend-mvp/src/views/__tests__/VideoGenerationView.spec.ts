@@ -102,8 +102,10 @@ describe('video prototype complete flow', () => {
   it('keeps a historical provider failure without inventing a result', async () => {
     localStorage.setItem('tianma-video-prototype-v1', JSON.stringify([{ id: 'failed-real', operator: 'element-replace', name: '真实失败任务', status: 'failed', createdAt: '2026-10-26T00:00:00Z', input: { ...getDemoElementReplacementInput(), prototypeDemo: false }, remoteJob: { id: 'request-failed-real', status: 'failed', providerTaskId: 'task-failed-real', createdAt: '2026-10-26T00:00:00Z', updatedAt: '2026-10-26T00:00:00Z', error: { code: 'Content.Invalid', message: '参考素材不可读取' } } }]))
     const { wrapper } = await open('/video-gen/element-replace?view=result&id=failed-real')
-    expect(wrapper.text()).toContain('结果视频暂不可用')
+    expect(wrapper.text()).toContain('失败')
+    expect(wrapper.text()).toContain('参考素材不可读取')
     expect(wrapper.find('video[aria-label="替换结果播放器"]').exists()).toBe(false)
+    expect(wrapper.findComponent({ name: 'ElementReplacementResult' }).exists()).toBe(false)
     expect(wrapper.text()).not.toContain('查看演示结果')
     wrapper.unmount()
   })

@@ -53,7 +53,7 @@ describe('speech synthesis prototype', () => {
 
   // Catches hidden output settings drifting from the product defaults.
   it('uses fixed MP3 defaults while keeping sample rate and bitrate in advanced settings', async () => {
-    localStorage.setItem(storageKey, JSON.stringify([storedTask({ ...speechInput, format: 'ogg_opus', sampleRate: 8000, bitRate: 8000 })]))
+    localStorage.setItem(storageKey, JSON.stringify([{ ...storedTask({ ...speechInput, format: 'ogg_opus', sampleRate: 8000, bitRate: 8000 }), status: 'queued', revision: 1 }]))
     const { wrapper } = await open('/video-gen/speech-synthesis?view=config&id=speech-1')
     expect(wrapper.find('select[aria-label="输出格式"]').exists()).toBe(false)
     await wrapper.get('[data-testid="speech-advanced-toggle"]').trigger('click')
@@ -85,7 +85,7 @@ describe('speech synthesis prototype', () => {
     await wrapper.get('button[aria-label="复制新品发布配音"]').trigger('click'); await flushPromises()
     expect((wrapper.get('input[aria-label="任务名称"]').element as HTMLInputElement).value).toBe('新品发布配音-副本')
     expect((wrapper.get('textarea[aria-label="合成文本"]').element as HTMLTextAreaElement).value).toBe(speechInput.text)
-    await wrapper.get('input[aria-label="语速"]').setValue('1.2')
+    await wrapper.get('input[aria-label="语速"]').setValue('120')
     await wrapper.get('form').trigger('submit'); await flushPromises()
     expect(listVideoTasks().filter(task => task.operator === 'speech-synthesis')).toHaveLength(2)
     expect(listVideoTasks().find(task => task.operator === 'speech-synthesis' && task.id !== first.id)?.input.speechRate).toBe(20)
@@ -141,5 +141,47 @@ describe('speech synthesis prototype', () => {
     expect(wrapper.get('[data-testid="speech-selected-voice"]').text()).toContain('云舟')
     expect(wrapper.get('button[aria-label="试听云舟"]').attributes('disabled')).toBeDefined()
     expect(wrapper.get('[aria-label="预置音色"]').attributes('class')).toContain('voice-grid')
+  })
+
+  it('refreshes a queued editor from the latest snapshot after a revision conflict', async () => {
+    vi.useFakeTimers(); vi.setSystemTime('2026-10-28T02:00:00Z')
+    const running = { ...storedTask(), id: 'speech-running', status: 'processing', revision: 2, startedAt: '2026-10-28T02:00:00.000Z', prototypeQueue: { order: 1, queuedAt: '2026-10-28T02:00:00.000Z', durationMs: 60000 } }
+    const queued = { ...storedTask(), id: 'speech-queued', name: '排队旧快照', status: 'queued', revision: 1, startedAt: null, prototypeQueue: { order: 2, queuedAt: '2026-10-28T02:00:00.000Z', durationMs: 3000 } }
+    localStorage.setItem(storageKey, JSON.stringify([queued, running]))
+    const { wrapper } = await open('/video-gen/speech-synthesis?view=config&id=speech-queued')
+    await wrapper.get('textarea[aria-label="合成文本"]').setValue('本地未保存内容')
+
+    const latest = { ...queued, name: '服务器最新名称', revision: 2, input: { ...queued.input, text: '服务器最新内容' } }
+    localStorage.setItem(storageKey, JSON.stringify([latest, running]))
+    window.dispatchEvent(new Event('storage')); await flushPromises()
+    await wrapper.get('form').trigger('submit'); await flushPromises()
+
+    expect((wrapper.get('input[aria-label="任务名称"]').element as HTMLInputElement).value).toBe('服务器最新名称')
+    expect((wrapper.get('textarea[aria-label="合成文本"]').element as HTMLTextAreaElement).value).toBe('服务器最新内容')
+    expect(listVideoTasks().find(task => task.id === 'speech-queued')).toMatchObject({ id: 'speech-queued', revision: 2, name: '服务器最新名称', prototypeQueue: { order: 2 } })
+  })
+
+  it('rejects a queued save that loses the worker race and opens the processing snapshot', async () => {
+    vi.useFakeTimers(); vi.setSystemTime('2026-10-28T02:00:00Z')
+    const running = { ...storedTask(), id: 'speech-running', status: 'processing', revision: 2, startedAt: '2026-10-28T02:00:00.000Z', prototypeQueue: { order: 1, queuedAt: '2026-10-28T02:00:00.000Z', durationMs: 3000 } }
+    const queued = { ...storedTask(), id: 'speech-queued', name: '待领取任务', status: 'queued', revision: 1, startedAt: null, prototypeQueue: { order: 2, queuedAt: '2026-10-28T02:00:00.000Z', durationMs: 3000 }, input: { ...speechInput, text: '执行快照' } }
+    localStorage.setItem(storageKey, JSON.stringify([queued, running]))
+    const { wrapper, router } = await open('/video-gen/speech-synthesis?view=config&id=speech-queued')
+    await wrapper.get('textarea[aria-label="合成文本"]').setValue('不应覆盖执行快照')
+    await vi.advanceTimersByTimeAsync(3000); await flushPromises()
+    await wrapper.get('form').trigger('submit'); await flushPromises()
+
+    expect(router.currentRoute.value.query.view).toBe('processing')
+    expect(wrapper.text()).toContain('语音合成中')
+    expect(listVideoTasks().find(task => task.id === 'speech-queued')).toMatchObject({ id: 'speech-queued', status: 'processing', input: { text: '执行快照' }, prototypeQueue: { order: 2 } })
+  })
+
+  it('redirects unfinished result URLs and never exposes result media', async () => {
+    localStorage.setItem(storageKey, JSON.stringify([{ ...storedTask(), status: 'processing' }]))
+    const { wrapper, router } = await open('/video-gen/speech-synthesis?view=result&id=speech-1')
+    await flushPromises()
+    expect(router.currentRoute.value.query.view).toBe('processing')
+    expect(wrapper.find('audio[aria-label="合成音频播放器"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="speech-audio-download"]').exists()).toBe(false)
   })
 })

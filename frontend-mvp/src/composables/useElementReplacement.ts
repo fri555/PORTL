@@ -68,13 +68,43 @@ export function isReplacementRemoteReference(value: string, kind: 'video' | 'ima
 function usableMedia(value: ReplacementMedia | null | undefined): boolean {
   return !!value && (!!getReplacementMediaUrl(value) || isReplacementRemoteReference(value.url, value.kind) || isReplacementRemoteReference(value.remoteUrl ?? '', value.kind))
 }
+function referenceIdentities(reference: ReplacementMedia): string[] {
+  const identities: string[] = []
+  if ((reference.source === 'material' || reference.source === 'demo') && reference.id) identities.push(`material:${reference.id}`)
+  for (const value of [reference.url, reference.remoteUrl]) {
+    if (!value) continue
+    const url = value.trim()
+    if (url.startsWith('data:image/')) {
+      if (getReplacementMediaUrl({ ...reference, url })) identities.push(`content:${url.slice(url.indexOf(',') + 1)}`)
+    } else if (getReplacementMediaUrl({ ...reference, url }) || isReplacementRemoteReference(url, 'image')) {
+      const parsed = new URL(url, window.location.origin)
+      parsed.hash = ''
+      identities.push(`url:${parsed.href}`)
+    }
+  }
+  return [...new Set(identities)]
+}
 export function validateElementReplacement(input: ElementReplacementInput): string[] {
   const errors: string[] = []
+  const descriptions = new Map<string, number>()
+  const references = new Map<string, number>()
   if (!usableMedia(input.sourceVideo)) errors.push('请选择可用的源视频；本地视频刷新后需重新选择')
   if (!input.groups.length) errors.push('请至少添加一组替换元素')
   input.groups.forEach((group, index) => {
-    if (!group.description.trim()) errors.push(`请填写第${index + 1}组原元素说明`)
+    const description = group.description.trim()
+    if (!description) errors.push(`请填写第${index + 1}组原元素说明`)
+    else if (descriptions.has(description)) errors.push(`第${index + 1}组原元素说明与第${descriptions.get(description)! + 1}组重复`)
+    else descriptions.set(description, index)
     if (!usableMedia(group.reference)) errors.push(`请选择第${index + 1}组目标参考图`)
+    else {
+      let duplicateIndex = -1
+      for (const identity of referenceIdentities(group.reference!)) {
+        const previousIndex = references.get(identity)
+        if (previousIndex !== undefined && (duplicateIndex === -1 || previousIndex < duplicateIndex)) duplicateIndex = previousIndex
+        else if (previousIndex === undefined) references.set(identity, index)
+      }
+      if (duplicateIndex !== -1) errors.push(`第${index + 1}组目标参考图与第${duplicateIndex + 1}组重复`)
+    }
   })
   if (!replacementModels.includes(input.settings.model)) errors.push('请选择支持的生成模型')
   if (!replacementResolutions.includes(input.settings.resolution)) errors.push('分辨率仅支持 480P、720P')

@@ -12,6 +12,63 @@ describe('speech configuration validation recovery', () => {
     expect(wrapper.text()).not.toContain('平台根据字幕时间轴生成 SRT')
   })
 
+  it('preserves saved MP3 quality settings when editing a queued task', async () => {
+    const wrapper = mount(SpeechSynthesisConfig, {
+      props: {
+        initialName: '排队配音',
+        initialData: { text: '保留已保存的音质。', format: 'mp3', sampleRate: 44100, bitRate: 160000 },
+        queued: true,
+      },
+    })
+    await wrapper.get('[data-testid="speech-advanced-toggle"]').trigger('click')
+    expect((wrapper.get('select[aria-label="采样率"]').element as HTMLSelectElement).value).toBe('44100')
+    expect((wrapper.get('select[aria-label="码率"]').element as HTMLSelectElement).value).toBe('160000')
+
+    await wrapper.get('form').trigger('submit')
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ format: 'mp3', sampleRate: 44100, bitRate: 160000 })
+  })
+
+  it('shows a format migration notice only for queued legacy non-MP3 tasks', () => {
+    const cases = [
+      { format: 'ogg_opus', queued: true, notice: true },
+      { format: 'mp3', queued: true, notice: false },
+      { format: 'ogg_opus', queued: false, notice: false },
+      { format: undefined, queued: true, notice: false },
+    ]
+    for (const item of cases) {
+      const wrapper = mount(SpeechSynthesisConfig, {
+        props: { initialName: '历史配音', initialData: { text: '原任务文本。', format: item.format }, queued: item.queued },
+      })
+      const notice = wrapper.find('[role="note"]')
+      expect(notice.exists()).toBe(item.notice)
+      if (item.notice) {
+        expect(notice.text()).toContain('MP3、24 kHz、64 kbps')
+        expect(notice.text()).toContain('保存前原任务配置不变')
+      }
+      wrapper.unmount()
+    }
+  })
+
+  it('clears empty-result voice filters without changing the selected voice', async () => {
+    const wrapper = mount(SpeechSynthesisConfig, {
+      props: {
+        initialName: '音色筛选',
+        initialData: { text: '筛选音色。', speaker: 'zh_male_m191_uranus_bigtts' },
+      },
+    })
+    await wrapper.get('input[aria-label="搜索音色"]').setValue('无此音色')
+    await wrapper.get('select[aria-label="音色语种"]').setValue('中文')
+    await wrapper.get('select[aria-label="音色风格"]').setValue('解说')
+    expect(wrapper.findAll('[data-testid="speech-voice"]')).toHaveLength(0)
+
+    await wrapper.get('button[aria-label="清空音色筛选"]').trigger('click')
+    expect((wrapper.get('input[aria-label="搜索音色"]').element as HTMLInputElement).value).toBe('')
+    expect((wrapper.get('select[aria-label="音色语种"]').element as HTMLSelectElement).value).toBe('')
+    expect((wrapper.get('select[aria-label="音色风格"]').element as HTMLSelectElement).value).toBe('')
+    expect(wrapper.findAll('[data-testid="speech-voice"]')).toHaveLength(6)
+    expect(wrapper.get('[data-testid="speech-voice"][aria-pressed="true"]').text()).toContain('云舟')
+  })
+
   // Catches an error message that leaves keyboard users at the bottom of the form.
   it('focuses the first invalid field and then the text field after the name is corrected', async () => {
     const wrapper = mount(SpeechSynthesisConfig, { props: { initialName: '   ' }, attachTo: document.body })

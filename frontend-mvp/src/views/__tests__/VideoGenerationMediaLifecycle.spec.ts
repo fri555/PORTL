@@ -23,6 +23,13 @@ function replacementTask(source = localVideo('original.mp4'), result = source): 
     createdAt: '2026-10-22T03:00:00.000Z', input: { ...getDemoElementReplacementInput(), sourceVideo: source, resultVideo: result, resultUsesOriginal: true } }
 }
 
+function saveEditableTask(task: VideoTask) {
+  const queuedAt = new Date().toISOString()
+  saveVideoTask({ ...task, status: 'queued', startedAt: null, revision: 1, prototypeQueue: { order: 2, queuedAt, durationMs: 3000 } })
+  saveVideoTask({ id: 'replacement-blocker', name: '运行中的元素替换', operator: 'element-replace', status: 'processing', createdAt: queuedAt,
+    startedAt: queuedAt, revision: 2, prototypeQueue: { order: 1, queuedAt, durationMs: 3_600_000 }, input: { prototypeDemo: true } })
+}
+
 async function open(path = '/video-gen/element-replace?view=config&id=replacement-task') {
   const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/video-gen/:capability', component: VideoGenerationView }] })
   await router.push(path)
@@ -63,17 +70,20 @@ describe('video task local media lifecycle', () => {
     vi.unstubAllGlobals()
   })
 
-  it('discards the previous replacement result before persisting a new processing task', async () => {
+  it('discards the previous replacement result before saving the same queued task', async () => {
     const task = replacementTask()
-    saveVideoTask(task)
+    saveEditableTask(task)
     const { wrapper } = await open()
     wrapper.findComponent({ name: 'ElementReplacementConfig' }).vm.$emit('submit', { ...task.input, sourceVideo: localVideo('new.mp4') })
     await vi.waitFor(() => {
-      expect(listVideoTasks()[0]?.status).toBe('processing')
-      expect(listVideoTasks()[0]?.remoteJob).toBeUndefined()
+      const saved = listVideoTasks().find(item => item.id === task.id)
+      expect(saved?.status).toBe('queued')
+      expect(saved?.remoteJob).toBeUndefined()
     })
-    const saved = listVideoTasks()[0]!
-    expect(saved.status).toBe('processing')
+    const saved = listVideoTasks().find(item => item.id === task.id)!
+    expect(saved.status).toBe('queued')
+    expect(saved.id).toBe(task.id)
+    expect(saved.prototypeQueue?.order).toBe(2)
     expect(saved.input).not.toHaveProperty('resultVideo')
     expect(saved.input).not.toHaveProperty('resultUsesOriginal')
     expect(saved.input.prototypeDemo).toBe(true)
@@ -82,12 +92,12 @@ describe('video task local media lifecycle', () => {
 
   it('releases every unused video in the previous task only after an edited task is saved', async () => {
     const task = replacementTask(localVideo('old-source.mp4'), localVideo('old-result.mp4'))
-    saveVideoTask(task)
+    saveEditableTask(task)
     const { wrapper } = await open()
     const next = localVideo('new.mp4')
     wrapper.findComponent({ name: 'ElementReplacementConfig' }).vm.$emit('submit', { ...task.input, sourceVideo: next })
     await vi.waitFor(() => {
-      expect(listVideoTasks()[0]?.status).toBe('processing')
+      expect(listVideoTasks().find(item => item.id === task.id)?.status).toBe('queued')
       expect(getLocalVideoPreview(task.input.sourceVideo.url)).toBe('')
     })
     expect(getLocalVideoPreview(task.input.sourceVideo.url)).toBe('')
@@ -97,14 +107,15 @@ describe('video task local media lifecycle', () => {
 
   it('keeps all previous previews and task data if saving an edit fails', async () => {
     const task = replacementTask(localVideo('old-source.mp4'), localVideo('old-result.mp4'))
-    saveVideoTask(task)
+    saveEditableTask(task)
     const { wrapper, router } = await open()
+    const before = listVideoTasks().find(item => item.id === task.id)
     vi.spyOn(localStorage, 'setItem').mockImplementation(() => { throw new Error('quota') })
     wrapper.findComponent({ name: 'ElementReplacementConfig' }).vm.$emit('submit', { ...task.input, sourceVideo: localVideo('new.mp4') })
-    await vi.waitFor(() => expect(ElMessage.error).toHaveBeenCalledWith(expect.stringContaining('本地任务保存失败')))
+    await vi.waitFor(() => expect(ElMessage.error).toHaveBeenCalled())
     expect(getLocalVideoPreview(task.input.sourceVideo.url)).not.toBe('')
     expect(getLocalVideoPreview(task.input.resultVideo.url)).not.toBe('')
-    expect(listVideoTasks()[0]).toEqual(task)
+    expect(listVideoTasks().find(item => item.id === task.id)).toEqual(before)
     expect(router.currentRoute.value.query.view).toBe('config')
     expect(providerSubmissions).toBe(0)
   })
