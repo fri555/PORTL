@@ -17,8 +17,8 @@ function input(): ElementReplacementInput {
     prototypeDemo: true,
   }
 }
-function mountConfig(initialData?: Record<string, any>) {
-  const wrapper = mount(ElementReplacementConfig, { props: { initialData }, attachTo: document.body })
+function mountConfig(initialData?: Record<string, any>, props: Record<string, any> = {}) {
+  const wrapper = mount(ElementReplacementConfig, { props: { initialData, ...props }, attachTo: document.body })
   wrappers.push(wrapper)
   return wrapper
 }
@@ -205,6 +205,65 @@ describe('元素替换配置', () => {
     const payload = wrapper.emitted('submit')?.[0]?.[0] as ElementReplacementInput
     expect(payload.groups[0]?.reference).toMatchObject({ name: 'person.png', source: 'upload', kind: 'image' })
     expect(payload.groups[0]?.reference?.url).toMatch(/^data:image\/png;base64,/)
+  })
+
+  it('shows upload constraints and keeps the selected video when a replacement exceeds 100 MiB', async () => {
+    const createObjectURL = vi.fn(() => 'blob:should-not-exist')
+    vi.stubGlobal('URL', class extends URL { static createObjectURL = createObjectURL; static revokeObjectURL = vi.fn() })
+    const wrapper = mountConfig(input())
+    expect(wrapper.text()).toContain('MP4、MOV')
+    expect(wrapper.text()).toContain('100 MiB')
+    await wrapper.findAll('.video-sources button')[1]!.trigger('click')
+    const file = new File(['small'], 'oversized.mp4', { type: 'video/mp4' })
+    Object.defineProperty(file, 'size', { value: 100 * 1024 * 1024 + 1 })
+    const fileInput = wrapper.get('[data-testid="replacement-video-file"]')
+    Object.defineProperty(fileInput.element, 'files', { configurable: true, value: [file] })
+    await fileInput.trigger('change')
+    expect(wrapper.text()).toContain('视频不能超过 100 MiB')
+    expect(createObjectURL).not.toHaveBeenCalled()
+    expect(wrapper.get('[data-testid="video-link"]').classes()).toContain('active')
+    await wrapper.get('form').trigger('submit')
+    expect((wrapper.emitted('submit')?.[0]?.[0] as ElementReplacementInput).sourceVideo?.url).toBe('https://example.com/runway.mp4')
+  })
+
+  it('requires matching supported image extension and MIME without replacing the selected reference', async () => {
+    const reader = vi.fn()
+    vi.stubGlobal('FileReader', class { readAsDataURL = reader })
+    const wrapper = mountConfig(input())
+    expect(wrapper.text()).toContain('JPG、JPEG、PNG、WEBP、GIF、BMP')
+    expect(wrapper.text()).toContain('10 MiB')
+    await wrapper.get('[aria-label="替换 1 上传参考图"]').trigger('click')
+    const fileInput = wrapper.get('[data-testid="replacement-reference-file"]')
+    Object.defineProperty(fileInput.element, 'files', { configurable: true, value: [new File(['image'], 'portrait.png', { type: 'image/jpeg' })] })
+    await fileInput.trigger('change')
+    expect(wrapper.text()).toContain('扩展名与实际类型一致')
+    expect(reader).not.toHaveBeenCalled()
+    await wrapper.get('form').trigger('submit')
+    expect((wrapper.emitted('submit')?.[0]?.[0] as ElementReplacementInput).groups[0]?.reference?.url).toBe(image)
+  })
+
+  it('rejects TIFF outside the production image whitelist and keeps the selected reference', async () => {
+    const reader = vi.fn()
+    vi.stubGlobal('FileReader', class { readAsDataURL = reader })
+    const wrapper = mountConfig(input())
+    const fileInput = wrapper.get('[data-testid="replacement-reference-file"]')
+    expect(fileInput.attributes('accept')).toBe('.jpg,.jpeg,.png,.webp,.gif,.bmp,image/jpeg,image/png,image/webp,image/gif,image/bmp')
+    await wrapper.get('[aria-label="替换 1 上传参考图"]').trigger('click')
+    Object.defineProperty(fileInput.element, 'files', { configurable: true, value: [new File(['image'], 'portrait.tiff', { type: 'image/tiff' })] })
+    await fileInput.trigger('change')
+    expect(wrapper.text()).toContain('仅支持 JPG、JPEG、PNG、WEBP、GIF、BMP')
+    expect(reader).not.toHaveBeenCalled()
+    await wrapper.get('form').trigger('submit')
+    expect((wrapper.emitted('submit')?.[0]?.[0] as ElementReplacementInput).groups[0]?.reference?.url).toBe(image)
+  })
+
+  it('shows 保存修改 for a queued task and still blocks repeat submission while submitting', async () => {
+    const wrapper = mountConfig(input(), { queued: true })
+    expect(wrapper.get('[data-testid="generate-replacement"]').text()).toBe('保存修改')
+    await wrapper.setProps({ submitting: true, submissionStage: '正在保存' })
+    await wrapper.get('form').trigger('submit')
+    expect(wrapper.emitted('submit')).toBeUndefined()
+    expect(wrapper.get('[data-testid="generate-replacement"]').text()).toBe('正在保存')
   })
 
   it('rejects credential-bearing links consistently with shared media validation', async () => {

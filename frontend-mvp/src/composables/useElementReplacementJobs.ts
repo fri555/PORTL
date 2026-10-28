@@ -32,7 +32,7 @@ export function createElementReplacementRunner(options: RunnerOptions) {
     const status = remoteJob.status === 'completed' ? 'completed'
       : remoteJob.status === 'timeout' ? 'timeout'
         : remoteJob.status === 'failed' ? 'failed'
-          : remoteJob.status === 'pending' ? 'queued' : 'processing'
+          : 'processing'
     return { ...task, input, remoteJob, status }
   }
   function current(id: string, requestId: string) {

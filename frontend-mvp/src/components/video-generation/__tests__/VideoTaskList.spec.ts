@@ -21,7 +21,6 @@ describe('video capability task list', () => {
     wrapper.unmount()
   })
   it.each([
-    { operator: 'element-replace' as const, remoteJob: false, unavailable: false },
     { operator: 'storyboard' as const, remoteJob: true, unavailable: false },
     { operator: 'element-replace' as const, remoteJob: true, unavailable: true },
   ])('keeps failed task viewing disabled outside the real replacement exception: %o', async ({ operator, remoteJob, unavailable }) => {
@@ -72,9 +71,9 @@ describe('video capability task list', () => {
     expect(wrapper.text()).not.toContain('替换中')
     wrapper.unmount()
   })
-  it('shows the speech status set as 全部、合成中、已完成、失败', () => {
+  it('shows the speech status set including the platform queue', () => {
     const wrapper = mount(VideoTaskList, { props: { meta: { ...meta, operator: 'speech-synthesis', title: '语音合成', processingLabel: '合成中' }, tasks: [{ ...tasks[0]!, operator: 'speech-synthesis' }] } })
-    expect(wrapper.findAll('[role="tab"]').map(node => node.text().replace(/\d+$/, ''))).toEqual(['全部', '合成中', '已完成', '失败'])
+    expect(wrapper.findAll('[role="tab"]').map(node => node.text().replace(/\d+$/, ''))).toEqual(['全部', '排队中', '合成中', '已完成', '失败'])
     expect(wrapper.text()).not.toContain('超时')
     wrapper.unmount()
   })
@@ -87,6 +86,18 @@ describe('video capability task list', () => {
     await wrapper.get('input[aria-label="任务名称"]').setValue('鞋款分镜')
     await wrapper.get('form').trigger('submit')
     expect(wrapper.emitted('create')?.[0]).toEqual(['鞋款分镜'])
+    wrapper.unmount()
+  })
+  it('shows execution time instead of creation time and leaves queued tasks editable', async () => {
+    const queued: VideoTask = { ...tasks[0]!, operator: 'speech-synthesis', status: 'queued', startedAt: null }
+    const wrapper = mount(VideoTaskList, { props: { meta: { ...meta, operator: 'speech-synthesis' }, tasks: [queued] } })
+    expect(wrapper.text()).toContain('尚未开始')
+    expect(wrapper.text()).not.toContain('2026-10-21')
+    const view = wrapper.get('button[aria-label="查看运动鞋展示"]')
+    expect(view.attributes('title')).toBe('查看并修改配置')
+    await view.trigger('click'); expect(wrapper.emitted('view')).toEqual([['1']])
+    await wrapper.setProps({ tasks: [{ ...queued, status: 'completed', startedAt: '2026-10-28T02:00:00Z' }] })
+    expect(wrapper.text()).toContain('开始执行：2026-10-28 10:00:00')
     wrapper.unmount()
   })
   it('requires confirmation before removing an existing task', async () => {

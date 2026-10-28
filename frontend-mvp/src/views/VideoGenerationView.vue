@@ -20,7 +20,7 @@ import SpeechSynthesisProcessing from '@/components/video-generation/speech-synt
 import SpeechSynthesisResult from '@/components/video-generation/speech-synthesis/SpeechSynthesisResult.vue'
 import { normalizeSpeechInput, speechValidationMessage } from '@/composables/useSpeechSynthesis'
 import { videoCapabilities } from '@/mock/video-generation'
-import { useVideoPrototype } from '@/composables/useVideoPrototype'
+import { advancePrototypeVideoQueue, enqueuePrototypeVideoTask, listVideoTasks, startPrototypeVideoQueue, updateQueuedPrototypeVideoTask, useVideoPrototype } from '@/composables/useVideoPrototype'
 import { releaseUnusedTaskVideos } from '@/composables/videoTaskMedia'
 import type { VideoTask } from '@/types/video-generation'
 
@@ -29,6 +29,11 @@ const router = useRouter()
 const { tasks, refresh, save, remove } = useVideoPrototype()
 const sidebarOpen = ref(true)
 const draftTaskName = ref<string | null>(null)
+const submitting = ref(false)
+const editingQueued = ref(false)
+const editingRevision = ref<number | undefined>()
+const editorVersion = ref(0)
+let stopQueue: (() => void) | undefined
 const section = computed(() => String(route.params.capability ?? 'capability-square'))
 const isSquare = computed(() => section.value === 'capability-square')
 const isDouyin = computed(() => section.value === 'douyin-hot-video')
@@ -49,7 +54,7 @@ const resultComponent = computed(() => section.value === 'speech-synthesis' ? Sp
 function square() { router.push('/video-gen/capability-square') }
 function list() { router.push({ path: `/video-gen/${section.value}`, query: { from: 'capability-square' } }) }
 function setView(nextView: string, id?: string, name?: string) {
-  router.push({ path: `/video-gen/${section.value}`, query: { from: 'capability-square', view: nextView, ...(id ? { id } : {}), ...(name ? { name } : {}) } })
+  return router.push({ path: `/video-gen/${section.value}`, query: { from: 'capability-square', view: nextView, ...(id ? { id } : {}), ...(name ? { name } : {}) } })
 }
 function create(name: string) { setView('config', undefined, name) }
 function copyTask(id: string) {
@@ -59,14 +64,17 @@ function copyTask(id: string) {
   const name = `${task.name.slice(0, Math.max(1, 20 - suffix.length))}${suffix}`
   router.push({ path: `/video-gen/${section.value}`, query: { from: 'capability-square', view: 'config', copyFrom: id, name } })
 }
-function open(id: string) { const task = tasks.value.find(item => item.id === id); setView(task && ['queued', 'processing'].includes(task.status) ? 'processing' : 'result', id) }
+function open(id: string) {
+  const task = tasks.value.find(item => item.id === id)
+  return setView(task?.status === 'queued' ? 'config' : task?.status === 'processing' ? 'processing' : task?.status === 'completed' ? 'result' : 'status', id)
+}
 function saveTask(task: VideoTask) {
   const previous = tasks.value.find(item => item.id === task.id)
   save(task)
   releaseUnusedTaskVideos(previous, tasks.value)
 }
 async function submit(input: Record<string, any>, configuredName?: string) {
-  if (!capability.value) return
+  if (!capability.value || submitting.value) return
   let name = taskName.value
   if (capability.value.operator === 'speech-synthesis') {
     name = (configuredName ?? taskName.value).trim()
@@ -78,8 +86,37 @@ async function submit(input: Record<string, any>, configuredName?: string) {
     name = (configuredName ?? taskName.value).trim()
     if (!name || name.length > 20) { ElMessage.error('请输入20个字符以内的任务名称'); return }
     const { resultVideo: _resultVideo, resultUsesOriginal: _resultUsesOriginal, ...nextInput } = input
-    const task: VideoTask = { id: currentTask.value?.id ?? `video-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`, operator: 'element-replace', name, status: 'processing', createdAt: currentTask.value?.createdAt ?? new Date().toISOString(), input: { ...nextInput, prototypeDemo: true } }
-    try { saveTask(task); setView('processing', task.id) } catch { ElMessage.error('本地任务保存失败，请减少参考素材后重试') }
+    input = { ...nextInput, prototypeDemo: true }
+  }
+  if (['element-replace', 'speech-synthesis'].includes(capability.value.operator)) {
+    submitting.value = true
+    try {
+      if (route.query.id) {
+        const previous = currentTask.value
+        if (!previous || !editingQueued.value) throw new Error('只有排队中的任务可以修改；历史任务请使用复制')
+        updateQueuedPrototypeVideoTask(previous.id, editingRevision.value, name, input)
+        releaseUnusedTaskVideos(previous, listVideoTasks())
+        ElMessage.success('修改已保存，队列位置保持不变')
+        await list()
+      } else {
+        const task: VideoTask = { id: `video-${crypto.randomUUID()}`, operator: capability.value.operator, name, status: 'queued', createdAt: new Date().toISOString(), input }
+        enqueuePrototypeVideoTask(task)
+        refresh()
+        if (tasks.value.find(item => item.id === task.id)?.status === 'queued') {
+          ElMessage.success('任务已加入队列，可在列表查看或修改配置')
+          await list()
+        } else await setView('processing', task.id)
+      }
+    } catch (error) {
+      refresh()
+      ElMessage.error(error instanceof Error ? error.message : '本地任务保存失败，请重试')
+      if (route.query.id) {
+        editingRevision.value = currentTask.value?.revision
+        draftTaskName.value = null
+        editorVersion.value++
+        if (currentTask.value?.status !== 'queued') await open(String(route.query.id))
+      }
+    } finally { submitting.value = false }
     return
   }
   const task: VideoTask = { id: currentTask.value?.id ?? `video-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`, operator: capability.value.operator, name, status: 'processing', createdAt: currentTask.value?.createdAt ?? new Date().toISOString(), input }
@@ -96,15 +133,26 @@ function updateInput(input: Record<string, any>) {
 }
 function deleteTask(id: string) {
   const task = tasks.value.find(item => item.id === id)
+  if (task && ['queued', 'processing'].includes(task.status)) return
   try {
     remove(id)
     releaseUnusedTaskVideos(task, tasks.value)
   } catch { ElMessage.error('删除失败，请重试') }
 }
 function toggleSidebar() { sidebarOpen.value = !sidebarOpen.value }
-watch(() => route.fullPath, () => { draftTaskName.value = null; refresh() })
-onMounted(() => { window.addEventListener('tianma:video-sidebar', toggleSidebar) })
-onBeforeUnmount(() => { window.removeEventListener('tianma:video-sidebar', toggleSidebar) })
+watch(() => route.fullPath, () => {
+  draftTaskName.value = null
+  refresh()
+  editingQueued.value = view.value === 'config' && currentTask.value?.status === 'queued'
+  editingRevision.value = currentTask.value?.revision
+  if (view.value === 'result' && currentTask.value && currentTask.value.status !== 'completed') void open(currentTask.value.id)
+}, { immediate: true })
+watch(() => currentTask.value?.status, status => {
+  if (view.value === 'processing' && status === 'completed' && currentTask.value) void setView('result', currentTask.value.id)
+})
+function resumeQueue() { try { advancePrototypeVideoQueue(); refresh() } catch { ElMessage.error('本地任务状态暂时无法更新，请重试') } }
+onMounted(() => { window.addEventListener('tianma:video-sidebar', toggleSidebar); window.addEventListener('focus', resumeQueue); stopQueue = startPrototypeVideoQueue() })
+onBeforeUnmount(() => { window.removeEventListener('tianma:video-sidebar', toggleSidebar); window.removeEventListener('focus', resumeQueue); stopQueue?.() })
 </script>
 
 <template>
@@ -120,7 +168,7 @@ onBeforeUnmount(() => { window.removeEventListener('tianma:video-sidebar', toggl
         <h1>能力广场</h1>
         <div class="capability-grid">
           <button v-for="item in videoCapabilities" :key="item.operator" class="capability-card" :data-testid="`capability-${item.operator}`" @click="router.push({ path: `/video-gen/${item.operator}`, query: { from: 'capability-square' } })">
-            <div class="capability-card__head"><span class="capability-card__icon"><Image v-if="item.operator === 'image-generate'" :size="20" /><Mic v-else-if="item.operator === 'speech-synthesis'" :size="20" /><Video v-else :size="20" /></span><strong>{{ item.title }}</strong><span class="capability-card__tag">{{ item.operator === 'speech-synthesis' ? '原型演示' : '在线体验' }}</span></div>
+            <div class="capability-card__head"><span class="capability-card__icon"><Image v-if="item.operator === 'image-generate'" :size="20" /><Mic v-else-if="item.operator === 'speech-synthesis'" :size="20" /><Video v-else :size="20" /></span><strong>{{ item.title }}</strong><span class="capability-card__tag">{{ ['speech-synthesis', 'element-replace'].includes(item.operator) ? '原型演示' : '在线体验' }}</span></div>
             <p>{{ item.description }}</p>
           </button>
         </div>
@@ -130,13 +178,14 @@ onBeforeUnmount(() => { window.removeEventListener('tianma:video-sidebar', toggl
       <template v-else-if="capability">
         <header class="video-breadcrumb"><button @click="square">能力广场</button><ChevronRight :size="12" /><button v-if="view !== 'list'" @click="list">{{ capability.title }}</button><span v-else>{{ capability.title }}</span><template v-if="view !== 'list'"><ChevronRight :size="12" /><strong>{{ taskName }}</strong><span v-if="currentTask" class="video-status">{{ taskStatusLabel }}</span></template></header>
         <VideoTaskList v-if="view === 'list'" :key="section" class="video-content" :meta="capability" :tasks="operatorTasks" :unavailable="section === 'video-generate'" @create="create" @view="open" @edit="id => setView('config', id)" @copy="copyTask" @remove="deleteTask" />
-        <component :is="configComponent" v-else-if="view === 'config'" :key="`${section}-${route.query.id ?? route.query.copyFrom ?? route.query.name}`" class="video-config-content" :class="{ 'element-config-content': section === 'element-replace' }" :initial-data="currentTask?.input ?? copySourceTask?.input" :initial-name="initialTaskName" @update-name="draftTaskName = $event" @submit="submit" @back="list" />
-        <ElementReplacementProcessing v-else-if="section === 'element-replace' && view === 'processing' && currentTask" @complete="completeDemo" />
-        <SpeechSynthesisProcessing v-else-if="section === 'speech-synthesis' && view === 'processing' && currentTask" @complete="completeDemo" />
+        <component :is="configComponent" v-else-if="view === 'config'" :key="`${section}-${route.query.id ?? route.query.copyFrom ?? route.query.name}-${editorVersion}`" class="video-config-content" :class="{ 'element-config-content': section === 'element-replace' }" :initial-data="currentTask?.input ?? copySourceTask?.input" :initial-name="initialTaskName" :queued="editingQueued" :submitting="submitting" @update-name="draftTaskName = $event" @submit="submit" @back="list" />
+        <ElementReplacementProcessing v-else-if="section === 'element-replace' && view === 'processing' && currentTask" :managed="!!currentTask.prototypeQueue" @complete="completeDemo" />
+        <SpeechSynthesisProcessing v-else-if="section === 'speech-synthesis' && view === 'processing' && currentTask" :managed="!!currentTask.prototypeQueue" @complete="completeDemo" />
         <section v-else-if="view === 'processing' && currentTask" class="video-processing">
           <span class="video-demo-label">原型演示</span><LoaderCircle :size="28" class="video-spinner" /><h2>{{ capability.processingLabel }}</h2><p>此为异步任务，您可同时处理多条任务，任务完成后在列表点击查看结果。</p><button class="video-primary" @click="completeDemo">查看演示结果</button><button class="video-plain" @click="list">返回任务列表</button>
         </section>
-        <component :is="resultComponent" v-else-if="view === 'result' && currentTask" :key="currentTask.id" class="video-result-content" :task="currentTask" @update-input="updateInput" @edit="setView('config', currentTask.id)" @back="list" />
+        <component :is="resultComponent" v-else-if="view === 'result' && currentTask?.status === 'completed'" :key="currentTask.id" class="video-result-content" :task="currentTask" @update-input="updateInput" @edit="setView('config', currentTask.id)" @back="list" />
+        <section v-else-if="view === 'status' && currentTask" class="video-missing" role="status"><h2>{{ taskStatusLabel }}</h2><p>{{ currentTask.remoteJob?.error?.message || '任务未生成可用结果，配置已保留，可返回列表复制后重试。' }}</p></section>
         <div v-else class="video-missing"><p>任务不存在或已删除</p><button class="video-primary" @click="list">返回任务列表</button></div>
       </template>
       <div v-else class="video-missing"><p>暂未找到该能力</p><button class="video-primary" @click="square">返回能力广场</button></div>

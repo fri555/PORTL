@@ -56,7 +56,7 @@ describe('real element replacement task lifecycle', () => {
     const { runner, list } = setup([old])
     await runner.start(input, '新名称', old)
     expect(list()).toHaveLength(1)
-    expect(list()[0]).toMatchObject({ id: 'existing-task', name: '新名称', createdAt: date, status: 'queued' })
+    expect(list()[0]).toMatchObject({ id: 'existing-task', name: '新名称', createdAt: date, status: 'processing' })
     expect(list()[0]?.input).not.toHaveProperty('resultVideo')
     expect(list()[0]?.input).not.toHaveProperty('resultUsesOriginal')
     expect(old.input.resultVideo.url).toBe('https://example.com/old.mp4')
@@ -94,12 +94,13 @@ describe('real element replacement task lifecycle', () => {
     expect(list()[0]?.status).toBe('failed')
     expect(list()[0]?.remoteJob?.error?.message).toBe('参考图无法读取')
   })
-  it('preserves pending and timeout as distinct product statuses', async () => {
+  it('keeps already-dispatched provider pending locked and preserves timeout', async () => {
     const pending: VideoTask = { id: 'task-status', name: '状态映射', operator: 'element-replace', status: 'processing', createdAt: date, input: { ...getDemoElementReplacementInput(), prototypeDemo: false }, remoteJob: job('running') }
     const { runner, api, list } = setup([pending])
     api.poll.mockResolvedValue(job('pending'))
     await runner.refresh(pending.id)
-    expect(list()[0]?.status).toBe('queued')
+    expect(list()[0]?.status).toBe('processing')
+    expect(list()[0]?.remoteJob?.status).toBe('pending')
     api.poll.mockResolvedValue(job('timeout'))
     await runner.refresh(pending.id)
     expect(list()[0]?.status).toBe('timeout')

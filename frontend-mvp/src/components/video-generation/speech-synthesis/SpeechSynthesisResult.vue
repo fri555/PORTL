@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { AudioLines, ChevronDown, Copy, Download, SlidersHorizontal } from 'lucide-vue-next'
-import { normalizeSpeechInput, speechCharacterCount, speechFormatLabel, speechVoiceName } from '@/composables/useSpeechSynthesis'
+import { normalizeSpeechInput, speechCharacterCount, speechFormatLabel, speechLoudnessMultiplier, speechSpeedPercent, speechVoiceName } from '@/composables/useSpeechSynthesis'
 import { speechDemoBase, speechFormats } from '@/mock/speech-synthesis'
 import type { SpeechDemoManifest } from '@/types/speech-synthesis'
 import type { VideoTask } from '@/types/video-generation'
@@ -60,12 +60,12 @@ async function download(event: MouseEvent, url: string, extension: string) {
   finally { downloading.value = false; if (objectUrl) setTimeout(() => URL.revokeObjectURL(objectUrl!), 1000) }
 }
 function retryAudio() { audioError.value = false; player.value?.load() }
-onMounted(loadMetadata)
+onMounted(() => { if (props.task.status === 'completed' && props.task.input.prototypeDemo !== false) void loadMetadata() })
 onBeforeUnmount(() => { disposed = true; request.abort(); player.value?.pause() })
 </script>
 
 <template>
-  <section class="speech-result">
+  <section v-if="task.status === 'completed' && task.input.prototypeDemo !== false" class="speech-result">
     <section class="audio-panel" aria-label="音频结果">
       <div class="audio-title"><span class="audio-icon"><AudioLines :size="24" /></span><div><strong>{{ task.name }}</strong><small>{{ speechFormatLabel(input.format) }}<template v-if="actual"> · {{ actual.duration?.toFixed(2) }} 秒 · {{ actual.sampleRate }} Hz · {{ actual.channels === 1 ? '单声道' : `${actual.channels} 声道` }}<span v-if="actual.bitDepth"> · {{ actual.bitDepth }} bit</span></template></small></div></div>
       <audio ref="player" :src="previewUrl" controls preload="metadata" aria-label="合成音频播放器" @error="audioError = true" @loadedmetadata="audioError = false" />
@@ -77,9 +77,10 @@ onBeforeUnmount(() => { disposed = true; request.abort(); player.value?.pause() 
     <p v-if="feedback" role="status" class="feedback">{{ feedback }}</p>
     <section class="detail-panel speech-result-details">
       <button class="speech-result-details__toggle" data-testid="speech-details-toggle" type="button" :aria-expanded="detailsOpen" @click="detailsOpen = !detailsOpen"><SlidersHorizontal :size="18" /><strong>生成详情</strong><span>{{ speechVoiceName(input.speaker) }} · {{ speechFormatLabel(input.format) }} · {{ input.sampleRate }} Hz</span><ChevronDown :size="17" :class="{ expanded: detailsOpen }" /></button>
-      <dl v-if="detailsOpen" data-testid="speech-result-details"><div class="detail-panel__text"><dt>输入文本</dt><dd data-testid="speech-input-text">{{ input.text }}</dd></div><div><dt>文本长度</dt><dd>{{ speechCharacterCount(input.text) }} 字符</dd></div><div><dt>音色</dt><dd>{{ speechVoiceName(input.speaker) }}</dd></div><div><dt>语速</dt><dd>{{ (1 + input.speechRate / 100).toFixed(1) }} 倍速</dd></div><div><dt>音频格式</dt><dd>{{ speechFormatLabel(input.format) }}</dd></div><div><dt>采样率</dt><dd>{{ input.sampleRate }} Hz</dd></div><div><dt>音量</dt><dd>{{ input.loudnessRate === 0 ? '正常' : input.loudnessRate }}</dd></div><div v-if="input.bitRate"><dt>码率</dt><dd>{{ input.bitRate / 1000 }} kbps</dd></div><div><dt>字幕</dt><dd>{{ input.enableSubtitle ? '已生成 SRT' : '未生成' }}</dd></div></dl>
+      <dl v-if="detailsOpen" data-testid="speech-result-details"><div class="detail-panel__text"><dt>输入文本</dt><dd data-testid="speech-input-text">{{ input.text }}</dd></div><div><dt>文本长度</dt><dd>{{ speechCharacterCount(input.text) }} 字符</dd></div><div><dt>音色</dt><dd>{{ speechVoiceName(input.speaker) }}</dd></div><div><dt>语速</dt><dd>{{ speechSpeedPercent(input.speechRate) }}%</dd></div><div><dt>音频格式</dt><dd>{{ speechFormatLabel(input.format) }}</dd></div><div><dt>采样率</dt><dd>{{ input.sampleRate }} Hz</dd></div><div><dt>音量</dt><dd>{{ speechLoudnessMultiplier(input.loudnessRate).toFixed(2) }} 倍</dd></div><div v-if="input.bitRate"><dt>码率</dt><dd>{{ input.bitRate / 1000 }} kbps</dd></div><div><dt>字幕</dt><dd>{{ input.enableSubtitle ? '已生成 SRT' : '未生成' }}</dd></div></dl>
     </section>
   </section>
+  <section v-else class="speech-result" role="status">暂无可用的合成结果</section>
 </template>
 
 <style scoped>

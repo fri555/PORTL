@@ -16,7 +16,7 @@ const nameTrigger = ref<HTMLElement | null>(null)
 const emptyImage = `${import.meta.env.BASE_URL}assets/video-generation/task-empty.svg`
 const statuses = computed(() => {
   if (props.meta.operator === 'speech-synthesis') return [
-    { value: '', label: '全部' }, { value: 'processing', label: '合成中' },
+    { value: '', label: '全部' }, { value: 'queued', label: '排队中' }, { value: 'processing', label: '合成中' },
     { value: 'completed', label: '已完成' }, { value: 'failed', label: '失败' },
   ]
   if (props.meta.operator === 'element-replace') return [
@@ -35,6 +35,12 @@ function count(value: string) { return value ? props.tasks.filter(task => task.s
 function label(value: string) { return statuses.value.find(item => item.value === value)?.label ?? value }
 function isBusy(task: VideoTask) { return ['queued', 'processing'].includes(task.status) }
 function createdAt(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? value : date.toLocaleString('sv-SE') }
+function taskTime(task: VideoTask) {
+  if (!['element-replace', 'speech-synthesis'].includes(task.operator)) return createdAt(task.createdAt)
+  if (task.status === 'queued') return '尚未开始'
+  const date = new Date(task.startedAt ?? '')
+  return `开始执行：${Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('sv-SE', { timeZone: 'Asia/Shanghai' })}`
+}
 async function openCreate(event: Event) {
   nameTrigger.value = event.currentTarget as HTMLElement
   name.value = `${props.meta.namePrefix}-${new Date().toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}`.slice(0, 20)
@@ -66,9 +72,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
       <div class="task-list__cards">
         <article v-for="task in filtered" :key="task.id" class="task-card" data-testid="task-card">
           <div class="task-card__icon"><Mic v-if="meta.operator === 'speech-synthesis'" :size="20" /><Video v-else :size="20" /></div>
-          <div class="task-card__info"><div><strong>{{ task.name }}</strong><span class="task-status" :class="task.status">{{ label(task.status) }}</span></div><small v-if="meta.operator === 'speech-synthesis'" class="speech-task-summary">{{ speechVoiceName(task.input.speaker) }}<span>·</span>{{ speechCharacterCount(task.input.text) }} 字符<span>·</span>{{ speechFormatLabel(task.input.format) }}<span>·</span>{{ createdAt(task.createdAt) }}</small><small v-else>{{ createdAt(task.createdAt) }}</small></div>
+          <div class="task-card__info"><div><strong>{{ task.name }}</strong><span class="task-status" :class="task.status">{{ label(task.status) }}</span></div><small v-if="meta.operator === 'speech-synthesis'" class="speech-task-summary">{{ speechVoiceName(task.input.speaker) }}<span>·</span>{{ speechCharacterCount(task.input.text) }} 字符<span>·</span>{{ speechFormatLabel(task.input.format) }}<span>·</span>{{ taskTime(task) }}</small><small v-else>{{ taskTime(task) }}</small></div>
           <div class="task-card__actions">
-            <button :aria-label="`查看${task.name}`" title="查看" :disabled="unavailable || !(['queued', 'processing', 'completed'].includes(task.status) || (task.operator === 'element-replace' && task.remoteJob && ['failed', 'timeout'].includes(task.status)))" @click="emit('view', task.id)"><Eye :size="16" /></button>
+            <button :aria-label="`查看${task.name}`" :title="task.status === 'queued' ? '查看并修改配置' : '查看'" :disabled="unavailable || !(['queued', 'processing', 'completed'].includes(task.status) || (['element-replace', 'speech-synthesis'].includes(task.operator) && ['failed', 'timeout'].includes(task.status)))" @click="emit('view', task.id)"><Eye :size="16" /></button>
             <button v-if="meta.operator === 'prompt-generate'" :aria-label="`编辑${task.name}`" title="编辑" :disabled="isBusy(task)" @click="emit('edit', task.id)"><Pencil :size="16" /></button>
             <button v-if="['element-replace', 'speech-synthesis'].includes(meta.operator)" :aria-label="`复制${task.name}`" title="复制" :disabled="isBusy(task)" @click="emit('copy', task.id)"><Copy :size="16" /></button>
             <button :aria-label="`删除${task.name}`" title="删除" :disabled="unavailable || isBusy(task)" @click="deleting = task.id"><Trash2 :size="16" /></button>

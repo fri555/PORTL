@@ -2,8 +2,9 @@
 import { onBeforeUnmount, onMounted } from 'vue'
 import { LoaderCircle, Video } from 'lucide-vue-next'
 const emit = defineEmits<{ complete: [] }>()
+const props = defineProps<{ managed?: boolean }>()
 let completionTimer: ReturnType<typeof setTimeout> | undefined
-onMounted(() => { completionTimer = setTimeout(() => emit('complete'), 3000) })
+onMounted(() => { if (!props.managed) completionTimer = setTimeout(() => emit('complete'), 3000) })
 onBeforeUnmount(() => { if (completionTimer) clearTimeout(completionTimer) })
 </script>
 
