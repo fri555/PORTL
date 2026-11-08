@@ -1,41 +1,33 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { Copy, FileSearch, Plus, Trash2, X } from 'lucide-vue-next'
+import { Copy, FileSearch, Plus, Search, Trash2, X } from 'lucide-vue-next'
+import {
+  buildFashionAssetRequest,
+  createDefaultDouyinQueryForm,
+  normalizeDouyinQueryForm,
+  validateDouyinQueryForm,
+  type DouyinQueryForm,
+  type DouyinRecallRoute,
+  type FashionAssetRequest,
+} from './douyin-hot-video-query'
 
-interface QueryImage {
-  name: string
-  uri: string
-  mimeType: string
-}
-interface QueryForm {
-  text: string
-  image: QueryImage | null
-  productNumber: string
-  strategyMode: 'default' | 'custom'
-  recallRoutes: string[]
-  competitorBrands: string
-  enableCompetitorMatching: boolean
-  isAiGenerated: string
-  publishedWithinDays: string | number
-  minVvAll: string | number
-  authorScope: string
-  metricWindowDays: string | number
-  useRanking: boolean
-  wSubject: string
-  wSellingPoints: string
-  wAudience: string
-  limit: string
-}
+type LocalQueryStatus = 'saved' | 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED'
+
 interface LocalQuery {
   id: string
   name: string
   createdAt: string
-  status: 'saved'
-  form: QueryForm
-  query: Record<string, any>
+  status: LocalQueryStatus
+  failureReason?: string
+  form: DouyinQueryForm
+  query: FashionAssetRequest | Record<string, unknown>
 }
 const STORAGE_KEY = 'tianma-douyin-prototype-v1'
-const routes = [
+const routes: Array<{
+  id: DouyinRecallRoute
+  name: string
+  description: string
+}> = [
   {
     id: 'author_normalized_creative_breakout',
     name: '同品类作者创意爆款',
@@ -71,43 +63,35 @@ const tabs = [
   { value: 'SUCCEEDED', label: '已完成' },
   { value: 'FAILED', label: '已失败' },
 ]
-function blankForm(): QueryForm {
-  return {
-    text: '',
-    image: null,
-    productNumber: '',
-    strategyMode: 'default',
-    recallRoutes: [],
-    competitorBrands: '',
-    enableCompetitorMatching: false,
-    isAiGenerated: 'any',
-    publishedWithinDays: '',
-    minVvAll: '',
-    authorScope: 'any',
-    metricWindowDays: '',
-    useRanking: false,
-    wSubject: '0.35',
-    wSellingPoints: '0.35',
-    wAudience: '0.30',
-    limit: '20',
-  }
-}
 function readTasks(): LocalQuery[] {
   try {
     const data: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]')
-    return Array.isArray(data)
-      ? data.filter(
-          (item) =>
-            item &&
-            typeof item.id === 'string' &&
-            typeof item.name === 'string' &&
-            item.status === 'saved' &&
-            item.form &&
-            typeof item.form.text === 'string' &&
-            item.query &&
-            typeof item.query === 'object',
-        )
-      : []
+    if (!Array.isArray(data)) return []
+    return data.flatMap((item): LocalQuery[] => {
+      if (
+        !item ||
+        typeof item !== 'object' ||
+        typeof item.id !== 'string' ||
+        typeof item.name !== 'string' ||
+        !['saved', 'QUEUED', 'RUNNING', 'SUCCEEDED', 'FAILED'].includes(String(item.status)) ||
+        !item.form ||
+        typeof item.form !== 'object' ||
+        !item.query ||
+        typeof item.query !== 'object'
+      )
+        return []
+      return [
+        {
+          id: item.id,
+          name: item.name,
+          createdAt: typeof item.createdAt === 'string' ? item.createdAt : new Date().toISOString(),
+          status: item.status as LocalQueryStatus,
+          ...(typeof item.failureReason === 'string' ? { failureReason: item.failureReason } : {}),
+          form: normalizeDouyinQueryForm(item.form),
+          query: item.query as Record<string, unknown>,
+        },
+      ]
+    })
   } catch {
     return []
   }
@@ -115,23 +99,40 @@ function readTasks(): LocalQuery[] {
 const tasks = ref(readTasks())
 const mode = ref<'list' | 'create' | 'view'>('list')
 const step = ref(1)
-const form = ref<QueryForm>(blankForm())
+const form = ref<DouyinQueryForm>(createDefaultDouyinQueryForm())
 const error = ref('')
+const invalidField = ref<keyof DouyinQueryForm | ''>('')
 const notice = ref('')
 const reading = ref(false)
 const statusFilter = ref('')
+const keyword = ref('')
+const keywordInput = ref('')
 const page = ref(1)
 const deleting = ref('')
 const currentTask = ref<LocalQuery | null>(null)
 const readonly = computed(() => mode.value === 'view')
 const filteredTasks = computed(() =>
-  tasks.value.filter((task) => !statusFilter.value || task.status === statusFilter.value),
+  tasks.value.filter(
+    (task) =>
+      (!statusFilter.value || task.status === statusFilter.value) &&
+      task.name.toLowerCase().includes(keyword.value.trim().toLowerCase()),
+  ),
 )
 const pageCount = computed(() => Math.max(1, Math.ceil(filteredTasks.value.length / 8)))
 const visibleTasks = computed(() => filteredTasks.value.slice((page.value - 1) * 8, page.value * 8))
-watch(statusFilter, () => {
+watch([statusFilter, keyword], () => {
   page.value = 1
 })
+function applySearch() {
+  keyword.value = keywordInput.value.trim()
+}
+function clearSearch() {
+  keywordInput.value = ''
+  applySearch()
+}
+function statusCount(value: string) {
+  return value ? tasks.value.filter((task) => task.status === value).length : tasks.value.length
+}
 watch(
   () => form.value.strategyMode,
   (value) => {
@@ -140,94 +141,41 @@ watch(
   },
 )
 function createTask(source?: LocalQuery) {
-  form.value = source ? JSON.parse(JSON.stringify(source.form)) : blankForm()
+  form.value = source
+    ? normalizeDouyinQueryForm(source.form)
+    : createDefaultDouyinQueryForm()
   currentTask.value = null
   step.value = 1
   error.value = ''
+  invalidField.value = ''
   notice.value = ''
   mode.value = 'create'
 }
 function viewTask(task: LocalQuery) {
-  form.value = { ...blankForm(), ...JSON.parse(JSON.stringify(task.form)) }
+  form.value = normalizeDouyinQueryForm(task.form)
   currentTask.value = task
   step.value = 4
   error.value = ''
+  invalidField.value = ''
   mode.value = 'view'
 }
 function backToList() {
   mode.value = 'list'
   error.value = ''
+  invalidField.value = ''
   notice.value = ''
 }
 function goStep(target: number) {
   if (readonly.value || target < step.value) {
     step.value = target
     error.value = ''
+    invalidField.value = ''
     notice.value = ''
   }
 }
-function buildQuery(): Record<string, any> {
-  const value = form.value
-  const filters: Record<string, any> = { enableCompetitorMatching: value.enableCompetitorMatching }
-  const brands = value.competitorBrands
-    .split(/[,，]/)
-    .map((item) => item.trim())
-    .filter(Boolean)
-  if (brands.length) filters.competitorBrands = brands
-  if (value.isAiGenerated !== 'any') filters.isAiGenerated = value.isAiGenerated === 'yes'
-  for (const name of ['publishedWithinDays', 'minVvAll', 'metricWindowDays'] as const)
-    if (String(value[name]).trim()) filters[name] = Number(value[name])
-  if (value.authorScope === 'blue_v') filters.authorScope = 'institution_certified_classify_0'
-  return {
-    recallStrategyType: value.strategyMode === 'custom' ? 'CUSTOM' : 'DEFAULT',
-    recallRoutes: value.strategyMode === 'custom' ? [...value.recallRoutes] : [],
-    filters,
-    limit: Number(value.limit),
-    ...(value.text.trim() ? { queryText: value.text.trim() } : {}),
-    ...(value.image ? { imageUrl: value.image.uri, imageMimeType: value.image.mimeType } : {}),
-    ...(value.useRanking
-      ? {
-          weights: {
-            subject: Number(value.wSubject),
-            sellingPoints: Number(value.wSellingPoints),
-            audience: Number(value.wAudience),
-          },
-        }
-      : {}),
-  }
-}
-function validateFilters() {
-  const value = form.value
-  for (const field of [
-    { key: 'publishedWithinDays', label: '发布天数' },
-    { key: 'minVvAll', label: '累计播放量下限' },
-    { key: 'metricWindowDays', label: '指标统计口径' },
-  ] as const) {
-    if (String(value[field.key]).trim()) {
-      const number = Number(value[field.key])
-      if (
-        !Number.isInteger(number) ||
-        number < 1 ||
-        (field.key === 'metricWindowDays' && number > 3650)
-      )
-        return `${field.label}请填写${field.key === 'metricWindowDays' ? ' 1-3650 的' : ''}正整数`
-    }
-  }
-  if (value.useRanking) {
-    const weights = [value.wSubject, value.wSellingPoints, value.wAudience]
-    if (weights.some((weight) => !weight.trim())) return '请填写主体、卖点和人群权重'
-    if (weights.some((weight) => !Number.isFinite(Number(weight)) || Number(weight) < 0))
-      return '排序权重必须为非负数'
-    if (Math.abs(weights.reduce((sum, weight) => sum + Number(weight), 0) - 1) > 0.001)
-      return '三个权重之和必须等于 1.0'
-  }
-  if (!value.limit.trim()) return '请输入返回条数'
-  if (!Number.isInteger(Number(value.limit)) || Number(value.limit) < 1 || Number(value.limit) > 20)
-    return '返回条数范围为 1-20，请填写整数'
-  return ''
-}
 function next() {
   error.value = ''
+  invalidField.value = ''
   notice.value = ''
   if (readonly.value) {
     step.value = Math.min(4, step.value + 1)
@@ -247,15 +195,23 @@ function next() {
     return
   }
   if (step.value === 3) {
-    error.value = validateFilters()
-    if (error.value) return
+    form.value = normalizeDouyinQueryForm(form.value)
+    const validation = validateDouyinQueryForm(form.value)
+    if (!validation.valid) {
+      error.value = validation.message
+      invalidField.value = validation.field
+      return
+    }
     const saved: LocalQuery = {
       id: 'douyin-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8),
       name: form.value.text.trim().slice(0, 30) || '仅图片查询',
       createdAt: new Date().toISOString(),
       status: 'saved',
-      form: JSON.parse(JSON.stringify(form.value)),
-      query: buildQuery(),
+      form: normalizeDouyinQueryForm(form.value),
+      query: buildFashionAssetRequest(form.value, {
+        text: form.value.text,
+        image: form.value.image,
+      }),
     }
     const updated = [saved, ...tasks.value]
     try {
@@ -272,8 +228,9 @@ function next() {
 async function selectImage(file?: File) {
   if (!file || reading.value) return
   error.value = ''
-  if (!['image/png', 'image/jpeg'].includes(file.type)) {
-    error.value = '仅支持PNG、JPG、JPEG格式的图片'
+  invalidField.value = ''
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+    error.value = '仅支持 PNG、JPG、JPEG、WEBP 格式的图片'
     return
   }
   if (file.size > 3150000) {
@@ -318,8 +275,13 @@ function confirmDelete() {
     error.value = '本地任务删除失败，请重试'
   }
 }
+function optionalValue(value: string | number) {
+  const normalized = String(value)
+  return normalized.trim() === '' ? '不限' : normalized
+}
 const summary = computed(() => {
   const value = form.value
+  const brands = value.competitorBrands.trim()
   return [
     ['商品描述', value.text.trim() || '未填写'],
     ['商品图片', value.image?.name || '未选择'],
@@ -333,8 +295,16 @@ const summary = computed(() => {
             .map((route) => route.name)
             .join('、'),
     ],
-    ['竞品品牌', value.competitorBrands || '自动发现'],
+    [
+      '竞品品牌',
+      value.enableCompetitorMatching
+        ? brands || '自动发现'
+        : brands
+          ? `未提交（已保留：${brands}）`
+          : '未启用',
+    ],
     ['竞品识别', value.enableCompetitorMatching ? '启用' : '关闭'],
+    ['排除本品牌', value.excludeTargetBrand ? '是' : '否'],
     [
       '是否AI生成',
       value.isAiGenerated === 'any'
@@ -343,10 +313,16 @@ const summary = computed(() => {
           ? '只要 AI 生成'
           : '只要非 AI 生成',
     ],
-    ['发布于最近 N天', value.publishedWithinDays || '不限'],
-    ['累计播放量下限', value.minVvAll || '不限'],
-    ['作者范围', value.authorScope === 'blue_v' ? '仅蓝 V 机构认证作者' : '不限'],
-    ['指标统计口径（天）', value.metricWindowDays || '不限'],
+    ['仅直播引流', value.liveTrafficOnly ? '是' : '否'],
+    ['发布于最近 N天', optionalValue(value.publishedWithinDays)],
+    ['累计播放量下限', optionalValue(value.minVvAll)],
+    ['作者范围', value.authorScope === 'institution_certified' ? '机构认证作者' : '不限'],
+    ['指标统计口径（天）', optionalValue(value.metricWindowDays)],
+    ['窗口新增播放量下限', optionalValue(value.minPeriodVvAll)],
+    ['Anchor 点击率下限', optionalValue(value.minAnchorCtr)],
+    ['完播率下限', optionalValue(value.minFinishRate)],
+    ['5 秒播放率下限', optionalValue(value.minPlay5sRate)],
+    ['点赞量下限', optionalValue(value.minLikeCntAll)],
     [
       '排序权重',
       value.useRanking
@@ -363,13 +339,37 @@ const summary = computed(() => {
     <template v-if="mode === 'list'">
       <header class="list-header">
         <div>
-          <h1>抖音爆款视频</h1>
+          <h1>爆款发现</h1>
           <span>管理你的素材召回任务</span>
         </div>
         <button type="button" class="primary" data-testid="douyin-create" @click="createTask()">
-          <Plus :size="16" />新建
+          <Plus :size="16" />新建任务
         </button>
       </header>
+      <div class="list-toolbar" data-testid="douyin-search-toolbar">
+        <div class="task-search">
+          <Search :size="16" />
+          <input
+            v-model="keywordInput"
+            aria-label="搜索任务名称"
+            placeholder="搜索任务名称"
+            @keyup.enter="applySearch"
+          />
+          <button
+            v-if="keywordInput"
+            type="button"
+            class="search-clear"
+            data-testid="douyin-search-clear"
+            aria-label="清除搜索"
+            @click="clearSearch"
+          >
+            <X :size="14" />
+          </button>
+        </div>
+        <button type="button" class="primary" data-testid="douyin-search-submit" @click="applySearch">
+          搜索
+        </button>
+      </div>
       <div role="tablist" aria-label="召回任务状态" class="status-tabs">
         <button
           v-for="tab in tabs"
@@ -381,12 +381,12 @@ const summary = computed(() => {
           @click="statusFilter = tab.value"
         >
           {{ tab.label }}
-          <small>{{ !tab.value || tab.value === 'saved' ? tasks.length : 0 }}</small>
+          <small>{{ statusCount(tab.value) }}</small>
         </button>
       </div>
       <div v-if="!visibleTasks.length" class="empty-state">
         <FileSearch :size="48" :stroke-width="1" /><strong>{{
-          tasks.length ? '暂无数据' : '暂无抖音爆款视频任务'
+          tasks.length ? '暂无数据' : '暂无爆款发现任务'
         }}</strong>
         <p v-if="!tasks.length">请点击「新建」按钮开始创建第一个任务</p>
       </div>
@@ -409,9 +409,9 @@ const summary = computed(() => {
             /><span
               ><strong>{{ task.name }}</strong
               ><small
-                >已保存查询 · 原型演示 ·
+                >{{ task.status === 'saved' ? '已保存查询' : tabs.find((tab) => tab.value === task.status)?.label }} · 原型演示 ·
                 {{ new Date(task.createdAt).toLocaleString('zh-CN', { hour12: false }) }}</small
-              ></span
+              ><small v-if="task.status === 'FAILED'" class="task-failure" data-testid="douyin-failure-reason">{{ task.failureReason || '未返回具体失败原因' }}</small></span
             ></button
           ><button
             type="button"
@@ -449,7 +449,7 @@ const summary = computed(() => {
     <template v-else>
       <header class="breadcrumb">
         <button type="button" data-testid="douyin-back-list" @click="backToList">
-          抖音爆款视频</button
+          爆款发现</button
         ><span>›</span><strong>{{ readonly ? '查看任务' : '新增任务' }}</strong>
       </header>
       <div class="wizard-wrapper">
@@ -475,7 +475,7 @@ const summary = computed(() => {
                 <small>填写商品描述或上传商品图片，快速定位匹配素材</small>
               </div>
               <div class="section-head">
-                <h3>商品信息 <span class="required">*</span></h3>
+                <h3>方式一 <span class="required">*</span></h3>
                 <small>商品描述与商品图片至少填一项</small>
               </div>
               <div class="query-grid">
@@ -502,10 +502,10 @@ const summary = computed(() => {
                         }}</small></template
                       ><input
                         type="file"
-                        accept=".png,.jpg,.jpeg"
+                        accept=".png,.jpg,.jpeg,.webp"
                         aria-label="商品图片"
                         @change="imageChanged" /></label
-                    ><small>支持PNG、JPG、JPEG，≤ 3.15MB</small
+                    ><small>PNG、JPG、WEBP，≤ 3.15MB</small
                     ><button
                       v-if="form.image"
                       type="button"
@@ -517,6 +517,9 @@ const summary = computed(() => {
                     </button>
                   </div>
                 </div>
+              </div>
+              <div class="section-head subsection-head">
+                <h3>方式二</h3>
               </div>
               <label class="field product-field"
                 >货号查询
@@ -571,23 +574,40 @@ const summary = computed(() => {
             >
               <div class="section-head">
                 <h2>筛选排序</h2>
-                <small>按品牌、发布时间、播放量、AI 生成等维度过滤，并调整排序权重</small>
+                <small>设置素材范围和排序方式</small>
               </div>
-              <h3>过滤条件</h3>
+              <h3>基础筛选</h3>
+              <div class="switch-grid">
+                <label class="compact-toggle"
+                  ><span>自动竞品识别</span><input
+                    v-model="form.enableCompetitorMatching"
+                    type="checkbox"
+                    role="switch"
+                    aria-label="启用竞品识别"
+                /></label>
+                <label class="compact-toggle"
+                  ><span>排除本品牌</span><input
+                    v-model="form.excludeTargetBrand"
+                    type="checkbox"
+                    role="switch"
+                    aria-label="排除本品牌"
+                /></label>
+                <label class="compact-toggle"
+                  ><span>仅直播引流</span><input
+                    v-model="form.liveTrafficOnly"
+                    type="checkbox"
+                    role="switch"
+                    aria-label="仅直播引流"
+                /></label>
+              </div>
               <label class="field"
                 >竞品品牌<input
                   v-model="form.competitorBrands"
+                  :disabled="!form.enableCompetitorMatching"
+                  :aria-invalid="invalidField === 'competitorBrands'"
                   aria-label="竞品品牌"
-                  placeholder="多个用逗号分隔；留空由系统自动发现" /></label
-              ><label class="toggle-card"
-                ><span
-                  ><strong>启用竞品识别</strong><small>关闭后改为整个品类数据召回。</small></span
-                ><input
-                  v-model="form.enableCompetitorMatching"
-                  type="checkbox"
-                  role="switch"
-                  aria-label="启用竞品识别"
-              /></label>
+                  placeholder="多个品牌用逗号分隔；留空自动发现" /></label
+              >
               <div class="filter-grid">
                 <label class="field"
                   >是否AI生成<select v-model="form.isAiGenerated" aria-label="是否AI生成">
@@ -601,33 +621,88 @@ const summary = computed(() => {
                     type="number"
                     min="1"
                     step="1"
+                    :aria-invalid="invalidField === 'publishedWithinDays'"
                     aria-label="发布于最近 N天"
                     placeholder="留空不限" /></label
                 ><label class="field"
                   >累计播放量下限<input
                     v-model="form.minVvAll"
                     type="number"
-                    min="1"
+                    min="0"
                     step="1"
+                    :aria-invalid="invalidField === 'minVvAll'"
                     aria-label="累计播放量下限"
                     placeholder="留空不限" /></label
                 ><label class="field"
                   >作者范围<select v-model="form.authorScope" aria-label="作者范围">
                     <option value="any">不限</option>
-                    <option value="blue_v">仅蓝 V 机构认证作者</option>
+                    <option value="institution_certified">机构认证作者</option>
                   </select></label
                 >
               </div>
-              <label class="field half-field"
-                >指标统计口径（天）<input
-                  v-model="form.metricWindowDays"
-                  type="number"
-                  min="1"
-                  max="3650"
-                  step="1"
-                  aria-label="指标统计口径（天）"
-                  placeholder="留空不限" /></label
-              ><label class="ranking-head"
+              <h3>指标筛选</h3>
+              <div class="filter-grid metric-grid">
+                <label class="field"
+                  >指标统计口径（天）<input
+                    v-model="form.metricWindowDays"
+                    type="number"
+                    min="1"
+                    max="3650"
+                    step="1"
+                    :aria-invalid="invalidField === 'metricWindowDays'"
+                    aria-label="指标统计口径（天）"
+                    placeholder="留空不限" /></label
+                ><label class="field"
+                  >窗口新增播放量下限<input
+                    v-model="form.minPeriodVvAll"
+                    type="number"
+                    min="0"
+                    step="1"
+                    :aria-invalid="invalidField === 'minPeriodVvAll'"
+                    aria-label="窗口新增播放量下限"
+                    placeholder="留空不限" /></label
+                ><label class="field"
+                  >Anchor 点击率下限（%）<input
+                    v-model="form.minAnchorCtr"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    :aria-invalid="invalidField === 'minAnchorCtr'"
+                    aria-label="Anchor 点击率下限（%）"
+                    placeholder="0-100" /></label
+                ><label class="field"
+                  >完播率下限（%）<input
+                    v-model="form.minFinishRate"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    :aria-invalid="invalidField === 'minFinishRate'"
+                    aria-label="完播率下限（%）"
+                    placeholder="0-100" /></label
+                ><label class="field"
+                  >5 秒播放率下限（%）<input
+                    v-model="form.minPlay5sRate"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    :aria-invalid="invalidField === 'minPlay5sRate'"
+                    aria-label="5 秒播放率下限（%）"
+                    placeholder="0-100" /></label
+                ><label class="field"
+                  >点赞量下限<input
+                    v-model="form.minLikeCntAll"
+                    type="number"
+                    min="0"
+                    step="1"
+                    :aria-invalid="invalidField === 'minLikeCntAll'"
+                    aria-label="点赞量下限"
+                    placeholder="留空不限" /></label
+                >
+              </div>
+              <label class="ranking-head"
                 ><h3>排序权重</h3>
                 <input
                   v-model="form.useRanking"
@@ -636,30 +711,52 @@ const summary = computed(() => {
                   aria-label="启用排序权重"
               /></label>
               <div v-if="form.useRanking" class="weight-area">
-                <small>三项权重均为非负数，合计须等于 1.0。</small>
                 <div class="filter-grid">
                   <label class="field"
-                    >主体 <span class="required">*</span
+                    ><span class="field-label">主体 <span class="required">*</span></span
                     ><input
                       v-model="form.wSubject"
+                      type="number"
+                      min="0"
+                      step="any"
+                      :aria-invalid="invalidField === 'wSubject'"
                       aria-label="主体权重"
                       placeholder="请输入主体" /></label
                   ><label class="field"
-                    >卖点 <span class="required">*</span
+                    ><span class="field-label">卖点 <span class="required">*</span></span
                     ><input
                       v-model="form.wSellingPoints"
+                      type="number"
+                      min="0"
+                      step="any"
+                      :aria-invalid="invalidField === 'wSellingPoints'"
                       aria-label="卖点权重"
                       placeholder="请输入卖点" /></label
                   ><label class="field"
-                    >人群 <span class="required">*</span
-                    ><input v-model="form.wAudience" aria-label="人群权重" placeholder="请输入人群"
+                    ><span class="field-label">人群 <span class="required">*</span></span
+                    ><input
+                      v-model="form.wAudience"
+                      type="number"
+                      min="0"
+                      step="any"
+                      :aria-invalid="invalidField === 'wAudience'"
+                      aria-label="人群权重"
+                      placeholder="请输入人群"
                   /></label>
                 </div>
               </div>
               <h3>返回设置</h3>
               <label class="field half-field"
-                >返回条数 <span class="required">*</span
-                ><input v-model="form.limit" aria-label="返回条数" placeholder="请输入返回条数"
+                ><span class="field-label">返回条数 <span class="required">*</span></span
+                ><input
+                  v-model="form.limit"
+                  type="number"
+                  min="1"
+                  max="20"
+                  step="1"
+                  :aria-invalid="invalidField === 'limit'"
+                  aria-label="返回条数"
+                  placeholder="请输入返回条数"
               /></label>
             </section>
           </fieldset>
@@ -743,9 +840,10 @@ const summary = computed(() => {
   gap: 20px;
   min-height: 620px;
   height: 100%;
-  padding: 20px;
+  overflow-y: auto;
+  padding: 24px 28px;
   color: #18181b;
-  font-size: 13px;
+  font-size: 14px;
 }
 .douyin-page h1,
 .douyin-page h2,
@@ -754,10 +852,13 @@ const summary = computed(() => {
   margin: 0;
 }
 .douyin-page h1 {
+  font-size: 18px;
+  font-weight: 500;
+}
+.douyin-page h2 {
   font-size: 16px;
   font-weight: 500;
 }
-.douyin-page h2,
 .douyin-page h3 {
   font-size: 14px;
   font-weight: 500;
@@ -769,7 +870,7 @@ const summary = computed(() => {
   gap: 6px;
   min-height: 32px;
   border: 1px solid #dfe2e6;
-  border-radius: 6px;
+  border-radius: 8px;
   background: #fff;
   padding: 5px 14px;
   color: #18181b;
@@ -780,6 +881,7 @@ const summary = computed(() => {
   background: #f6f6f7;
 }
 .douyin-page button.primary {
+  min-height: 36px;
   border-color: #18181b;
   background: #18181b;
   color: #fff;
@@ -799,6 +901,46 @@ const summary = computed(() => {
   align-items: center;
   gap: 12px;
 }
+.list-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.task-search {
+  display: flex;
+  width: 360px;
+  height: 36px;
+  box-sizing: border-box;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #dfe2e6;
+  border-radius: 8px;
+  padding: 0 10px;
+  color: #92949a;
+}
+.douyin-page .task-search input {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  border: 0;
+  padding: 0;
+  outline: none;
+}
+.douyin-page .task-search .search-clear {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #e6e7ea;
+  padding: 0;
+  color: #6b6f76;
+}
+.douyin-page .task-search .search-clear:hover {
+  background: #d8dade;
+}
 .list-header span,
 .status-tabs small {
   font-size: 12px;
@@ -806,19 +948,23 @@ const summary = computed(() => {
 }
 .status-tabs {
   display: flex;
-  gap: 4px;
+  gap: 24px;
   flex-wrap: wrap;
+  border-bottom: 1px solid #ededed;
 }
 .status-tabs button {
-  min-height: 28px;
+  min-height: 38px;
   border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
   background: transparent;
-  padding: 3px 12px;
+  padding: 3px 0 8px;
   color: #737780;
   white-space: nowrap;
 }
 .status-tabs button.active {
-  background: #f3f4f5;
+  border-bottom-color: #18181b;
+  background: transparent;
   color: #18181b;
 }
 .task-list {
@@ -830,10 +976,10 @@ const summary = computed(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 74px;
+  min-height: 84px;
   border: 1px solid #e4e4e7;
-  border-radius: 9px;
-  padding: 12px 16px;
+  border-radius: 12px;
+  padding: 14px 16px;
 }
 .douyin-page .task-main {
   display: flex;
@@ -852,10 +998,10 @@ const summary = computed(() => {
   color: #92949a;
 }
 .task-main > img {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   object-fit: cover;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 .task-main > span {
   display: flex;
@@ -870,8 +1016,11 @@ const summary = computed(() => {
   font-weight: 500;
 }
 .task-main small {
-  font-size: 11px;
+  font-size: 12px;
   color: #92949a;
+}
+.task-main .task-failure {
+  color: #dc3d36;
 }
 .douyin-page .icon-button {
   width: 28px;
@@ -1013,17 +1162,21 @@ const summary = computed(() => {
 .route-card small,
 .toggle-card small,
 .weight-area > small {
-  font-size: 11px;
+  font-size: 12px;
   color: #92949a;
   line-height: 1.6;
 }
 .required {
   color: #ef4444;
 }
-.query-grid,
 .filter-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.query-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 .field {
@@ -1033,6 +1186,11 @@ const summary = computed(() => {
   min-width: 0;
   line-height: 1.5;
 }
+.field-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
 .douyin-page input:not([type='checkbox']):not([type='radio']):not([type='file']),
 .douyin-page select,
 .douyin-page textarea {
@@ -1041,7 +1199,7 @@ const summary = computed(() => {
   height: 32px;
   min-width: 0;
   border: 1px solid #dfe2e6;
-  border-radius: 6px;
+  border-radius: 8px;
   background: #fff;
   padding: 5px 10px;
   outline: none;
@@ -1061,6 +1219,17 @@ const summary = computed(() => {
 .douyin-page textarea:focus,
 .douyin-page select:focus {
   border-color: #a1a1aa;
+}
+.douyin-page input[aria-invalid='true'],
+.douyin-page select[aria-invalid='true'] {
+  border-color: #dc3d36;
+  box-shadow: 0 0 0 2px rgba(220, 61, 54, 0.08);
+}
+.douyin-page input:disabled,
+.douyin-page select:disabled,
+.douyin-page textarea:disabled {
+  background: #f5f5f6;
+  color: #92949a;
 }
 .upload-row {
   display: flex;
@@ -1085,7 +1254,7 @@ const summary = computed(() => {
   flex: none;
   overflow: hidden;
   border: 1px dashed #dfe2e6;
-  border-radius: 6px;
+  border-radius: 8px;
   background: #fcfcff;
   cursor: pointer;
 }
@@ -1106,7 +1275,10 @@ const summary = computed(() => {
   object-fit: cover;
 }
 .product-field {
-  max-width: 360px;
+  max-width: 390px;
+}
+.subsection-head {
+  margin-top: 4px;
 }
 .lookup-row {
   display: flex;
@@ -1121,7 +1293,7 @@ const summary = computed(() => {
   align-items: center;
   gap: 12px;
   border: 1px solid #dfe2e6;
-  border-radius: 6px;
+  border-radius: 8px;
   background: #fff;
   padding: 14px 16px;
   cursor: pointer;
@@ -1160,7 +1332,7 @@ const summary = computed(() => {
   justify-content: space-between;
   gap: 12px;
   border: 1px solid #dfe2e6;
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 14px 16px;
   background: linear-gradient(#f7f7f9, #fff);
 }
@@ -1168,6 +1340,55 @@ const summary = computed(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+.switch-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.compact-toggle {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #e4e4e7;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: #fff;
+}
+.douyin-page input[role='switch'] {
+  position: relative;
+  width: 34px;
+  height: 18px;
+  flex: none;
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  background: #d9dadd;
+  cursor: pointer;
+  transition: background 0.16s ease;
+}
+.douyin-page input[role='switch']::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px #0003;
+  content: '';
+  transition: transform 0.16s ease;
+}
+.douyin-page input[role='switch']:checked {
+  background: #18181b;
+}
+.douyin-page input[role='switch']:checked::after {
+  transform: translateX(16px);
+}
+.metric-grid {
+  row-gap: 14px;
 }
 .half-field {
   max-width: 352px;
@@ -1263,7 +1484,7 @@ const summary = computed(() => {
   box-sizing: border-box;
   width: 360px;
   max-width: 100%;
-  border-radius: 9px;
+  border-radius: 12px;
   background: #fff;
   padding: 24px;
   box-shadow: 0 12px 40px #0002;
@@ -1289,6 +1510,13 @@ const summary = computed(() => {
     flex-direction: column;
     gap: 4px;
   }
+  .list-toolbar {
+    width: 100%;
+  }
+  .list-toolbar .task-search {
+    flex: 1;
+    width: auto;
+  }
   .stepper {
     gap: 6px;
     justify-content: flex-start;
@@ -1303,7 +1531,8 @@ const summary = computed(() => {
   }
   .query-grid,
   .route-grid,
-  .filter-grid {
+  .filter-grid,
+  .switch-grid {
     grid-template-columns: 1fr;
   }
   .result-section dl {

@@ -470,7 +470,14 @@
   background: #fff;
   box-shadow: 0 22px 60px rgba(0, 0, 0, 0.22);
 }
+.quota-manager-dialog {
+  width: min(720px, calc(100vw - 32px));
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.22);
+}
 .quota-dialog header,
+.quota-manager-dialog header,
 .audit-detail-modal > header,
 .usage-detail-modal > header {
   display: flex;
@@ -480,6 +487,7 @@
   padding: 18px 20px;
 }
 .quota-dialog header > div,
+.quota-manager-dialog header > div,
 .audit-detail-modal > header > div,
 .usage-detail-modal > header > div {
   display: flex;
@@ -487,12 +495,14 @@
   gap: 11px;
 }
 .quota-dialog header strong,
+.quota-manager-dialog header strong,
 .audit-detail-modal header strong,
 .usage-detail-modal header strong {
   display: block;
   font-size: 15px;
 }
 .quota-dialog header p,
+.quota-manager-dialog header p,
 .audit-detail-modal header p,
 .usage-detail-modal header p {
   margin: 3px 0 0;
@@ -500,6 +510,7 @@
   font-size: 10px;
 }
 .quota-dialog header button,
+.quota-manager-dialog header button,
 .audit-detail-modal header button,
 .usage-detail-modal header button {
   display: grid;
@@ -621,6 +632,252 @@ dt {
   border-top: 1px solid #eee;
   padding: 14px 20px;
 }
+.quota-manager-dialog footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid #eee;
+  padding: 14px 20px;
+}
+.quota-manager-dialog footer > button:not(.primary-button) {
+  height: 36px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  padding: 0 14px;
+}
+.quota-manager-toolbar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.quota-manager-toolbar label {
+  margin: 0;
+}
+.member-picker-button {
+  display: inline-flex;
+  width: 100%;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  color: #3f3f46;
+  font: 13px inherit;
+}
+.selected-member-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 18px;
+}
+.selected-member-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 999px;
+  background: #f1f2f4;
+  padding: 6px 10px;
+  color: #52525b;
+  font-size: 11px;
+}
+.selected-member-row button,
+.quota-scope-selected button {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #71717a;
+}
+.quota-manager-list {
+  overflow: hidden;
+  border: 1px solid #e6e7ea;
+  border-radius: 9px;
+}
+.quota-manager-list article {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  padding: 12px 14px;
+}
+.quota-manager-list article + article {
+  border-top: 1px solid #eee;
+}
+.quota-manager-list strong,
+.quota-manager-list small {
+  display: block;
+}
+.quota-manager-list small {
+  margin-top: 3px;
+  color: #8b8d94;
+  font-size: 11px;
+}
+.quota-manager-list article > button {
+  border: 0;
+  background: transparent;
+  color: #2563eb;
+  font: 12px inherit;
+}
+.manager-avatar {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 9px;
+  background: #18181b;
+  color: #fff;
+  font-size: 12px;
+}
+.quota-manager-dialog .primary-button:disabled {
+  border-color: #d4d4d8;
+  background: #d4d4d8;
+  cursor: not-allowed;
+}
+.quota-scope-layer {
+  z-index: 820;
+  background: rgba(0, 0, 0, 0.42);
+}
+.quota-scope-dialog {
+  width: min(680px, calc(100vw - 32px));
+  overflow: hidden;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.24);
+}
+.quota-scope-dialog header,
+.quota-scope-dialog footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #eee;
+  padding: 14px 18px;
+}
+.quota-scope-dialog header strong {
+  font-size: 15px;
+}
+.quota-scope-dialog header > button {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+}
+.quota-scope-dialog footer {
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid #eee;
+  border-bottom: 0;
+}
+.quota-scope-dialog footer > button:not(.primary-button) {
+  height: 34px;
+  border: 1px solid #ddd;
+  border-radius: 7px;
+  background: #fff;
+  padding: 0 13px;
+}
+.quota-scope-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(180px, 0.8fr);
+  min-height: 360px;
+}
+.quota-scope-browser {
+  border-right: 1px solid #eee;
+  padding: 16px;
+}
+.quota-scope-search {
+  display: flex;
+  height: 36px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #dedfe2;
+  border-radius: 8px;
+  padding: 0 10px;
+  color: #8b8d94;
+}
+.quota-scope-search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  font: 12px inherit;
+}
+.quota-scope-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 12px 0 8px;
+}
+.quota-scope-tabs button {
+  height: 30px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  padding: 0 12px;
+  color: #71717a;
+  font: 12px inherit;
+}
+.quota-scope-tabs button.active {
+  background: #f1f2f4;
+  color: #18181b;
+  font-weight: 600;
+}
+.quota-scope-options {
+  max-height: 265px;
+  overflow: auto;
+}
+.quota-scope-options > button {
+  display: flex;
+  width: 100%;
+  min-height: 38px;
+  align-items: center;
+  justify-content: space-between;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  padding: 7px 10px 7px 14px;
+  color: #3f3f46;
+  font: 12px inherit;
+  text-align: left;
+}
+.quota-scope-options > button:hover,
+.quota-scope-options > button.selected {
+  background: #f5f6f8;
+}
+.quota-scope-options > button svg {
+  color: #d4d4d8;
+}
+.quota-scope-options > button.selected svg {
+  color: #18181b;
+}
+.quota-scope-selected {
+  padding: 18px;
+}
+.quota-scope-selected > strong {
+  font-size: 12px;
+}
+.quota-scope-selected > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.quota-scope-selected span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  background: #f1f2f4;
+  padding: 6px 8px 6px 10px;
+  color: #52525b;
+  font-size: 11px;
+}
 .quota-dialog footer > button:not(.primary-button) {
   height: 36px;
   border: 1px solid #ddd;
@@ -659,6 +916,33 @@ dt {
   border-radius: 14px;
   background: #fff;
   box-shadow: 0 22px 60px rgba(0, 0, 0, 0.22);
+}
+.personal-usage-detail-modal {
+  width: min(560px, calc(100vw - 32px));
+}
+.personal-usage-detail-list {
+  margin: 0;
+  padding: 8px 24px 22px;
+}
+.personal-usage-detail-list .usage-detail-row {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 18px;
+  border-bottom: 1px solid #eee;
+  padding: 13px 0;
+}
+.personal-usage-detail-list .usage-detail-row:last-child {
+  border-bottom: 0;
+}
+.personal-usage-detail-list dt {
+  color: #71717a;
+}
+.personal-usage-detail-list dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #18181b;
+  text-align: right;
 }
 .audit-detail-body section,
 .usage-detail-body section {
@@ -1189,6 +1473,17 @@ dt {
   }
   .quota-form .full {
     grid-column: auto;
+  }
+  .quota-manager-toolbar,
+  .quota-scope-body {
+    grid-template-columns: 1fr;
+  }
+  .quota-scope-browser {
+    border-right: 0;
+    border-bottom: 1px solid #eee;
+  }
+  .quota-scope-selected {
+    min-height: 96px;
   }
   .table-actions button:not(.secondary-button) {
     display: none;

@@ -93,8 +93,82 @@ describe('SettingsInsightsView', () => {
     expect(wrapper.text()).toContain('系统额度')
     expect(wrapper.text()).not.toContain('调用次数')
     const table = wrapper.get('table.usage-tree')
-    for (const heading of ['分类', '系统额度', '使用率', '金额消耗', '操作']) expect(table.text()).toContain(heading)
+    for (const heading of ['分类', '系统额度', '使用率', '金额消耗', '操作'])
+      expect(table.text()).toContain(heading)
     expect(wrapper.get('button[aria-label="配置全局默认额度"]').element).toBeTruthy()
+  })
+
+  it('selects people and departments as an AIBP manageable scope', async () => {
+    const wrapper = await mountPage('/settings/usage', admin)
+
+    await wrapper.get('button[aria-label="配置额度管理权限"]').trigger('click')
+    const dialog = wrapper.get('[role="dialog"][aria-label="额度管理权限"]')
+    await dialog.get('select[aria-label="选择额度管理员"]').setValue('manager-chen')
+    await dialog.get('button[aria-label="添加可管控范围"]').trigger('click')
+
+    await wrapper
+      .get('[role="dialog"][aria-label="选择可管控范围"] button[aria-label="选择部门数字技术中心"]')
+      .trigger('click')
+    await wrapper
+      .get('[role="dialog"][aria-label="选择可管控范围"] button[aria-label="人员范围"]')
+      .trigger('click')
+    await wrapper
+      .get('[role="dialog"][aria-label="选择可管控范围"] button[aria-label="选择人员张明（朝暮）"]')
+      .trigger('click')
+    await wrapper
+      .get('[role="dialog"][aria-label="选择可管控范围"] button[aria-label="确认范围"]')
+      .trigger('click')
+
+    const chips = wrapper
+      .get('[role="dialog"][aria-label="额度管理权限"]')
+      .findAll('[data-testid="quota-scope-chip"]')
+    expect(chips.map((chip) => chip.text())).toEqual(['数字技术中心', '张明（朝暮）'])
+
+    await wrapper
+      .get('[role="dialog"][aria-label="额度管理权限"] button[aria-label="保存额度管理员授权"]')
+      .trigger('click')
+    expect(wrapper.get('[role="status"]').text()).toContain('额度管理权限已保存')
+
+    await wrapper.get('button[aria-label="配置额度管理权限"]').trigger('click')
+    const reopened = wrapper.get('[role="dialog"][aria-label="额度管理权限"]')
+    await reopened.get('button[aria-label="编辑陈峰（AIBP）范围"]').trigger('click')
+    expect(reopened.findAll('[data-testid="quota-scope-chip"]').map((chip) => chip.text())).toEqual(
+      ['数字技术中心', '张明（朝暮）'],
+    )
+  })
+
+  it('discards cancelled scope changes and keeps selected objects unique', async () => {
+    const wrapper = await mountPage('/settings/usage', admin)
+
+    await wrapper.get('button[aria-label="配置额度管理权限"]').trigger('click')
+    const dialog = wrapper.get('[role="dialog"][aria-label="额度管理权限"]')
+    await dialog.get('button[aria-label="添加可管控范围"]').trigger('click')
+    await wrapper
+      .get('[role="dialog"][aria-label="选择可管控范围"] button[aria-label="选择部门数字技术中心"]')
+      .trigger('click')
+    await wrapper
+      .get('[role="dialog"][aria-label="选择可管控范围"] button[aria-label="取消范围选择"]')
+      .trigger('click')
+    expect(
+      wrapper
+        .get('[role="dialog"][aria-label="额度管理权限"]')
+        .findAll('[data-testid="quota-scope-chip"]'),
+    ).toHaveLength(0)
+
+    await wrapper
+      .get('[role="dialog"][aria-label="额度管理权限"] button[aria-label="添加可管控范围"]')
+      .trigger('click')
+    await wrapper
+      .get('[role="dialog"][aria-label="选择可管控范围"] button[aria-label="选择部门数字技术中心"]')
+      .trigger('click')
+    await wrapper
+      .get('[role="dialog"][aria-label="选择可管控范围"] button[aria-label="确认范围"]')
+      .trigger('click')
+    expect(
+      wrapper
+        .get('[role="dialog"][aria-label="额度管理权限"]')
+        .findAll('[data-testid="quota-scope-chip"]'),
+    ).toHaveLength(1)
   })
 
   it('applies filters on query and keeps metric cards synchronized', async () => {
@@ -127,7 +201,10 @@ describe('SettingsInsightsView', () => {
     expect(wrapper.get('[role="alert"]').text()).toContain('仅剩 6%')
     await wrapper.get('button[aria-label="展开商品部"]').trigger('click')
     const person = wrapper.get('[data-testid="usage-row-user-chaomu"]')
-    await person.findAll('button').find((b) => b.text() === '设置额度')!.trigger('click')
+    await person
+      .findAll('button')
+      .find((b) => b.text() === '设置额度')!
+      .trigger('click')
     expect(wrapper.get('[role="dialog"]').text()).toContain('张明（朝暮）')
     expect(wrapper.get('select[aria-label="额度周期"]').text()).toContain('每日')
     expect(wrapper.get('[role="dialog"]').text()).toContain('删除个人额度')
@@ -138,7 +215,9 @@ describe('SettingsInsightsView', () => {
 
     await wrapper.get('button[aria-label="展开商品部"]').trigger('click')
     await wrapper.get('button[aria-label="展开张明（朝暮）"]').trigger('click')
-    await wrapper.get('[data-testid="usage-row-session-assortment-0916"] .row-actions button').trigger('click')
+    await wrapper
+      .get('[data-testid="usage-row-session-assortment-0916"] .row-actions button')
+      .trigger('click')
     const dialog = wrapper.get('[role="dialog"][aria-label="用量明细详情"]')
     expect(dialog.classes()).toContain('usage-detail-modal')
     expect(dialog.text()).toContain('输入 Token')
@@ -166,8 +245,27 @@ describe('SettingsInsightsView', () => {
     expect(wrapper.get('select[aria-label="对象类型"]').element).toBeTruthy()
     expect(wrapper.get('button[aria-label="导出当前筛选结果"]').element).toBeTruthy()
     const table = wrapper.get('table[aria-label="日志列表"]')
-    for (const heading of ['操作时间','人员','模块','操作类型','操作对象','修改前','修改后','描述']) expect(table.text()).toContain(heading)
-    expect(table.findAll('th').map((cell) => cell.text())).toEqual(['操作时间','人员','模块','操作类型','操作对象','修改前','修改后','描述'])
+    for (const heading of [
+      '操作时间',
+      '人员',
+      '模块',
+      '操作类型',
+      '操作对象',
+      '修改前',
+      '修改后',
+      '描述',
+    ])
+      expect(table.text()).toContain(heading)
+    expect(table.findAll('th').map((cell) => cell.text())).toEqual([
+      '操作时间',
+      '人员',
+      '模块',
+      '操作类型',
+      '操作对象',
+      '修改前',
+      '修改后',
+      '描述',
+    ])
     expect(table.text()).not.toContain('操作对象 ID')
     await wrapper.get('[data-testid="audit-row-audit-001"]').trigger('click')
     const dialog = wrapper.get('[role="dialog"][aria-label="审计日志详情"]')

@@ -86,6 +86,14 @@
 .personal-ledger td {
   height: 82px;
 }
+.personal-usage-row {
+  cursor: pointer;
+}
+.personal-usage-row:hover,
+.personal-usage-row:focus-visible {
+  background: #fafafa;
+  outline: none;
+}
 .request-cell {
   display: grid;
   width: 280px;

@@ -35,6 +35,9 @@ function toAgent(profile: BusinessExpertProfile): Agent {
         ownerName: profile.developerName,
         lastUploadedAt: '2026-09-' + String(10 + index).padStart(2, '0'),
       })),
+      ...(['biz-01', 'biz-02'].includes(profile.id) ? {
+        knowledgeDocuments: [{ id: 'policy-import-onboarding', name: '新员工入职指南.docx', knowledgeBaseId: 'kb-public-1', knowledgeBaseName: '集团制度知识库' }],
+      } : {}),
       ...(profile.id === 'biz-02' ? {
         tools: [
           { id: 't1', name: '联网搜索', description: '实时联网检索信息' },

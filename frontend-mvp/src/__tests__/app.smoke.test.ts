@@ -71,8 +71,10 @@ describe('production-aligned prototype smoke flows', () => {
   it('keeps the production navigation order and opens personal usage from the account menu', async () => {
     const { wrapper, router } = await mountAuthed('/chat')
     const text = wrapper.text()
-    expect(text.indexOf('工作台')).toBeLessThan(text.indexOf('仪表盘'))
-    expect(text.indexOf('仪表盘')).toBeLessThan(text.indexOf('知识中心'))
+    expect(text.indexOf('天马智擎')).toBeLessThan(text.indexOf('内容中心'))
+    expect(text.indexOf('内容中心')).toBeLessThan(text.indexOf('自动化'))
+    expect(text.indexOf('工作台')).toBeLessThan(text.indexOf('数据中心'))
+    expect(text.indexOf('数据中心')).toBeLessThan(text.indexOf('知识中心'))
     expect(text.indexOf('知识中心')).toBeLessThan(text.indexOf('设置'))
     await wrapper.get('[data-testid="header-user-anchor"]').trigger('click')
     await flushPromises()

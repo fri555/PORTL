@@ -83,7 +83,7 @@ describe('speech synthesis prototype', () => {
     expect(wrapper.get('audio[aria-label="合成音频播放器"]').attributes('src')).toContain('demo.mp3')
     await wrapper.findAll('.video-breadcrumb button')[1]!.trigger('click'); await flushPromises()
     await wrapper.get('button[aria-label="复制新品发布配音"]').trigger('click'); await flushPromises()
-    expect((wrapper.get('input[aria-label="任务名称"]').element as HTMLInputElement).value).toBe('新品发布配音-副本')
+    expect((wrapper.get('input[aria-label="任务名称"]').element as HTMLInputElement).value).toBe('新品发布配音（2）')
     expect((wrapper.get('textarea[aria-label="合成文本"]').element as HTMLTextAreaElement).value).toBe(speechInput.text)
     await wrapper.get('input[aria-label="语速"]').setValue('120')
     await wrapper.get('form').trigger('submit'); await flushPromises()
@@ -120,11 +120,11 @@ describe('speech synthesis prototype', () => {
     expect(wrapper.text()).toContain('PCM')
   })
 
-  // Catches summaries ignoring the current name filter or enabling edits during processing.
-  it('filters speech task summaries by name and status and protects processing tasks', async () => {
+  // Catches summaries ignoring the current name filter or disabling the universal copy action.
+  it('filters speech task summaries by name and status and keeps processing tasks copyable', async () => {
     localStorage.setItem(storageKey, JSON.stringify([storedTask(), { ...storedTask(), id: 'speech-2', name: '活动开场', status: 'processing' }]))
     const { wrapper } = await open('/video-gen/speech-synthesis')
-    expect(wrapper.get('button[aria-label="复制活动开场"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('button[aria-label="复制活动开场"]').attributes('disabled')).toBeUndefined()
     expect(wrapper.get('button[aria-label="删除活动开场"]').attributes('disabled')).toBeDefined()
     await wrapper.get('input[aria-label="搜索任务"]').setValue('新品')
     expect(wrapper.findAll('[data-testid="task-card"]')).toHaveLength(1)

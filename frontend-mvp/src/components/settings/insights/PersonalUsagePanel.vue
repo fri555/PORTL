@@ -14,7 +14,11 @@ const endDate = defineModel<string>('endDate', { required: true })
 const personalPeriod = defineModel<'today' | '7d' | '30d' | 'custom'>('personalPeriod', {
   required: true,
 })
-const emit = defineEmits<{ choosePeriod: [period: 'today' | '7d' | '30d']; export: [] }>()
+const emit = defineEmits<{
+  choosePeriod: [period: 'today' | '7d' | '30d']
+  export: []
+  select: [record: PersonalUsageRecord]
+}>()
 </script>
 
 <template>
@@ -104,7 +108,15 @@ const emit = defineEmits<{ choosePeriod: [period: 'today' | '7d' | '30d']; expor
           </tr>
         </thead>
         <tbody>
-          <tr v-for="record in personalUsageRecords" :key="record.id">
+          <tr
+            v-for="record in personalUsageRecords"
+            :key="record.id"
+            class="personal-usage-row"
+            tabindex="0"
+            @click="emit('select', record)"
+            @keydown.enter="emit('select', record)"
+            @keydown.space.prevent="emit('select', record)"
+          >
             <td>{{ record.time }}</td>
             <td>
               <div class="request-cell">

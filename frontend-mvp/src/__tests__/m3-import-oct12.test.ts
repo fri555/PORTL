@@ -21,9 +21,10 @@ async function page(url = '/knowledge', role: 'admin' | 'user' = 'admin') {
   await router.push(url); await router.isReady()
   const w = mount(KnowledgeBaseView, { attachTo: document.body, global: { plugins: [pinia, router], stubs } }); wrappers.push(w); await flushPromises(); return w
 }
-async function menu(w: ReturnType<typeof mount>) {
-  await w.get('[aria-label="新建"]').trigger('click')
-  return w.get('[aria-label="新建菜单"]').findAll('[role="menuitem"]').map(button => button.attributes('aria-label'))
+async function menu(w: ReturnType<typeof mount>, kind: '新建' | '上传') {
+  const toolbar = w.get('[data-testid="knowledge-action-row"]')
+  await toolbar.get(`[aria-label="${kind}"]`).trigger('click')
+  return toolbar.get(`[aria-label="${kind}菜单"]`).findAll('[role="menuitem"]').map(button => button.attributes('aria-label'))
 }
 describe('M3 context, tree destinations and task records', () => {
   it('scopes task data by logged-in user and role before the UI renders it', () => {
@@ -34,7 +35,7 @@ describe('M3 context, tree destinations and task records', () => {
   })
   it('opens own sync records from the toolbar and hides all connection configuration', async () => {
     const w = await page('/knowledge', 'user')
-    await w.get('.knowledge-sidebar__access').trigger('click')
+    await w.get('[data-testid="knowledge-action-row"]').get('[aria-label="同步记录"]').trigger('click')
     expect(w.find('[data-testid="knowledge-sync-personal"]').exists()).toBe(true)
     expect(w.find('[data-testid="knowledge-access-admin"]').exists()).toBe(false)
     expect(w.find('[data-testid="dingtalk-connection-card"]').exists()).toBe(false)
@@ -44,27 +45,31 @@ describe('M3 context, tree destinations and task records', () => {
     expect(w.text()).not.toContain('清晖')
     expect(w.text()).not.toContain('知夏')
   })
-  it('allows own schedule updates but rejects a forged other-user task update', async () => {
+  // Scheme 1 replaces front-end schedule mutation with backend-managed records.
+  it('keeps managed records read-only for own and forged other-user scheduling intents', async () => {
     const w = await page('/knowledge?view=sync', 'user')
     const panel = w.getComponent(AccessPanel)
-    const before = (panel.props('records') as DingTalkImportTask[])[0]!
+    const before = JSON.stringify(panel.props('records'))
     panel.vm.$emit('update-schedule', 'DT-20261011-0002', '每天', '10:00')
+    panel.vm.$emit('update-schedule', 'DT-20261012-0001', '不自动同步', '—')
     await w.vm.$nextTick()
+    expect(JSON.stringify(panel.props('records'))).toBe(before)
     expect((panel.props('records') as DingTalkImportTask[]).map(task => task.importTaskId)).toEqual(['DT-20261012-0001', 'DT-20261006-0007'])
-    panel.vm.$emit('update-schedule', before.importTaskId, '不自动同步', '—')
-    await w.vm.$nextTick()
-    expect((panel.props('records') as DingTalkImportTask[])[0]!.frequency).toBe('不自动同步')
-    expect((panel.props('records') as DingTalkImportTask[])[0]!.importTaskId).toBe(before.importTaskId)
+    expect(panel.find('input[type="time"]').exists()).toBe(false)
+    expect(panel.find('[data-action="create-agent-task"]').exists()).toBe(false)
   })
   it('blocks ordinary-user direct navigation to admin connection settings', async () => {
     const w = await page('/knowledge?view=access', 'user')
     expect(w.findComponent(AccessPanel).exists()).toBe(false)
     expect(w.find('[data-testid="knowledge-access-admin"]').exists()).toBe(false)
   })
-  it('shows four root actions, three KB actions and two folder actions', async () => {
-    expect(await menu(await page())).toEqual(['新建知识库', '新建文件夹', '上传文件', '从钉钉导入'])
-    expect(await menu(await page('/knowledge?kb=kb-public-1'))).toEqual(['新建文件夹', '上传文件', '从钉钉导入'])
-    expect(await menu(await page('/knowledge?kb=kb-public-1&folder=policy-hr'))).toEqual(['上传文件', '从钉钉导入'])
+  it('groups root, KB and folder actions consistently as New and Upload', async () => {
+    expect(await menu(await page(), '新建')).toEqual(['新建知识库', '新建文件夹', '新建文档'])
+    expect(await menu(await page(), '上传')).toEqual(['上传文件', '从钉钉导入'])
+    expect(await menu(await page('/knowledge?kb=kb-public-1'), '新建')).toEqual(['新建文件夹', '新建文档'])
+    expect(await menu(await page('/knowledge?kb=kb-public-1'), '上传')).toEqual(['上传文件', '从钉钉导入'])
+    expect(await menu(await page('/knowledge?kb=kb-public-1&folder=policy-hr'), '新建')).toEqual(['新建文档'])
+    expect(await menu(await page('/knowledge?kb=kb-public-1&folder=policy-hr'), '上传')).toEqual(['上传文件', '从钉钉导入'])
   })
   it('starts root import empty and defaults KB/folder import to its current writable node', async () => {
     const root = await page('/knowledge?import=dingtalk')
@@ -92,16 +97,16 @@ describe('M3 context, tree destinations and task records', () => {
     expect(destinations.some(item => item.id === 'kb-public-1')).toBe(true)
     expect(destinations.some(item => item.id === 'policy-hr')).toBe(true)
     expect(destinations.some(item => item.id === 'personal-key-customers' && item.parentId === 'kb-personal-1')).toBe(true)
-    expect(w.find('.knowledge-sidebar__access').exists()).toBe(true)
+    expect(w.get('[data-testid="knowledge-action-row"]').find('[aria-label="同步记录"]').exists()).toBe(true)
   })
-  it('creates one task with two source-to-local mappings and saves into the selected folder', async () => {
+  it('registers imported folder files for background sync without schedule fields', async () => {
     const w = await page('/knowledge?kb=kb-public-1&folder=policy-hr&import=dingtalk')
     // The existing onboarding/attendance fixture is already imported to this KB.
     const docs = personalDingTalkDocuments(boundDingTalkIdentity(mockUser)).filter(item => ['catalog', 'launch'].includes(item.id))
-    w.getComponent(ImportDialog).vm.$emit('complete', { destinationId: 'policy-hr', documents: docs, platformUserId: mockUser.id, frequency: '每天', schedule: '00:00' })
+    w.getComponent(ImportDialog).vm.$emit('complete', { destinationId: 'policy-hr', documents: docs, platformUserId: mockUser.id })
     await w.vm.$nextTick()
     expect(w.text()).toContain('商品分类说明.xlsx'); expect(w.text()).toContain('新品上架流程.docx')
-    await w.get('[aria-label="展开侧栏"]').trigger('click'); await w.get('.knowledge-sidebar__access').trigger('click')
+    await w.get('[data-testid="knowledge-action-row"]').get('[aria-label="知识接入"]').trigger('click')
     const panel = w.getComponent(AccessPanel)
     const records = panel.props('records') as DingTalkImportTask[]
     expect(records).toHaveLength(8)
@@ -110,13 +115,11 @@ describe('M3 context, tree destinations and task records', () => {
     expect(task.documentMappings.map(item => item.sourceDocumentId)).toEqual(['catalog', 'launch'])
     expect(task.documentMappings.every(item => item.localFileId)).toBe(true)
     expect(task.destinationId).toBe('policy-hr')
-    const originalMappings = task.documentMappings.map(item => item.localFileId)
-    panel.vm.$emit('update-schedule', task.importTaskId, '每周', '周一 09:00'); await w.vm.$nextTick()
-    expect(records[0]!.importTaskId).toBe(task.importTaskId)
-    expect(records[0]!.documentMappings.map(item => item.localFileId)).toEqual(originalMappings)
-    expect(records[0]!.frequency).toBe('每周')
+    expect(task.syncMode).toBe('backend-managed')
+    expect(task).not.toHaveProperty('frequency')
+    expect(task).not.toHaveProperty('schedule')
   })
-  it('separates sources/destination, joins multiple document sources with semicolons, and searches alias/source/destination', async () => {
+  it('separates record sources/destination and searches managed documents by owner, source, and destination', async () => {
     const w = await page('/knowledge?view=access')
     await w.findAll('.records-tabs button').find(button => button.text() === '记录')!.trigger('click')
     expect(w.get('.record-head').text()).toContain('来源')
@@ -124,14 +127,15 @@ describe('M3 context, tree destinations and task records', () => {
     expect(rows).toHaveLength(7)
     expect(rows[0]!.get('.source-cell').text()).toContain('；')
     expect(rows[0]!.get('.destination-cell').text()).toBe('集团制度知识库 / 人事制度')
+    await w.findAll('.records-tabs button').find(button => button.text() === '自动同步')!.trigger('click')
     const search = w.get('input[aria-label="搜索同步记录"]')
     for (const keyword of ['朝暮', '集团制度知识库']) {
       await search.setValue(keyword)
-      expect(w.findAll('[data-testid="dingtalk-sync-record"]')).toHaveLength(2)
+      expect(w.findAll('[data-testid="dingtalk-managed-sync"]')).toHaveLength(2)
     }
     await search.setValue('新员工入职指南')
-    expect(w.findAll('[data-testid="dingtalk-sync-record"]')).toHaveLength(1)
-    await search.setValue('没有匹配'); expect(w.text()).toContain('暂无匹配的同步记录')
+    expect(w.findAll('[data-testid="dingtalk-managed-sync"]')).toHaveLength(1)
+    await search.setValue('没有匹配'); expect(w.findAll('[data-testid="dingtalk-managed-sync"]')).toHaveLength(0)
   })
   it('creates a root folder only after selecting a writable knowledge base', async () => {
     const w = await page()

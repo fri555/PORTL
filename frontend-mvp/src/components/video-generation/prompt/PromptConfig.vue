@@ -8,8 +8,18 @@ interface ReferenceImage {
   name: string
   uri: string
 }
-const props = defineProps<{ initialData?: Record<string, any> }>()
-const emit = defineEmits<{ submit: [payload: Record<string, any>] }>()
+function stripMaterialMentions(value: string) {
+  return value
+    .replace(/@[\w.-]+/g, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim()
+}
+const props = defineProps<{ initialData?: Record<string, any>; initialName?: string }>()
+const emit = defineEmits<{
+  submit: [payload: Record<string, any>, name?: string]
+  'update-name': [name: string]
+}>()
+const taskName = ref(String(props.initialName ?? '').slice(0, 20))
 const requirements = ref(
   String(props.initialData?.parameters?.requirements ?? props.initialData?.requirements ?? ''),
 )
@@ -29,10 +39,20 @@ const composing = ref(false)
 const importedPrompt = ref(String(props.initialData?.importedPrompt ?? ''))
 const importedName = ref(String(props.initialData?.importedName ?? ''))
 const importedReferences = ref<ReferenceImage[]>(props.initialData?.importedReferences ?? [])
+const normalizedPrompt = ref(
+  String(
+    props.initialData?.parameters?.normalizedPrompt ??
+      (typeof props.initialData?.prompt === 'string'
+        ? stripMaterialMentions(props.initialData.prompt)
+        : ''),
+  ),
+)
 const importOpen = ref(false)
 const reverseTasks = ref<VideoTask[]>([])
 const canSubmit = computed(
-  () => Boolean(requirements.value.trim() || importedPrompt.value.trim()) && !reading.value,
+  () =>
+    Boolean(requirements.value.trim() || importedPrompt.value.trim() || normalizedPrompt.value.trim()) &&
+    !reading.value,
 )
 const mentionGroups = computed(() => {
   const matches = references.value.filter((item) => item.name.includes(mentionQuery.value))
@@ -158,6 +178,12 @@ function importTask(task: VideoTask) {
     .flatMap((item) => item.references)
     .forEach((image) => byName.set(image.name, { name: image.name, uri: image.uri }))
   importedReferences.value = [...byName.values()]
+  for (const image of importedReferences.value) {
+    if (references.value.length >= 9) break
+    if (!references.value.some((item) => item.name === image.name || item.uri === image.uri))
+      references.value.push({ ...image })
+  }
+  normalizedPrompt.value = stripMaterialMentions(importedPrompt.value)
   convertedFrom.value =
     results.length === 1 ? { reverseTaskId: task.id, segmentId: results[0]!.segmentId } : null
   error.value = ''
@@ -179,6 +205,9 @@ function submit() {
     parameters: {
       locale: 'zh-CN',
       requirements: requirements.value.trim() || importedPrompt.value.trim(),
+      ...(normalizedPrompt.value.trim()
+        ? { normalizedPrompt: normalizedPrompt.value.trim() }
+        : {}),
     },
     references: references.value.map((item, index) => ({
       referenceId: `ref-${index + 1}`,
@@ -195,12 +224,23 @@ function submit() {
           importedReferences: importedReferences.value,
         }
       : {}),
-  })
+  }, taskName.value.trim() || undefined)
 }
 </script>
 
 <template>
   <form class="prompt-config" @submit.prevent="submit">
+    <section v-if="initialName" class="config-section">
+      <h2><label for="prompt-task-name">任务名称</label></h2>
+      <input
+        id="prompt-task-name"
+        v-model="taskName"
+        class="task-name-input"
+        aria-label="任务名称"
+        maxlength="20"
+        @input="emit('update-name', taskName)"
+      />
+    </section>
     <section class="config-section">
       <h2>选择模板</h2>
       <div class="template-grid">
@@ -273,6 +313,17 @@ function submit() {
       </div>
     </section>
     <section class="config-section">
+      <h2><label for="normalized-prompt">常态化提示词</label></h2>
+      <textarea
+        id="normalized-prompt"
+        v-model="normalizedPrompt"
+        rows="4"
+        maxlength="32000"
+        data-testid="normalized-prompt-input"
+        placeholder="去除 @素材引用后，可继续调整常态化提示词"
+      />
+    </section>
+    <section class="config-section">
       <h2>参考图片</h2>
       <div
         v-for="(image, index) in references"
@@ -304,6 +355,7 @@ function submit() {
           @change="addReferences"
       /></label>
       <p class="field-hint">最多 9 张，每张不超过 10MB；输入 @ 可引用参考图。</p>
+      <p class="material-notice">如果是提示词逆向任务导入的素材，在素材被替换后再删除原素材。</p>
     </section>
     <p v-if="error" role="alert" class="form-error">{{ error }}</p>
     <button
@@ -430,7 +482,8 @@ function submit() {
   cursor: pointer;
 }
 .prompt-config textarea,
-.reference-row input {
+.reference-row input,
+.task-name-input {
   box-sizing: border-box;
   width: 100%;
   border: 1px solid #e4e4e7;
@@ -446,7 +499,8 @@ function submit() {
   resize: vertical;
 }
 .prompt-config textarea:focus,
-.reference-row input:focus {
+.reference-row input:focus,
+.task-name-input:focus {
   border-color: #a1a1aa;
   box-shadow: 0 0 0 2px #18181b09;
 }
@@ -468,6 +522,9 @@ function submit() {
   min-width: 0;
   flex: 1;
   padding: 7px 10px;
+}
+.task-name-input {
+  height: 38px;
 }
 .icon-button {
   display: inline-flex;
@@ -502,10 +559,15 @@ function submit() {
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
 }
-.field-hint {
+.field-hint,
+.material-notice {
   margin: 0;
   color: #a1a1aa;
   font-size: 12px;
+}
+.material-notice {
+  color: #71717a;
+  line-height: 1.6;
 }
 .submit-button {
   height: 36px;

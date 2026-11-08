@@ -22,6 +22,8 @@ import {
   X,
 } from 'lucide-vue-next'
 import AgentSettingsView from '@/components/settings/AgentSettingsView.vue'
+import SettingsSidebar from '@/components/settings/SettingsSidebar.vue'
+import { useAppStore } from '@/stores/app'
 
 type SettingDomain = 'agent' | 'model' | 'skill' | 'connector'
 type Status = 'active' | 'paused' | 'draft'
@@ -41,6 +43,7 @@ type SettingRecord = {
 
 const route = useRoute()
 const router = useRouter()
+const store = useAppStore()
 
 const routeDomainMap: Record<string, SettingDomain> = {
   models: 'model',
@@ -326,30 +329,12 @@ function statusClass(status: Status) {
 </script>
 
 <template>
-  <AgentSettingsView v-if="activeDomain === 'agent'" />
-  <div v-else class="min-h-[calc(100vh-3.5rem)] bg-[#f6f6f7] text-[#111]">
-    <div class="flex min-h-[calc(100vh-3.5rem)] w-full">
-      <aside class="hidden w-[270px] shrink-0 border-r border-[#eaeaea] bg-white px-3 py-4 lg:block">
-        <div class="px-2">
-          <h1 class="text-base font-semibold">设置</h1>
-        </div>
-        <nav class="mt-4 space-y-1">
-          <button
-            v-for="(meta, key) in domainMeta"
-            :key="key"
-            type="button"
-            class="flex h-9 w-full items-center gap-3 rounded-lg px-3 py-[7px] text-left text-[14px] font-normal transition"
-            :class="activeDomain === key ? 'bg-[#edeef1] text-[#111] font-medium' : 'text-[#666] font-normal hover:bg-[#f4f4f5]'"
-            :aria-current="activeDomain === key ? 'page' : undefined"
-            @click="switchDomain(key as SettingDomain)"
-          >
-            <component :is="meta.icon" class="h-4 w-4" />
-            <span>{{ meta.label }}</span>
-          </button>
-        </nav>
-      </aside>
-
-      <main class="min-w-0 flex-1">
+  <div class="flex min-h-[calc(100vh-3.5rem)] bg-[#f6f6f7] text-[#111]">
+    <SettingsSidebar :user-id="store.user?.id" />
+    <div class="min-w-0 flex-1">
+      <AgentSettingsView v-if="activeDomain === 'agent'" />
+      <div v-else class="min-h-[calc(100vh-3.5rem)]">
+        <main class="min-w-0 flex-1">
         <template v-if="!formMode">
           <section class="w-full border-b border-[#e5e5e7] bg-white px-5 py-5 sm:px-8">
             <div class="flex flex-wrap items-start gap-4">
@@ -616,15 +601,16 @@ function statusClass(status: Status) {
             </aside>
           </section>
         </template>
-      </main>
-    </div>
+        </main>
 
-    <Transition enter-active-class="transition duration-200" enter-from-class="-translate-y-2 opacity-0" enter-to-class="translate-y-0 opacity-100" leave-active-class="transition duration-150" leave-from-class="opacity-100" leave-to-class="opacity-0">
-      <div v-if="toast" class="fixed left-1/2 top-20 z-50 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm text-zinc-800 shadow-xl">
-        <KeyRound class="h-4 w-4 text-zinc-400" />
-        <span>{{ toast }}</span>
-        <button type="button" class="rounded-md p-1 text-zinc-400 hover:bg-zinc-100" @click="toast = ''"><X class="h-3.5 w-3.5" /></button>
+        <Transition enter-active-class="transition duration-200" enter-from-class="-translate-y-2 opacity-0" enter-to-class="translate-y-0 opacity-100" leave-active-class="transition duration-150" leave-from-class="opacity-100" leave-to-class="opacity-0">
+          <div v-if="toast" class="fixed left-1/2 top-20 z-50 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm text-zinc-800 shadow-xl">
+            <KeyRound class="h-4 w-4 text-zinc-400" />
+            <span>{{ toast }}</span>
+            <button type="button" class="rounded-md p-1 text-zinc-400 hover:bg-zinc-100" @click="toast = ''"><X class="h-3.5 w-3.5" /></button>
+          </div>
+        </Transition>
       </div>
-    </Transition>
+    </div>
   </div>
 </template>

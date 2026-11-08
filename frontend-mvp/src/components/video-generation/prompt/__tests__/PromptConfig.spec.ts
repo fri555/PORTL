@@ -57,6 +57,29 @@ describe('PromptConfig', () => {
     })
   })
 
+  it('prefills the normalized prompt from a result and keeps materials separate', async () => {
+    const wrapper = mount(PromptConfig, {
+      props: {
+        initialData: {
+          prompt: '使用 @sc_snow 展示羽绒服，镜头缓慢推进',
+          references: [{ name: 'sc_snow', uri: 'data:image/png;base64,YQ==' }],
+        },
+      },
+    })
+    expect(
+      (wrapper.get('[data-testid="normalized-prompt-input"]').element as HTMLTextAreaElement).value,
+    ).toBe('使用 展示羽绒服，镜头缓慢推进')
+    expect(wrapper.findAll('[data-testid="reference-row"]')).toHaveLength(1)
+    expect(wrapper.text()).toContain(
+      '如果是提示词逆向任务导入的素材，在素材被替换后再删除原素材。',
+    )
+    await wrapper.get('form').trigger('submit')
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({
+      parameters: { normalizedPrompt: '使用 展示羽绒服，镜头缓慢推进' },
+      references: [{ name: 'sc_snow' }],
+    })
+  })
+
   it('rejects unsupported and oversized references and lets an accepted image be removed', async () => {
     const wrapper = mount(PromptConfig)
     const huge = new File(['x'], 'huge.png', { type: 'image/png' })
@@ -132,6 +155,7 @@ describe('PromptConfig', () => {
     expect(wrapper.get('[data-testid="imported-prompt"]').text()).toContain('羽绒服逆向')
     expect(wrapper.get('[data-testid="imported-prompt"]').text()).toContain('@sc_snow 雪地运镜')
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(wrapper.findAll('[data-testid="reference-row"]')).toHaveLength(1)
     await wrapper.get('form').trigger('submit')
     expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({
       parameters: { requirements: '原型演示：@sc_snow 雪地运镜' },

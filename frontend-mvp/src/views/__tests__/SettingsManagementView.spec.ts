@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import SettingsManagementView from '@/views/SettingsManagementView.vue'
+import { useAppStore } from '@/stores/app'
+import { mockUser } from '@/mock/user'
 
 async function mountSettings(path = '/settings/agents') {
+  localStorage.clear()
+  const pinia = createPinia()
+  setActivePinia(pinia)
+  useAppStore().login({ ...mockUser, id: 'u_001', role: 'admin' })
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -16,7 +23,7 @@ async function mountSettings(path = '/settings/agents') {
   })
   router.push(path)
   await router.isReady()
-  return mount(SettingsManagementView, { global: { plugins: [router] } })
+  return mount(SettingsManagementView, { global: { plugins: [pinia, router] } })
 }
 
 describe('SettingsManagementView', () => {
@@ -65,8 +72,8 @@ describe('SettingsManagementView', () => {
     expect(wrapper.text()).toContain('快捷提示词')
     expect(wrapper.text()).toContain('模型配置')
     expect(wrapper.text()).toContain('适用部门')
-    expect(wrapper.text()).toContain('能力标签')
-    expect(wrapper.text()).not.toContain('最多选择 3 个')
+    expect(wrapper.text()).toContain('接入系统标签')
+    expect(wrapper.text()).toContain('最多选择 3 个')
   })
 
   it('edits usage instructions as four plain labeled fields without grouped cards', async () => {
@@ -96,12 +103,12 @@ describe('SettingsManagementView', () => {
 
   it('keeps the sidebar selection synced with settings sub-routes', async () => {
     const wrapper = await mountSettings('/settings/agents')
-    await wrapper.vm.$router.push('/settings/quota')
+    await wrapper.vm.$router.push('/settings/models')
     await flushPromises()
 
-    expect(wrapper.vm.$route.path).toBe('/settings/quota')
-    expect(wrapper.text()).toContain('额度管理')
-    expect(wrapper.text()).toContain('品牌营销部月度额度')
+    expect(wrapper.vm.$route.path).toBe('/settings/models')
+    expect(wrapper.text()).toContain('模型管理')
+    expect(wrapper.text()).toContain('接入模型')
   })
 })
 

@@ -18,8 +18,8 @@ describe('knowledge and citation review recovery',()=>{
   it('renders nothing for direct admin navigation without permission',()=>{
     const wrapper=mount(AccessPanel,{props:{destinations:[],canManage:false}});wrappers.push(wrapper);expect(wrapper.find('[data-testid="knowledge-access-admin"]').exists()).toBe(false);expect(wrapper.findAll('button')).toHaveLength(0)
   })
-  it('keeps admin settings limited to connection and synchronization records',()=>{
-    const wrapper=mount(AccessPanel,{props:{destinations:[],canManage:true},global:{stubs:{Teleport:true}}});wrappers.push(wrapper);expect(wrapper.text()).toContain('数据源');expect(wrapper.text()).toContain('配置连接');expect(wrapper.text()).toContain('同步记录');expect(wrapper.text()).not.toContain('新建数据源');expect(wrapper.text()).not.toContain('指定同步执行身份')
+  it('keeps admin settings limited to connection and automatic-sync/record tabs',()=>{
+    const wrapper=mount(AccessPanel,{props:{destinations:[],canManage:true},global:{stubs:{Teleport:true}}});wrappers.push(wrapper);expect(wrapper.get('h1').text()).toBe('数据源');expect(wrapper.text()).toContain('配置连接');expect(wrapper.get('[role="tablist"]').findAll('[role="tab"]').map(tab=>tab.text())).toEqual(['自动同步','记录']);expect(wrapper.text()).not.toContain('新建数据源');expect(wrapper.text()).not.toContain('指定同步执行身份')
   })
   it('records the initiating user for every synchronization job',()=>{
     const wrapper=mount(AccessPanel,{props:{destinations:[],canManage:true},global:{stubs:{Teleport:true}}});wrappers.push(wrapper);expect(wrapper.get('.record-table').text()).toContain('朝暮');expect(wrapper.get('.record-table').text()).toContain('清晖');expect(wrapper.get('.record-table').text()).toContain('知夏')

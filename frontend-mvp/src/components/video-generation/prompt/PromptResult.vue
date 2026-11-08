@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
-import { Copy, Save, Sparkles, X } from 'lucide-vue-next'
+import { Copy, RefreshCcw, Save, Sparkles, X } from 'lucide-vue-next'
 import type { VideoTask } from '@/types/video-generation'
 import { copyTextWithTimeout } from '@/utils/copyText'
 
@@ -11,7 +11,10 @@ interface PromptVersion {
   optimizeDescription?: string
 }
 const props = defineProps<{ task: VideoTask }>()
-const emit = defineEmits<{ 'update-input': [input: Record<string, any>] }>()
+const emit = defineEmits<{
+  'update-input': [input: Record<string, any>]
+  recreate: [id: string]
+}>()
 const prompt = ref('')
 const versions = ref<PromptVersion[]>([])
 const currentInput = ref<Record<string, any>>({})
@@ -120,6 +123,14 @@ function adoptOptimization() {
     <p class="demo-note"><span>原型演示</span>根据创作需求展示本地 Prompt，支持编辑与保存。</p>
     <div class="result-toolbar">
       <button
+        class="primary-button"
+        type="button"
+        data-testid="recreate-prompt-btn"
+        @click="emit('recreate', task.id)"
+      >
+        <RefreshCcw :size="14" />重新编辑
+      </button>
+      <button
         type="button"
         :disabled="copyBusy || !prompt.trim()"
         data-testid="copy-prompt-btn"
@@ -136,7 +147,6 @@ function adoptOptimization() {
         <Sparkles :size="14" />提示词优化
       </button>
       <button
-        class="primary-button"
         type="button"
         :disabled="!prompt.trim()"
         data-testid="save-version-btn"

@@ -15,6 +15,14 @@ function task(input: Record<string, any> = {}): VideoTask {
 }
 
 describe('PromptResult', () => {
+  it('starts a new editable version from the result without changing the current task', async () => {
+    const wrapper = mount(PromptResult, {
+      props: { task: task({ prompt: '使用 @sc_snow 展示羽绒服' }) },
+    })
+    await wrapper.get('[data-testid="recreate-prompt-btn"]').trigger('click')
+    expect(wrapper.emitted('recreate')).toEqual([['prompt-one']])
+  })
+
   it('derives the prototype result from the submitted requirement', () => {
     const wrapper = mount(PromptResult, { props: { task: task() } })
     expect(wrapper.text()).toContain('原型演示')

@@ -27,10 +27,34 @@ describe('KnowledgeBaseView source clone', () => {
     expect(rows[11].text()).toContain('人力培训知识库')
     expect(wrapper.text()).not.toContain('权限04')
     expect(wrapper.get('[data-testid="knowledge-table-header"]').text()).toContain('名称')
-    expect(wrapper.get('[data-testid="knowledge-table-header"]').text()).toContain('创建者')
+    expect(wrapper.get('[data-testid="knowledge-table-header"]').text()).toContain('所有者')
     expect(wrapper.get('[data-testid="knowledge-table-header"]').text()).toContain('创建时间')
     expect(wrapper.get('[data-testid="knowledge-table-header"]').text()).toContain('操作')
     expect(wrapper.get('[data-testid="knowledge-table-header"]').text()).not.toContain('最近访问')
+  })
+
+  it('switches the top-right actions between all knowledge bases, a knowledge base, and a folder', async () => {
+    const row = wrapper.get('[data-testid="knowledge-action-row"]')
+    const topLevelLabels = () => row.findAll('button').filter((button) => {
+      const parent = button.element.parentElement
+      return parent === row.element || parent?.classList.contains('create-menu')
+    }).map(button => button.attributes('aria-label'))
+    expect(topLevelLabels()).toEqual(['知识接入', '新建', '小智问答'])
+    expect(row.find('button[aria-label="上传"]').exists()).toBe(false)
+
+    await row.get('button[aria-label="新建"]').trigger('click')
+    expect(row.get('[role="menu"][aria-label="新建菜单"]').findAll('[role="menuitem"]').map(item => item.attributes('aria-label'))).toEqual(['新建知识库'])
+
+    await wrapper.findAll('[data-testid="knowledge-kb-row"]')[0].trigger('click')
+    expect(topLevelLabels()).toEqual(['知识接入', '上传', '新建', '小智问答'])
+    await row.get('button[aria-label="新建"]').trigger('click')
+    expect(row.get('[role="menu"][aria-label="新建菜单"]').findAll('[role="menuitem"]').map(item => item.attributes('aria-label'))).toEqual(['新建文件夹'])
+    await row.get('button[aria-label="上传"]').trigger('click')
+    expect(row.get('[role="menu"][aria-label="上传菜单"]').findAll('[role="menuitem"]').map(item => item.attributes('aria-label'))).toEqual(['上传文件', '从钉钉导入'])
+
+    await wrapper.findAll('[data-testid="knowledge-node-row"]')[0].trigger('click')
+    expect(topLevelLabels()).toEqual(['知识接入', '上传', '小智问答'])
+    expect(row.find('button[aria-label="新建"]').exists()).toBe(false)
   })
 
   it('does not resurrect removed legacy source grants after saving platform permissions', async () => {
@@ -47,9 +71,11 @@ describe('KnowledgeBaseView source clone', () => {
   })
 
   it('opens the exact source sidebar and switches spaces', async () => {
-    await wrapper.get('button[aria-label="展开侧栏"]').trigger('click')
     const sidebar = wrapper.get('[data-testid="knowledge-sidebar"]')
-    expect(sidebar.text()).toContain('新建知识库')
+    expect(sidebar.get('button[aria-label="新建"]').text()).toContain('新建')
+    expect(sidebar.get('button[aria-label="上传"]').text()).toContain('上传')
+    await sidebar.get('button[aria-label="新建"]').trigger('click')
+    expect(sidebar.get('[aria-label="新建菜单"]').text()).toContain('新建知识库')
     expect(sidebar.text()).toContain('公共空间')
     expect(sidebar.text()).toContain('个人空间')
     expect(sidebar.text()).toContain('集团制度知识库')
@@ -66,14 +92,33 @@ describe('KnowledgeBaseView source clone', () => {
     expect(wrapper.text()).toContain('我的客户资料')
   })
 
+  it('defaults a new knowledge base to the currently selected space', async () => {
+    await wrapper.get('[data-testid="knowledge-sidebar"] button[aria-label="个人空间"]').trigger('click')
+    await wrapper.get('[data-testid="knowledge-action-row"] button[aria-label="新建"]').trigger('click')
+    await wrapper.get('button[aria-label="新建知识库"]').trigger('click')
+    expect((wrapper.get('input[value="personal"]').element as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('opens a file preview from the file tree action menu', async () => {
+    const sidebar = wrapper.get('[data-testid="knowledge-sidebar"]')
+    await sidebar.get('button[aria-label="展开集团制度知识库"]').trigger('click')
+    await sidebar.get('button[aria-label="展开人事制度"]').trigger('click')
+    await sidebar.get('button[aria-label="考勤管理制度_v3.pdf更多操作"]').trigger('click')
+    expect(wrapper.get('[role="menu"]').findAll('[role="menuitem"]').map(item => item.text())).toEqual(['预览', '权限管理', '删除'])
+    await wrapper.get('[role="menuitem"][aria-label="预览"]').trigger('click')
+    expect(wrapper.get('[data-testid="knowledge-file-preview"]').text()).toContain('考勤管理制度_v3.pdf')
+  })
+
   it('matches the create, upload, and folder dialog copy and disabled states', async () => {
+    await wrapper.get('[data-testid="knowledge-action-row"]').get('button[aria-label="新建"]').trigger('click')
     await wrapper.get('button[aria-label="新建知识库"]').trigger('click')
     expect(wrapper.get('[role="dialog"]').text()).toContain('所属空间')
     expect(wrapper.get('[role="dialog"]').text()).toContain('公共空间')
     expect(wrapper.get('[role="dialog"]').text()).toContain('个人空间')
     await wrapper.get('button[aria-label="关闭弹窗"]').trigger('click')
 
-    await wrapper.get('button[aria-label="新建"]').trigger('click')
+    await wrapper.findAll('[data-testid="knowledge-kb-row"]')[0].trigger('click')
+    await wrapper.get('[data-testid="knowledge-action-row"]').get('button[aria-label="上传"]').trigger('click')
     await wrapper.get('button[aria-label="上传文件"]').trigger('click')
     const upload = wrapper.get('[role="dialog"]')
     expect(upload.text()).toContain('上传至')
@@ -224,7 +269,6 @@ describe('KnowledgeBaseView source clone', () => {
     await wrapper.get('[data-testid="permission-impact-dialog"] button.button.primary').trigger('click')
     expect(wrapper.find('.permission-form').exists()).toBe(false)
 
-    await wrapper.get('button[aria-label="展开侧栏"]').trigger('click')
     expect(wrapper.get('[data-testid="knowledge-sidebar"]').find('[aria-label="已单独设置权限"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="knowledge-main-pane"] [aria-label="已单独设置权限"]').exists()).toBe(false)
   })
@@ -269,7 +313,7 @@ describe('KnowledgeBaseView source clone', () => {
 
     await wrapper.findAll('[data-testid="knowledge-node-row"]')[0].trigger('click')
     expect(wrapper.get('[data-testid="knowledge-file-preview"]').text()).toContain('考勤管理制度_v3.pdf')
-    expect(wrapper.get('[data-testid="knowledge-file-preview"]').text()).toContain('本地 mock 数据')
+    expect(wrapper.get('[data-testid="knowledge-file-preview"]').text()).toContain('文件信息')
   })
 
   it('creates a folder in the current local mock location', async () => {

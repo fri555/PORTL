@@ -54,13 +54,12 @@ describe('knowledge-center preview permissions', () => {
     routeQuery.import = 'dingtalk'
     const view = mountView('OWNER')
     const importer = view.getComponent(DingTalkDocumentImport)
-    expect(importer.get('[data-testid="dingtalk-sync-policy"]').text()).toContain('导入人为创建者')
-    expect(importer.get('[data-testid="dingtalk-sync-policy"]').text()).toContain('后续在天马智擎维护权限')
     const document = personalDingTalkDocuments(importer.props('identity')).find(item => item.id === 'catalog')!
     importer.vm.$emit('complete', { destinationId: 'kb-public-2', documents: [document], platformUserId: mockUser.id, frequency: '每天', schedule: '00:00' })
     await flushPromises()
     await view.findAll('[data-testid="knowledge-kb-row"]')[1].trigger('click')
     const imported = view.getComponent(KnowledgeTable).props('nodes')!.find(node => node.sourceDocumentId === 'catalog')!
+    expect(view.find('[aria-label="钉钉同步文档"]').exists()).toBe(true)
     expect(imported.permission).toMatchObject({ owner: mockUser.displayName, inheritParent: false, roles: { 清晖: 'MANAGER', 向阳: 'DOWNLOADER', 知夏: 'READER', 人力资源中心: 'DOWNLOADER' } })
     expect(imported.permission!.members).not.toContain('天马AI项目群')
     expect(imported.permission!.members).toContain('人力资源中心')
@@ -97,7 +96,8 @@ describe('knowledge-center preview permissions', () => {
   })
   it('allows managers to delete an independent public permission root', async () => {
     const view = mountView('MANAGER', 'user')
-    await view.get('[aria-label="集团制度知识库操作菜单"]').trigger('click')
+    // Use a root without agent dependencies; reference protection is covered separately.
+    await view.get('[aria-label="商品基础资料库操作菜单"]').trigger('click')
     const action = view.findAll('[role="menuitem"]').find(item => item.text() === '删除')!
     expect(action.attributes()).not.toHaveProperty('disabled')
     await action.trigger('click')
@@ -108,9 +108,8 @@ describe('knowledge-center preview permissions', () => {
     const view = mountView('DOWNLOADER', 'user')
     const importer = view.getComponent(DingTalkDocumentImport)
     const document = personalDingTalkDocuments(importer.props('identity')).find(item => item.id === 'catalog')!
-    importer.vm.$emit('complete', { destinationId: 'kb-personal-1', documents: [document], platformUserId: mockUser.id, frequency: '每天', schedule: '00:00' })
+    importer.vm.$emit('complete', { destinationId: 'kb-personal-1', documents: [document], platformUserId: mockUser.id })
     await flushPromises()
-    await view.get('[aria-label="展开侧栏"]').trigger('click')
     await view.get('[aria-label="个人空间"]').trigger('click')
     await view.findAll('[data-testid="knowledge-kb-row"]')[0].trigger('click')
     const imported = view.getComponent(KnowledgeTable).props('nodes')!.find(node => node.sourceDocumentId === 'catalog')!
@@ -123,8 +122,8 @@ describe('knowledge-center preview permissions', () => {
     const library = table.props('items')[0]!
     library.permission = { owner: '其他创建者', members: [mockUser.displayName], roles: { [mockUser.displayName]: 'MANAGER' }, inheritParent: false, revision: 1 }
     await view.findAll('[data-testid="knowledge-kb-row"]')[0].trigger('click')
-    await view.get('[aria-label="新建"]').trigger('click')
-    expect(view.get('[aria-label="上传文件"]').attributes()).not.toHaveProperty('disabled')
+    await view.get('[data-testid="knowledge-action-row"]').get('[aria-label="上传"]').trigger('click')
+    expect(view.get('[aria-label="上传菜单"]').get('[aria-label="上传文件"]').attributes()).not.toHaveProperty('disabled')
     await view.findAll('[data-testid="knowledge-node-row"]')[0].trigger('click')
     const file = view.getComponent(KnowledgeTable).props('nodes')![0]!
     file.permission = { owner: '其他创建者', members: [mockUser.displayName], roles: { [mockUser.displayName]: 'READER' }, inheritParent: false, revision: 1 }
@@ -185,8 +184,8 @@ describe('knowledge-center preview permissions', () => {
     expect(preview.text()).toContain('考勤管理制度_v3.pdf')
     expect(view.find('[aria-label="小智问答"]').exists()).toBe(true)
     expect(preview.find('[aria-label="下载文件"]').exists()).toBe(downloadable)
-    await view.get('[aria-label="新建"]').trigger('click')
-    expect(view.get('[aria-label="上传文件"]').attributes()).toHaveProperty('disabled')
+    await view.get('[data-testid="knowledge-action-row"]').get('[aria-label="上传"]').trigger('click')
+    expect(view.get('[aria-label="上传菜单"]').get('[aria-label="上传文件"]').attributes()).toHaveProperty('disabled')
   })
 
 })

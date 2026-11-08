@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref, toRef, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import {
   Activity,
   Bot,
@@ -23,7 +23,13 @@ import {
   X,
 } from 'lucide-vue-next'
 import { useAppStore } from '@/stores/app'
-import type { DeptNode, UsageNode, VisibleUsageRow, QuotaPolicy } from '@/types/settings-insights'
+import type {
+  DeptNode,
+  PersonalUsageRecord,
+  UsageNode,
+  VisibleUsageRow,
+  QuotaPolicy,
+} from '@/types/settings-insights'
 import {
   createUsageTrees,
   createQuotaPolicies,
@@ -54,18 +60,159 @@ import { usageCsvRows, personalUsageCsvRows } from '@/composables/settings/insig
 import { useAuditInsights } from '@/composables/settings/useAuditInsights'
 import PersonalUsagePanel from '@/components/settings/insights/PersonalUsagePanel.vue'
 import AuditInsightsPanel from '@/components/settings/insights/AuditInsightsPanel.vue'
+import SettingsSidebar from '@/components/settings/SettingsSidebar.vue'
+import { isSystemAdministrator } from '@/composables/settings/quota-access'
 
 const route = useRoute()
-const router = useRouter()
 const store = useAppStore()
 const isAudit = computed(() => route.path.endsWith('/audit'))
-const isAdmin = computed(() => store.user?.role === 'admin' && route.query.scope !== 'personal')
+const isAdmin = computed(() => isSystemAdministrator(store.user?.id) && route.query.scope !== 'personal')
 const { adminTree, personalTree } = createUsageTrees()
 const quotaPolicies = ref<QuotaPolicy[]>(createQuotaPolicies())
+const quotaManagerOpen = ref(false)
+type QuotaScopeKind = 'department' | 'person'
+type QuotaScopeItem = { id: string; kind: QuotaScopeKind; name: string; depth?: number }
+type QuotaManagerGrant = {
+  id: string
+  managerId: string
+  managerName: string
+  scopes: QuotaScopeItem[]
+}
+
+const quotaManagers = [
+  { id: 'manager-chen', name: '陈峰（AIBP）' },
+  { id: 'manager-zhang', name: '张婷（AIBP）' },
+  { id: 'manager-zhou', name: '周悦（AIBP）' },
+]
+const quotaManagerGrants = ref<QuotaManagerGrant[]>([
+  {
+    id: 'grant-zhang',
+    managerId: 'manager-zhang',
+    managerName: '张婷（AIBP）',
+    scopes: [
+      { id: 'user-chaomu', kind: 'person', name: '张明（朝暮）' },
+      { id: 'user-qinghui', kind: 'person', name: '李清（清晖）' },
+    ],
+  },
+  {
+    id: 'grant-zhou',
+    managerId: 'manager-zhou',
+    managerName: '周悦（AIBP）',
+    scopes: [{ id: 'dept-137517219', kind: 'department', name: '数字技术中心' }],
+  },
+])
+const quotaManagerId = ref(quotaManagers[0].id)
+const quotaEditingGrantId = ref<string | null>(null)
+const quotaScopeDraft = ref<QuotaScopeItem[]>([])
+const quotaPickerOpen = ref(false)
+const quotaPickerTab = ref<QuotaScopeKind>('department')
+const quotaPickerQuery = ref('')
+const quotaPickerDraft = ref<QuotaScopeItem[]>([])
+
+const quotaDepartmentOptions = computed(() => {
+  const options: QuotaScopeItem[] = []
+  const walk = (nodes: DeptNode[], depth = 0) => {
+    nodes.forEach((node) => {
+      options.push({ id: node.id, kind: 'department', name: node.name, depth })
+      if (node.children) walk(node.children, depth + 1)
+    })
+  }
+  walk(deptTree)
+  return options
+})
+const quotaPersonOptions = computed<QuotaScopeItem[]>(() => {
+  const seen = new Set<string>()
+  return flattenPersons(adminTree)
+    .filter((person) => {
+      if (seen.has(person.id)) return false
+      seen.add(person.id)
+      return true
+    })
+    .map((person) => ({ id: person.id, kind: 'person', name: person.name }))
+})
+const filteredQuotaScopeOptions = computed(() => {
+  const source =
+    quotaPickerTab.value === 'department' ? quotaDepartmentOptions.value : quotaPersonOptions.value
+  const query = quotaPickerQuery.value.trim().toLowerCase()
+  return query ? source.filter((item) => item.name.toLowerCase().includes(query)) : source
+})
+
+function cloneQuotaScopes(scopes: QuotaScopeItem[]) {
+  return scopes.map((scope) => ({ ...scope }))
+}
+function quotaScopeKey(scope: QuotaScopeItem) {
+  return `${scope.kind}:${scope.id}`
+}
+function syncQuotaManagerDraft() {
+  const grant = quotaManagerGrants.value.find((item) => item.managerId === quotaManagerId.value)
+  quotaEditingGrantId.value = grant?.id ?? null
+  quotaScopeDraft.value = grant ? cloneQuotaScopes(grant.scopes) : []
+}
+function openQuotaManagerDialog() {
+  quotaManagerId.value = quotaManagers[0].id
+  syncQuotaManagerDraft()
+  quotaManagerOpen.value = true
+}
+function editQuotaManagerGrant(grant: QuotaManagerGrant) {
+  quotaManagerId.value = grant.managerId
+  quotaEditingGrantId.value = grant.id
+  quotaScopeDraft.value = cloneQuotaScopes(grant.scopes)
+}
+function openQuotaScopePicker() {
+  quotaPickerTab.value = 'department'
+  quotaPickerQuery.value = ''
+  quotaPickerDraft.value = cloneQuotaScopes(quotaScopeDraft.value)
+  quotaPickerOpen.value = true
+}
+function isQuotaScopeSelected(scope: QuotaScopeItem) {
+  const key = quotaScopeKey(scope)
+  return quotaPickerDraft.value.some((item) => quotaScopeKey(item) === key)
+}
+function toggleQuotaScope(scope: QuotaScopeItem) {
+  const key = quotaScopeKey(scope)
+  const exists = quotaPickerDraft.value.some((item) => quotaScopeKey(item) === key)
+  quotaPickerDraft.value = exists
+    ? quotaPickerDraft.value.filter((item) => quotaScopeKey(item) !== key)
+    : [...quotaPickerDraft.value, { ...scope }]
+}
+function removeQuotaScope(scope: QuotaScopeItem, target: 'draft' | 'picker' = 'draft') {
+  const key = quotaScopeKey(scope)
+  if (target === 'picker') {
+    quotaPickerDraft.value = quotaPickerDraft.value.filter((item) => quotaScopeKey(item) !== key)
+    return
+  }
+  quotaScopeDraft.value = quotaScopeDraft.value.filter((item) => quotaScopeKey(item) !== key)
+}
+function cancelQuotaScopePicker() {
+  quotaPickerOpen.value = false
+  quotaPickerDraft.value = []
+}
+function confirmQuotaScopePicker() {
+  quotaScopeDraft.value = cloneQuotaScopes(quotaPickerDraft.value)
+  quotaPickerOpen.value = false
+}
+function saveQuotaManagerGrant() {
+  const manager = quotaManagers.find((item) => item.id === quotaManagerId.value)
+  if (!manager || quotaScopeDraft.value.length === 0) return
+  const grant: QuotaManagerGrant = {
+    id: quotaEditingGrantId.value ?? `grant-${manager.id}`,
+    managerId: manager.id,
+    managerName: manager.name,
+    scopes: cloneQuotaScopes(quotaScopeDraft.value),
+  }
+  const existingIndex = quotaManagerGrants.value.findIndex(
+    (item) => item.id === grant.id || item.managerId === manager.id,
+  )
+  if (existingIndex >= 0) quotaManagerGrants.value.splice(existingIndex, 1, grant)
+  else quotaManagerGrants.value.push(grant)
+  quotaManagerOpen.value = false
+  showFeedback('额度管理权限已保存')
+}
 const audit = reactive(useAuditInsights(showFeedback))
 const selectedAudit = toRef(audit, 'selectedAudit')
 
 const selectedUsage = ref<UsageNode | null>(null)
+const selectedPersonalUsage = ref<PersonalUsageRecord | null>(null)
 const expandedIds = ref(new Set<string>())
 const feedback = ref('')
 const quotaOpen = ref(false)
@@ -350,11 +497,6 @@ const metrics = computed(() => [
   },
 ])
 
-const navItems = computed(() => [
-  { label: '用量管理', path: '/settings/usage', icon: CircleDollarSign },
-  { label: '日志管理', path: '/settings/audit', icon: ShieldCheck },
-  { label: '智能体管理', path: '/settings/agents', icon: Bot },
-])
 function toggleNode(id: string) {
   const next = new Set(expandedIds.value)
   next.has(id) ? next.delete(id) : next.add(id)
@@ -526,6 +668,14 @@ function togglePersonMenu(id: string, ev: MouseEvent) {
 function closePersonMenu() {
   personMenuId.value = ''
 }
+function openPersonDetailFromMenu(person: UsageNode) {
+  closePersonMenu()
+  openPersonDetail(person)
+}
+function openPersonQuotaFromMenu(person: UsageNode) {
+  closePersonMenu()
+  openPersonQuota(person)
+}
 const personRequests = computed(() => {
   if (!selectedPersonDetail.value) return []
   const person = selectedPersonDetail.value
@@ -571,28 +721,7 @@ const personCacheTokens = computed(() =>
     class="settings-insights"
     :class="{ 'settings-insights--personal': !isAdmin }"
   >
-    <aside v-if="isAdmin" class="settings-side" data-testid="settings-admin-nav">
-      <div class="settings-brand"><span>SETTINGS</span><strong>设置</strong></div>
-      <nav aria-label="设置导航">
-        <button
-          v-for="item in navItems"
-          :key="item.path"
-          type="button"
-          :class="{ active: route.path === item.path }"
-          @click="router.push(item.path)"
-        >
-          <component :is="item.icon" :size="17" /><span>{{ item.label }}</span
-          ><ChevronRight :size="14" />
-        </button>
-      </nav>
-      <div class="settings-user-scope">
-        <Users :size="16" />
-        <div>
-          <strong>{{ store.user?.displayName }}</strong
-          ><small>超级管理员 · 全组织数据</small>
-        </div>
-      </div>
-    </aside>
+    <div v-if="isAdmin" data-testid="settings-admin-nav"><SettingsSidebar :user-id="store.user?.id" /></div>
 
     <main data-testid="settings-insights-card" class="settings-content">
       <PersonalUsagePanel
@@ -605,6 +734,7 @@ const personCacheTokens = computed(() =>
         :personal-usage-records="personalUsageRecords"
         @choose-period="choosePersonalPeriod"
         @export="exportPersonalUsage"
+          @select="selectedPersonalUsage = $event"
       />
 
       <template v-else-if="!isAudit">
@@ -753,6 +883,9 @@ const personCacheTokens = computed(() =>
               <p>按人员汇总，点击行查看请求明细</p>
             </div>
             <div class="table-actions">
+              <button type="button" aria-label="配置额度管理权限" @click="openQuotaManagerDialog">
+                <ShieldCheck :size="15" />额度管理权限
+              </button>
               <button type="button" aria-label="配置全局默认额度" @click="openGlobalQuota">
                 <Settings2 :size="15" />全局默认额度
               </button>
@@ -880,18 +1013,14 @@ const personCacheTokens = computed(() =>
                       <button
                         type="button"
                         role="menuitem"
-                        @click="
-                          personMenuId = ''; openPersonDetail(person)
-                        "
+                        @click="openPersonDetailFromMenu(person)"
                       >
                         详情
                       </button>
                       <button
                         type="button"
                         role="menuitem"
-                        @click="
-                          personMenuId = ''; openPersonQuota(person)
-                        "
+                        @click="openPersonQuotaFromMenu(person)"
                       >
                         设置
                       </button>
@@ -941,6 +1070,183 @@ const personCacheTokens = computed(() =>
     </main>
 
     <Teleport to="body">
+      <div v-if="quotaManagerOpen" class="modal-layer" @mousedown.self="quotaManagerOpen = false">
+        <section
+          class="quota-manager-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-label="额度管理权限"
+        >
+          <header>
+            <div>
+              <span class="dialog-icon"><ShieldCheck :size="18" /></span>
+              <strong>额度管理权限</strong>
+            </div>
+            <button type="button" aria-label="关闭额度管理权限" @click="quotaManagerOpen = false">
+              <X :size="18" />
+            </button>
+          </header>
+          <div class="dialog-body quota-manager-body">
+            <div class="quota-manager-toolbar">
+              <label>
+                <span>授权人员</span>
+                <select
+                  v-model="quotaManagerId"
+                  aria-label="选择额度管理员"
+                  @change="syncQuotaManagerDraft"
+                >
+                  <option v-for="manager in quotaManagers" :key="manager.id" :value="manager.id">
+                    {{ manager.name }}
+                  </option>
+                </select>
+              </label>
+              <label>
+                <span>可管控范围</span>
+                <button
+                  type="button"
+                  class="member-picker-button"
+                  aria-label="添加可管控范围"
+                  @click="openQuotaScopePicker"
+                >
+                  <Users :size="15" />添加范围
+                </button>
+              </label>
+            </div>
+            <div
+              v-if="quotaScopeDraft.length"
+              class="selected-member-row"
+              aria-label="已选择的可管控范围"
+            >
+              <span
+                v-for="scope in quotaScopeDraft"
+                :key="quotaScopeKey(scope)"
+                data-testid="quota-scope-chip"
+              >
+                {{ scope.name }}
+                <button
+                  type="button"
+                  :aria-label="`移除${scope.name}`"
+                  @click="removeQuotaScope(scope)"
+                >
+                  <X :size="12" />
+                </button>
+              </span>
+            </div>
+            <div class="quota-manager-list">
+              <article v-for="grant in quotaManagerGrants" :key="grant.id">
+                <div class="manager-avatar">{{ grant.managerName.slice(0, 1) }}</div>
+                <div>
+                  <strong>{{ grant.managerName }}</strong>
+                  <small>{{ grant.scopes.length }} 个范围</small>
+                </div>
+                <button
+                  type="button"
+                  :aria-label="`编辑${grant.managerName}范围`"
+                  @click="editQuotaManagerGrant(grant)"
+                >
+                  编辑
+                </button>
+              </article>
+            </div>
+          </div>
+          <footer>
+            <button type="button" @click="quotaManagerOpen = false">取消</button>
+            <button
+              type="button"
+              class="primary-button"
+              aria-label="保存额度管理员授权"
+              :disabled="quotaScopeDraft.length === 0"
+              @click="saveQuotaManagerGrant"
+            >
+              保存授权
+            </button>
+          </footer>
+        </section>
+      </div>
+      <div v-if="quotaPickerOpen" class="modal-layer quota-scope-layer">
+        <section
+          class="quota-scope-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-label="选择可管控范围"
+        >
+          <header>
+            <strong>选择范围</strong>
+            <button type="button" aria-label="关闭范围选择" @click="cancelQuotaScopePicker">
+              <X :size="18" />
+            </button>
+          </header>
+          <div class="quota-scope-body">
+            <div class="quota-scope-browser">
+              <label class="quota-scope-search">
+                <Search :size="15" />
+                <input v-model="quotaPickerQuery" aria-label="搜索可管控范围" placeholder="搜索" />
+              </label>
+              <div class="quota-scope-tabs" role="tablist" aria-label="范围类型">
+                <button
+                  type="button"
+                  :class="{ active: quotaPickerTab === 'department' }"
+                  aria-label="部门范围"
+                  @click="quotaPickerTab = 'department'"
+                >
+                  部门
+                </button>
+                <button
+                  type="button"
+                  :class="{ active: quotaPickerTab === 'person' }"
+                  aria-label="人员范围"
+                  @click="quotaPickerTab = 'person'"
+                >
+                  人员
+                </button>
+              </div>
+              <div class="quota-scope-options">
+                <button
+                  v-for="scope in filteredQuotaScopeOptions"
+                  :key="quotaScopeKey(scope)"
+                  type="button"
+                  :class="{ selected: isQuotaScopeSelected(scope) }"
+                  :style="scope.depth ? { paddingLeft: `${14 + scope.depth * 16}px` } : undefined"
+                  :aria-label="`选择${scope.kind === 'department' ? '部门' : '人员'}${scope.name}`"
+                  :aria-pressed="isQuotaScopeSelected(scope)"
+                  @click="toggleQuotaScope(scope)"
+                >
+                  <span>{{ scope.name }}</span
+                  ><CheckCircle2 :size="15" />
+                </button>
+              </div>
+            </div>
+            <div class="quota-scope-selected">
+              <strong>已选 {{ quotaPickerDraft.length }}</strong>
+              <div>
+                <span v-for="scope in quotaPickerDraft" :key="quotaScopeKey(scope)">
+                  {{ scope.name }}
+                  <button
+                    type="button"
+                    :aria-label="`移除已选${scope.name}`"
+                    @click="removeQuotaScope(scope, 'picker')"
+                  >
+                    <X :size="12" />
+                  </button>
+                </span>
+              </div>
+            </div>
+          </div>
+          <footer>
+            <button type="button" aria-label="取消范围选择" @click="cancelQuotaScopePicker">
+              取消
+            </button>
+            <button
+              type="button"
+              class="primary-button"
+              aria-label="确认范围"
+              @click="confirmQuotaScopePicker"
+            >
+              确认
+            </button>
+          </footer>
+        </section>
+      </div>
       <div v-if="quotaOpen" class="modal-layer" @mousedown.self="quotaOpen = false">
         <section
           class="quota-dialog"
@@ -1068,6 +1374,51 @@ const personCacheTokens = computed(() =>
               确认调整
             </button>
           </footer>
+        </section>
+      </div>
+      <div
+        v-if="selectedPersonalUsage"
+        class="modal-layer"
+        @mousedown.self="selectedPersonalUsage = null"
+      >
+        <section
+          class="usage-detail-modal personal-usage-detail-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label="个人用量详情"
+        >
+          <header>
+            <div>
+              <span class="dialog-icon"><CircleDollarSign :size="18" /></span>
+              <div>
+                <strong>用量详情</strong>
+                <p>{{ selectedPersonalUsage.requestId }}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              aria-label="关闭个人用量详情"
+              @click="selectedPersonalUsage = null"
+            >
+              <X :size="18" />
+            </button>
+          </header>
+          <dl class="personal-usage-detail-list">
+            <div class="usage-detail-row"><dt>请求</dt><dd>{{ selectedPersonalUsage.request }}</dd></div>
+            <div class="usage-detail-row"><dt>会话</dt><dd>{{ selectedPersonalUsage.requestId }}</dd></div>
+            <div class="usage-detail-row"><dt>模型</dt><dd>{{ selectedPersonalUsage.model }}</dd></div>
+            <div class="usage-detail-row">
+              <dt>输入 / 输出 / 缓存 Token</dt>
+              <dd>
+                {{ compact(Math.round(selectedPersonalUsage.tokens * 0.62)) }} /
+                {{ compact(Math.round(selectedPersonalUsage.tokens * 0.28)) }} /
+                {{ compact(Math.round(selectedPersonalUsage.tokens * 0.1)) }}
+              </dd>
+            </div>
+            <div class="usage-detail-row"><dt>金额消耗</dt><dd>{{ money(selectedPersonalUsage.amount) }}</dd></div>
+            <div class="usage-detail-row"><dt>数据状态</dt><dd>已入账</dd></div>
+            <div class="usage-detail-row"><dt>请求时间</dt><dd>{{ selectedPersonalUsage.time }}</dd></div>
+          </dl>
         </section>
       </div>
       <div v-if="selectedUsage" class="modal-layer" @mousedown.self="selectedUsage = null">

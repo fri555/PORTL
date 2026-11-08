@@ -19,13 +19,13 @@ async function button(w: ReturnType<typeof mount>, text: string) {
 }
 async function selectFirst(w: ReturnType<typeof mount>) {
   await w.get('[aria-label="上传至"]').trigger('click'); await w.get('[aria-label="存放至我的客户资料"]').trigger('click')
-  await button(w, '选择文件'); await w.get('input[aria-label="搜索钉钉文档"]').setValue('入职')
+  await button(w, '选择文件'); await w.get('[aria-label="进入知识库"]').trigger('click'); await w.get('input[aria-label="搜索钉钉文档"]').setValue('入职')
   await w.get('input[aria-label="选择新员工入职指南"]').setValue(true); await button(w, '确认导入 1 项')
 }
 describe('M3 current-user permissions and import boundaries', () => {
   it('lists only source documents readable by the bound user and ignores supplied identity query values', () => {
     window.history.replaceState({}, '', '/?userId=ding-demo-chaomu')
-    expect(personalDingTalkDocuments(identity()).map(item => item.id)).toEqual(['onboarding', 'attendance', 'catalog', 'native-table'])
+    expect(personalDingTalkDocuments(identity()).map(item => item.id)).toEqual(['onboarding', 'attendance', 'catalog', 'native-table', 'mydoc-personal-worklog'])
     expect(personalDingTalkDocuments({ ...identity(), dingUserId: 'ding-demo-chaomu' })).toEqual([])
     expect(personalDingTalkDocuments(boundDingTalkIdentity({ id: 'unknown', displayName: '未知用户' }))).toEqual([])
     expect(prototypeCanWriteKnowledge('kb-public-1', 'user')).toBe(false)
@@ -34,11 +34,11 @@ describe('M3 current-user permissions and import boundaries', () => {
     const w = dialog(); expect(w.text()).not.toContain('我的钉钉身份')
     expect(w.find('[aria-label="App Key"]').exists()).toBe(false)
     expect(w.find('[aria-label="User ID"]').exists()).toBe(false)
-    await button(w, '选择文件'); await w.get('input[aria-label="搜索钉钉文档"]').setValue('报销')
+    await button(w, '选择文件'); await w.get('[aria-label="进入知识库"]').trigger('click'); await w.get('input[aria-label="搜索钉钉文档"]').setValue('报销')
     expect(w.get('[role="tree"]').findAll('[role="treeitem"]')).toHaveLength(0)
   })
   it('marks an unsupported file in the tree and selected panel and requires its removal before importing', async () => {
-    const w = dialog(); await selectFirst(w); await button(w, '选择文件')
+    const w = dialog(); await selectFirst(w); await button(w, '选择文件'); await w.get('[aria-label="进入知识库"]').trigger('click')
     await w.get('input[aria-label="搜索钉钉文档"]').setValue('多维表')
     expect(w.get('[role="tree"]').text()).toContain('格式暂不支持')
     await w.get('input[aria-label="选择商品运营多维表"]').setValue(true); await button(w, '确认导入 2 项')
@@ -54,11 +54,14 @@ describe('M3 current-user permissions and import boundaries', () => {
     expect(w.findAll('button').find(item => item.text() === '选择文件')!.attributes('disabled')).toBeDefined()
     expect(w.emitted('complete')).toBeUndefined()
   })
-  it('submits one batch with target, current user and synchronization schedule', async () => {
+  it('submits one batch with target and current user for automatic background registration', async () => {
     vi.useFakeTimers(); const w = dialog(); await selectFirst(w)
     await button(w, '确认导入'); await vi.advanceTimersByTimeAsync(500)
     expect(w.emitted('complete')).toHaveLength(1)
-    expect(w.emitted('complete')![0]![0]).toMatchObject({ destinationId: 'kb-personal-1', platformUserId: 'u-personal-demo', documents: [{ id: 'onboarding' }], frequency: '每天', schedule: '00:00' })
+    const payload = w.emitted('complete')![0]![0]
+    expect(payload).toMatchObject({ destinationId: 'kb-personal-1', platformUserId: 'u-personal-demo', documents: [{ id: 'onboarding' }] })
+    expect(payload).not.toHaveProperty('frequency')
+    expect(payload).not.toHaveProperty('schedule')
     expect(w.emitted('close')).toHaveLength(1)
   })
   it('cancels pending import and source selections if the logged identity changes', async () => {

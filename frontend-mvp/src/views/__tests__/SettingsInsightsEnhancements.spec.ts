@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import SettingsInsightsView from '@/views/SettingsInsightsView.vue'
+import SettingsUsageView from '@/views/SettingsUsageView.vue'
 import { useAppStore } from '@/stores/app'
 import type { MockUser } from '@/types/user'
 
@@ -21,14 +21,14 @@ async function mountPage(path: string) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
-      { path: '/settings/usage', component: SettingsInsightsView },
-      { path: '/settings/audit', component: SettingsInsightsView },
+      { path: '/settings/usage', component: SettingsUsageView },
+      { path: '/settings/audit', component: { template: '<div />' } },
       { path: '/settings/agents', component: { template: '<div>智能体管理</div>' } },
     ],
   })
   await router.push(path)
   await router.isReady()
-  const wrapper = mount(SettingsInsightsView, {
+  const wrapper = mount(SettingsUsageView, {
     attachTo: document.body,
     global: { plugins: [pinia, router], stubs: { Teleport: true } },
   })
@@ -37,7 +37,7 @@ async function mountPage(path: string) {
 }
 
 function visibleNumbers(wrapper: Awaited<ReturnType<typeof mountPage>>, selector: string) {
-  return wrapper.findAll('table.usage-flat tbody tr.person-row').map((row) => {
+  return wrapper.findAll('table[aria-label="用量额度"] tbody tr[data-member-id]').map((row) => {
     const text = row.get(selector).text().replace(/[^\d.-]/g, '')
     return Number(text)
   })
@@ -79,11 +79,11 @@ describe('usage detail and quota list refinements', () => {
     expect(defaultRates).toEqual([...defaultRates].sort((a, b) => b - a))
 
     await wrapper.get('button[aria-label="按额度排序"]').trigger('click')
-    const descendingQuota = visibleNumbers(wrapper, 'td:nth-child(2) > span')
+    const descendingQuota = visibleNumbers(wrapper, 'td:nth-child(2)')
     expect(descendingQuota).toEqual([...descendingQuota].sort((a, b) => b - a))
 
     await wrapper.get('button[aria-label="按额度排序"]').trigger('click')
-    const ascendingQuota = visibleNumbers(wrapper, 'td:nth-child(2) > span')
+    const ascendingQuota = visibleNumbers(wrapper, 'td:nth-child(2)')
     expect(ascendingQuota).toEqual([...ascendingQuota].sort((a, b) => a - b))
   })
 })

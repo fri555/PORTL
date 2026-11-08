@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, nextTick, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, CirclePlus, Copy, FileText, ImageIcon, MoreHorizontal, Plus, Search, Settings2, Trash2, WandSparkles, X } from 'lucide-vue-next'
 import { createUsageForm, usageContentFromForm, usageFormFromContent, validateUsageForm, validateUsageInstructions, normalizeSystemTags, stripAutomaticSystemTags, USAGE_TEXT_MAX_LENGTH, USAGE_TEMPLATE } from '@/utils/agentUsage'
 import { expertDrafts, getExpertDraft, publishExpertDraft, setExpertStatus, deleteExpert, isExpertDeleted } from '@/utils/expertPrototypeStore'
 import { AGENT_CATEGORY_META, type Agent } from '@/types/agent'
 import { ElInputTag } from 'element-plus'
 import { dailyAssistant } from '@/mock/agents'
+import { sourceKnowledgeBases } from '@/mock/knowledge-source'
+import type { SourceKnowledgeBase, SourceKnowledgeNode } from '@/types/knowledge-source'
 import ResourcePermissionDialog, { type PermissionMember } from '@/components/common/ResourcePermissionDialog.vue'
 
 type AgentStatus = 'active' | 'disabled'
@@ -109,7 +111,7 @@ function loadUsageForm(content: string, agent?: Agent) {
   const form = usageFormFromContent(content)
   form.systems = stripAutomaticSystemTags(form.systems, {
     connectedSystems: agent?.capabilities?.connectedSystems ?? draft.connectedSystems,
-    hasKnowledge: Boolean(agent?.knowledgeBaseIds.length || agent?.capabilities?.knowledgeBases?.length || agent?.capabilities?.knowledgeDocuments?.length || draft.selectedDocs.length),
+    hasKnowledge: Boolean(agent?.knowledgeBaseIds.length || agent?.capabilities?.knowledgeBases?.length || agent?.capabilities?.knowledgeDocuments?.length || draft.selectedDocs.length || draft.legacySelectedDocs.length),
     internetEnabled: agent?.capabilities?.internetEnabled === true || draft.selectedTools.includes('Brave网络搜索'),
   })
   Object.assign(usageForm, form)
@@ -138,6 +140,7 @@ const draft = reactive({
   strictKnowledge: false,
   monitoring: true,
   selectedDocs: [] as string[],
+  legacySelectedDocs: [] as string[],
   selectedTools: [] as string[],
   dailyQuickPrompts: [
     { id: 'qp-1', title: '发消息', content: '给「花名」发条钉钉消息：「内容」' },
@@ -150,14 +153,63 @@ const draft = reactive({
 })
 
 
-const knowledgeDocs = [
-  { name: 'AM-014-天马集团车辆管理制度20260324.docx', size: '0.04', scope: '个人空间', kind: 'W' },
-  { name: 'AM-003-天马集团会议设备使用指南20260318.pdf', size: '4.33', scope: '个人空间', kind: 'PDF' },
-  { name: 'AM-001-天马集团6S+C办公环境管理制度20260501.docx', size: '0.07', scope: '个人空间', kind: 'W' },
-  { name: '6.2 吸引力法则.pdf', size: '6.68', scope: '公共空间', kind: 'PDF' },
-  { name: '2.2 话术逻辑.pdf', size: '5.54', scope: '公共空间', kind: 'PDF' },
-  { name: '斯凯奇26Q3开季培训202607.pdf', size: '11.05', scope: '公共空间', kind: 'PDF' },
+type KnowledgeDoc = { id: string; name: string; size: string; scope: string; kind: string }
+const legacyKnowledgeDocs: KnowledgeDoc[] = [
+  { id: 'agent-doc-am014', name: 'AM-014-天马集团车辆管理制度20260324.docx', size: '0.04', scope: '个人空间', kind: 'W' },
+  { id: 'agent-doc-am003', name: 'AM-003-天马集团会议设备使用指南20260318.pdf', size: '4.33', scope: '个人空间', kind: 'PDF' },
+  { id: 'agent-doc-am001', name: 'AM-001-天马集团6S+C办公环境管理制度20260501.docx', size: '0.07', scope: '个人空间', kind: 'W' },
+  { id: 'agent-doc-attraction', name: '6.2 吸引力法则.pdf', size: '6.68', scope: '公共空间', kind: 'PDF' },
+  { id: 'agent-doc-sales', name: '2.2 话术逻辑.pdf', size: '5.54', scope: '公共空间', kind: 'PDF' },
+  { id: 'agent-doc-skechers', name: '斯凯奇26Q3开季培训202607.pdf', size: '11.05', scope: '公共空间', kind: 'PDF' },
 ]
+const knowledgeItemsStoreKey = 'tianma.prototype.knowledge-items.v2'
+const knowledgeDocs = ref<KnowledgeDoc[]>([])
+const knowledgeSearch = ref('')
+const filteredKnowledgeDocs = computed(() => {
+  const term = knowledgeSearch.value.trim().toLocaleLowerCase()
+  return term ? knowledgeDocs.value.filter(doc => `${doc.name} ${doc.scope}`.toLocaleLowerCase().includes(term)) : knowledgeDocs.value
+})
+function collectKnowledgeDocs(bases: SourceKnowledgeBase[]): KnowledgeDoc[] {
+  const result: KnowledgeDoc[] = []
+  const visit = (nodes: SourceKnowledgeNode[], path: string[]) => {
+    for (const node of nodes) {
+      if (node.kind === 'folder') visit(node.children ?? [], [...path, node.name])
+      else if (node.kind === 'file' && node.id && node.name) result.push({
+        id: node.id, name: node.name, size: node.size ?? '', scope: path.join(' / '),
+        kind: node.format || node.name.split('.').pop()?.toUpperCase() || '文件',
+      })
+    }
+  }
+  for (const base of bases) visit(base.nodes ?? [], [base.name])
+  return result
+}
+function readKnowledgeItems(): SourceKnowledgeBase[] {
+  try {
+    const saved: unknown = JSON.parse(localStorage.getItem(knowledgeItemsStoreKey) ?? 'null')
+    if (Array.isArray(saved) && saved.every(item => item && typeof item.id === 'string' && Array.isArray(item.nodes))) return saved as SourceKnowledgeBase[]
+  } catch { /* A disabled or invalid local cache leaves the supplied prototype files available. */ }
+  return sourceKnowledgeBases
+}
+function refreshKnowledgeDocs() {
+  const byId = new Map(legacyKnowledgeDocs.map(doc => [doc.id, doc]))
+  for (const doc of collectKnowledgeDocs(readKnowledgeItems())) byId.set(doc.id, doc)
+  knowledgeDocs.value = [...byId.values()]
+}
+function onKnowledgeStorage(event: StorageEvent) {
+  if (event.key === knowledgeItemsStoreKey || event.key === null) refreshKnowledgeDocs()
+}
+function onKnowledgeVisible() {
+  if (document.visibilityState === 'visible') refreshKnowledgeDocs()
+}
+onMounted(() => {
+  refreshKnowledgeDocs()
+  window.addEventListener('storage', onKnowledgeStorage)
+  document.addEventListener('visibilitychange', onKnowledgeVisible)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('storage', onKnowledgeStorage)
+  document.removeEventListener('visibilitychange', onKnowledgeVisible)
+})
 
 const tools = [
   { name: 'Brave网络搜索', category: '搜索工具', description: '隐私优先的网页与新闻搜索' },
@@ -197,6 +249,7 @@ function notify(message: string) {
 }
 
 function resetDraft() {
+  knowledgeSearch.value = ''
   usageError.value = ''
   checkedUsage.value = false
   checkedPublication.value = false
@@ -209,7 +262,7 @@ function resetDraft() {
     applicableDepartments: ['通用'], connectedSystems: [],
     model: '', react: true, chainOfThought: false, historyTurns: 20, compressionThreshold: 3000,
     longTermMemory: false, markdown: true, rolePrompt: defaultPrompt, strictKnowledge: false,
-    monitoring: true, selectedDocs: [], selectedTools: [],
+    monitoring: true, selectedDocs: [], legacySelectedDocs: [], selectedTools: [],
     dailyQuickPrompts: [
       { id: `qp-${++qpIdSeq}`, title: '发消息', content: '给「花名」发条钉钉消息：「内容」' },
       { id: `qp-${++qpIdSeq}`, title: '建待办', content: '给我建个钉钉待办：「标题」「内容」，「时间」前完成' },
@@ -222,6 +275,7 @@ function resetDraft() {
 }
 
 function openCreate() {
+  refreshKnowledgeDocs()
   resetDraft()
   formMode.value = 'create'
   activeStep.value = 1
@@ -229,6 +283,7 @@ function openCreate() {
 }
 
 function openEdit(agent: AgentRow) {
+  refreshKnowledgeDocs()
   resetDraft()
   const existingDraft = getExpertDraft(agent.id)
   Object.assign(draft, {
@@ -247,7 +302,10 @@ function openEdit(agent: AgentRow) {
     longTermMemory: true,
     usageInstructions: getExpertDraft(agent.id)?.usageInstructions ?? agent.usageInstructions ?? USAGE_TEMPLATE,
   })
-  Object.assign(draft, { applicableDepartments: existingDraft?.useDepartments ?? [], connectedSystems: existingDraft?.capabilities?.connectedSystems ?? [], selectedDocs: existingDraft?.capabilities?.selectedDocumentNames ?? [], selectedTools: existingDraft?.capabilities?.selectedToolNames ?? [] })
+  const selectedIds = [...new Set(existingDraft?.capabilities?.selectedDocumentIds ?? [])]
+  const resolvedNames = new Set(selectedIds.map(id => knowledgeDocs.value.find(document => document.id === id)?.name).filter((name): name is string => Boolean(name)))
+  const legacyNames = (existingDraft?.capabilities?.selectedDocumentNames ?? []).filter(name => !resolvedNames.has(name))
+  Object.assign(draft, { applicableDepartments: existingDraft?.useDepartments ?? [], connectedSystems: existingDraft?.capabilities?.connectedSystems ?? [], selectedDocs: selectedIds, legacySelectedDocs: legacyNames, selectedTools: existingDraft?.capabilities?.selectedToolNames ?? [] })
   loadUsageForm(draft.usageInstructions, existingDraft ?? undefined)
   formMode.value = 'edit'
   activeStep.value = 1
@@ -346,7 +404,8 @@ function saveAgent() {
     capabilities: {
       ...previous?.capabilities,
       connectedSystems: [...draft.connectedSystems],
-      selectedDocumentNames: [...draft.selectedDocs],
+      selectedDocumentNames: [...new Set([...draft.legacySelectedDocs, ...draft.selectedDocs.map(id => knowledgeDocs.value.find(document => document.id === id)?.name).filter((name): name is string => Boolean(name))])],
+      selectedDocumentIds: [...new Set(draft.selectedDocs)],
       selectedToolNames: [...draft.selectedTools],
       internetEnabled: previous && JSON.stringify(normalizeSystemTags(draft.selectedTools).sort()) === JSON.stringify(normalizeSystemTags(previous.capabilities?.selectedToolNames ?? []).sort())
         ? previous.capabilities?.internetEnabled
@@ -576,6 +635,14 @@ function importConfig(event: Event) {
           ;(draft as Record<string, unknown>)[key] = value
         }
       }
+      if (Array.isArray(imported.selectedDocs)) {
+        const knownIds = new Set(knowledgeDocs.value.map(doc => doc.id))
+        draft.selectedDocs = imported.selectedDocs.filter((value): value is string => typeof value === 'string' && knownIds.has(value))
+        draft.legacySelectedDocs = [...new Set([
+          ...draft.legacySelectedDocs,
+          ...imported.selectedDocs.filter((value): value is string => typeof value === 'string' && !knownIds.has(value)),
+        ])]
+      }
       loadUsageForm(draft.usageInstructions)
       usageError.value = validateUsageForm(usageForm, false) ?? ''
       notify(usageError.value || '配置已导入')
@@ -612,9 +679,6 @@ function toggleLimited(list: string[], value: string, limit: number) {
       <main data-testid="settings-production-card" class="relative mx-auto flex h-full w-full flex-col overflow-hidden rounded-lg border border-[#ececef] bg-white px-5 pb-5 pt-5 sm:px-8">
         <div class="flex shrink-0 flex-wrap items-center justify-between gap-4">
           <div class="flex items-center gap-4">
-            <button type="button" class="grid h-5 w-5 place-items-center text-zinc-500" aria-label="展开导航">
-              <ChevronLeft class="h-4 w-4 rounded-sm border border-zinc-400" />
-            </button>
             <h1 class="text-[18px] font-semibold">智能体管理</h1>
           </div>
           <div class="flex min-w-0 flex-1 items-center justify-end gap-3 sm:flex-none">
@@ -841,10 +905,12 @@ function toggleLimited(list: string[], value: string, limit: number) {
           <div v-else-if="activeStep === 3" class="space-y-7">
             <section>
               <div class="flex items-center justify-between"><div><h2 class="text-lg font-semibold">知识库</h2><p class="mt-1 text-xs text-zinc-400">关联文档以增强回答能力</p></div><label class="flex items-center gap-2 text-sm">严格模式<input v-model="draft.strictKnowledge" type="checkbox" /></label></div>
-              <label class="mt-4 flex h-10 items-center rounded-lg border border-zinc-200 px-3"><Search class="mr-2 h-4 w-4 text-zinc-400" /><input class="flex-1 text-sm outline-none" placeholder="搜索文档名称..." /></label>
-              <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <button v-for="doc in knowledgeDocs" :key="doc.name" type="button" class="flex min-w-0 items-center gap-3 rounded-xl border p-3 text-left" :class="draft.selectedDocs.includes(doc.name) ? 'border-blue-400 bg-blue-50/40' : 'border-zinc-200'" @click="toggleArray(draft.selectedDocs, doc.name)"><span class="grid h-9 w-9 shrink-0 place-items-center rounded bg-blue-500 text-[10px] font-bold text-white">{{ doc.kind }}</span><span class="min-w-0 flex-1"><b class="block truncate text-sm font-medium">{{ doc.name }}</b><small class="text-zinc-400">{{ doc.size }}　<span class="text-blue-400">{{ doc.scope }}</span></small></span><input type="checkbox" :checked="draft.selectedDocs.includes(doc.name)" tabindex="-1" /></button>
+              <label class="mt-4 flex h-10 items-center rounded-lg border border-zinc-200 px-3"><Search class="mr-2 h-4 w-4 text-zinc-400" /><input v-model="knowledgeSearch" class="flex-1 text-sm outline-none" placeholder="搜索文档名称..." /></label>
+              <div v-if="draft.legacySelectedDocs.length" class="mt-3 flex flex-wrap items-center gap-2 text-xs text-zinc-500"><span>旧引用</span><span v-for="name in draft.legacySelectedDocs" :key="name" class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-1"><FileText class="h-3 w-3" />{{ name }}<button type="button" :aria-label="`移除旧引用 ${name}`" @click="toggleArray(draft.legacySelectedDocs, name)"><X class="h-3 w-3" /></button></span></div>
+              <div class="mt-3 grid max-h-[390px] gap-3 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-3">
+                <button v-for="doc in filteredKnowledgeDocs" :key="doc.id" :data-testid="`agent-knowledge-file-${doc.id}`" type="button" class="flex min-w-0 items-center gap-3 rounded-xl border p-3 text-left" :class="draft.selectedDocs.includes(doc.id) ? 'border-blue-400 bg-blue-50/40' : 'border-zinc-200'" @click="toggleArray(draft.selectedDocs, doc.id)"><span class="grid h-9 w-9 shrink-0 place-items-center rounded bg-blue-500 text-[10px] font-bold text-white">{{ doc.kind }}</span><span class="min-w-0 flex-1"><b class="block truncate text-sm font-medium">{{ doc.name }}</b><small class="block truncate text-zinc-400">{{ doc.size }}　<span class="text-blue-400">{{ doc.scope }}</span></small></span><input type="checkbox" :checked="draft.selectedDocs.includes(doc.id)" tabindex="-1" /></button>
               </div>
+              <p v-if="!filteredKnowledgeDocs.length" class="mt-3 text-sm text-zinc-400">暂无匹配文档</p>
             </section>
             <section>
               <div class="flex items-center justify-between"><div><h2 class="text-lg font-semibold">工具箱</h2><p class="mt-1 text-xs text-zinc-400">拓展智能体的操作能力</p></div><button type="button" class="inline-flex h-9 items-center gap-2 rounded-lg border border-zinc-200 px-3 text-sm"><Plus class="h-4 w-4" />添加技能</button></div>

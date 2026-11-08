@@ -53,16 +53,46 @@ describe('video capability task list', () => {
     expect(wrapper.text()).not.toContain('运动鞋展示')
     wrapper.unmount()
   })
-  it('copies an editable capability task instead of editing it in place', async () => {
-    const wrapper = mount(VideoTaskList, { props: { meta: { ...meta, operator: 'speech-synthesis', title: '语音合成' }, tasks: [tasks[0]!] } })
+  it('copies a prompt task instead of editing it in place', async () => {
+    const wrapper = mount(VideoTaskList, { props: { meta: { ...meta, operator: 'prompt-generate', title: '视频 Prompt 生成' }, tasks: [{ ...tasks[0]!, operator: 'prompt-generate', status: 'processing' }] } })
     const copy = wrapper.get('button[aria-label="复制运动鞋展示"]')
     expect(copy.attributes('title')).toBe('复制')
+    expect(copy.attributes('disabled')).toBeUndefined()
     await copy.trigger('click')
     expect(wrapper.emitted('copy')).toEqual([['1']])
     expect(wrapper.find('button[aria-label="编辑运动鞋展示"]').exists()).toBe(false)
-    expect(wrapper.text()).not.toContain('已超时')
-    expect(wrapper.text()).not.toContain('已取消')
     wrapper.unmount()
+  })
+
+  it.each(['queued', 'processing', 'completed', 'failed', 'timeout'] as const)(
+    'keeps copy enabled for a task in %s state',
+    async (status) => {
+      const task: VideoTask = { ...tasks[0]!, status }
+      const wrapper = mount(VideoTaskList, { props: { meta, tasks: [task] } })
+      const copy = wrapper.get('button[aria-label="复制运动鞋展示"]')
+      expect(copy.attributes('disabled')).toBeUndefined()
+      await copy.trigger('click')
+      expect(wrapper.emitted('copy')).toEqual([['1']])
+      wrapper.unmount()
+    },
+  )
+
+  it('shows the failure reason in red on the task card with a fallback', () => {
+    const wrapper = mount(VideoTaskList, {
+      props: {
+        meta,
+        tasks: [
+          { ...tasks[0]!, status: 'failed', input: { failureReason: '模型服务不可用' } },
+          { ...tasks[1]!, status: 'failed', input: {} },
+        ],
+      },
+    })
+    const reasons = wrapper.findAll('[data-testid="task-failure-reason"]')
+    expect(reasons.map((item) => item.text())).toEqual([
+      '模型服务不可用',
+      '未返回具体失败原因',
+    ])
+    expect(reasons.every((item) => item.classes().includes('task-card__failure'))).toBe(true)
   })
   it('shows the element status set as 全部、排队中、处理中、已完成、失败、超时', () => {
     const wrapper = mount(VideoTaskList, { props: { meta: { ...meta, operator: 'element-replace', title: '元素替换' }, tasks: [{ ...tasks[0]!, operator: 'element-replace' }] } })
@@ -108,9 +138,11 @@ describe('video capability task list', () => {
     expect(wrapper.emitted('remove')?.[0]).toEqual(['1'])
     wrapper.unmount()
   })
-  it('keeps the unimplemented online video creator unavailable', async () => {
-    const wrapper = mount(VideoTaskList, { props: { meta: { ...meta, operator: 'video-generate' }, tasks: [], unavailable: true } })
-    expect(wrapper.get('[data-testid="new-task"]').attributes('disabled')).toBeDefined()
+  it('opens the online video creator configuration directly', async () => {
+    const wrapper = mount(VideoTaskList, { props: { meta: { ...meta, operator: 'video-generate', title: '视频生成', namePrefix: '视频生成' }, tasks: [] } })
+    await wrapper.get('[data-testid="new-task"]').trigger('click')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(wrapper.emitted('create')?.[0]?.[0]).toMatch(/^视频生成-/)
     wrapper.unmount()
   })
 })

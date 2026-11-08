@@ -163,19 +163,21 @@ describe('development and QA review boundaries', () => {
   })
   it('limits knowledge access settings to connection configuration and sync records', async () => {
     const w = keep(mount(AccessPanel,{props:{destinations:[{id:'kb',name:'测试库'}]},global:{stubs}}))
-    expect(w.text()).toContain('数据源')
+    expect(w.get('.page-head h1').text()).toBe('数据源')
     expect(w.text()).toContain('配置连接')
-    expect(w.text()).toContain('同步记录')
+    expect(w.findAll('.records-tabs [role="tab"]').map(tab => tab.text())).toEqual(['自动同步', '记录'])
+    expect(w.find('.records-section h2').exists()).toBe(false)
     expect(w.text()).not.toContain('新建数据源')
     expect(w.text()).not.toContain('指定同步执行身份')
   })
-  it('allows an administrator to update a sync schedule from a record', async () => {
+  // Scheme 1 retires administrator schedule menus; backend owns scheduling.
+  it('keeps background sync scheduling out of administrator controls', () => {
     const w = keep(mount(AccessPanel,{props:{destinations:[{id:'kb',name:'测试库'}]},global:{stubs}}))
-    await click(w,'同步设置')
-    expect(w.text()).toContain('同步频率')
-    expect(w.text()).toContain('每日执行时间')
-    await click(w,'保存')
-    expect(w.text()).toContain('同步记录')
+    expect(w.find('[aria-label="操作菜单"]').exists()).toBe(false)
+    expect(w.find('.dialog-select').exists()).toBe(false)
+    expect(w.find('[data-action="create-agent-task"]').exists()).toBe(false)
+    expect(w.findAll('[data-testid="dingtalk-managed-sync"]')).toHaveLength(7)
+    expect(w.text()).toContain('后台自动同步')
   })
   it('keeps the initiating user visible in every sync record', () => {
     const w = keep(mount(AccessPanel,{props:{destinations:[{id:'kb',name:'测试库'}]},global:{stubs}}))
