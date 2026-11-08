@@ -40,6 +40,8 @@ export interface Agent {
     supportedFileFormats?: string[]
     connectedSystems?: string[]
     selectedDocumentNames?: string[]
+    /** Stable local knowledge file IDs; selectedDocumentNames remains for legacy display. */
+    selectedDocumentIds?: string[]
     selectedToolNames?: string[]
     knowledgeDocuments?: { id: string; name: string; knowledgeBaseId?: string; knowledgeBaseName?: string; lastSuccessfulSyncAt?: string }[]
     connectors?: { id: string; name: string; protocol?: string; description?: string }[]
