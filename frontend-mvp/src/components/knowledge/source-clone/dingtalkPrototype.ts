@@ -82,6 +82,18 @@ export const documents = [
   },
 ]
 
+// These source IDs are account-scoped fixtures. They are not recreated when a user
+// navigates between Knowledge Base and My Docs, so import mappings stay stable.
+export const myDocuments = [
+  {
+    id: 'mydocs-u001-projects', label: '项目资料', type: 'folder', children: [
+      { id: 'mydoc-u001-weekly', label: '项目周会纪要', type: 'doc' },
+      { id: 'mydoc-u001-checklist', label: '项目交付清单', type: 'doc' },
+    ],
+  },
+  { id: 'mydoc-personal-worklog', label: '个人工作笔记', type: 'doc' },
+]
+
 
 
 
@@ -114,8 +126,8 @@ export interface BoundDingTalkIdentity {
 }
 // Server-owned binding fixtures: no user-entered or query-supplied operator identity.
 const prototypeIdentityBindings: Record<string, { dingUserId: string; readableIds: string[] }> = {
-  u_001: { dingUserId: 'ding-demo-chaomu', readableIds: ['onboarding', 'attendance', 'expense', 'catalog', 'launch'] },
-  'u-personal-demo': { dingUserId: 'ding-demo-user', readableIds: ['onboarding', 'attendance', 'catalog'] },
+  u_001: { dingUserId: 'ding-demo-chaomu', readableIds: ['onboarding', 'attendance', 'expense', 'catalog', 'launch', 'mydoc-u001-weekly', 'mydoc-u001-checklist'] },
+  'u-personal-demo': { dingUserId: 'ding-demo-user', readableIds: ['onboarding', 'attendance', 'catalog', 'mydoc-personal-worklog'] },
 }
 export function boundDingTalkIdentity(user: { id: string; displayName: string } | null | undefined, scenario: PrototypeScenario = 'normal'): BoundDingTalkIdentity {
   const binding = user ? prototypeIdentityBindings[user.id] : undefined
@@ -132,6 +144,7 @@ export interface ImportableDocument {
   updatedAt: string
   exportable: boolean
   exportReason?: string
+  sourcePath?: string
   sourceRole?: DingTalkSourceRole
   initialPermissions?: DingTalkInitialPermissions
 }
@@ -153,6 +166,9 @@ const personalDocumentFixtures: ImportableDocument[] = [
   { id: 'expense', name: '费用报销规范', format: 'DOCX', updatedAt: '2026-10-07 16:00', exportable: true },
   { id: 'launch', name: '新品上架流程', format: 'DOCX', updatedAt: '2026-10-08 11:00', exportable: true },
   { id: 'native-table', name: '商品运营多维表', format: '原生多维表', updatedAt: '2026-10-08 15:00', exportable: false, exportReason: '钉钉未开放本期所需导出能力' },
+  { id: 'mydoc-u001-weekly', name: '项目周会纪要', format: 'DOCX', updatedAt: '2026-10-20 11:00', exportable: true, sourcePath: '我的文档 / 项目资料' },
+  { id: 'mydoc-u001-checklist', name: '项目交付清单', format: 'XLSX', updatedAt: '2026-10-21 16:40', exportable: true, sourcePath: '我的文档 / 项目资料' },
+  { id: 'mydoc-personal-worklog', name: '个人工作笔记', format: 'DOCX', updatedAt: '2026-10-22 09:10', exportable: true, sourcePath: '我的文档' },
 ]
 export function personalDingTalkDocuments(identity: BoundDingTalkIdentity, scenario: PrototypeScenario = 'normal'): ImportableDocument[] {
   if (identity.status !== 'bound') return []

@@ -115,6 +115,8 @@ export interface DingTalkImportTask {
   frequency?: DingTalkSyncFrequency
   schedule?: string
   latestSyncAt: string
+  /** Epoch milliseconds of the latest user-triggered execution submission. */
+  lastManualSubmittedAt?: number
   executedAt?: string
   status: '待执行' | '同步成功' | '同步中' | '部分失败' | '同步失败'
   failureReason?: string

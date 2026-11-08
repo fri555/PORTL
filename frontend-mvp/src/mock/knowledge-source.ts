@@ -33,6 +33,8 @@ export const publicKnowledgeBases: SourceKnowledgeBase[] = [
         file('policy-leave', '员工休假管理细则.docx', '人力中心', '2026-06-12', 'DOCX', '864 KB'),
       ]),
       file('policy-handbook', '员工手册2026版.docx', '人力中心', '2026-06-10', 'DOCX', '3.1 MB'),
+      { ...file('policy-import-onboarding', '新员工入职指南.docx', '朝暮', '2026-10-12', 'DOCX', '钉钉转存'), sourceDocumentId: 'onboarding' },
+      { ...file('policy-import-attendance', '考勤与休假制度.pdf', '朝暮', '2026-10-12', 'PDF', '钉钉转存'), sourceDocumentId: 'attendance' },
     ]),
     folder('policy-admin', '行政制度', '行政部', '2026-06-08', [
       file('policy-seal', '印章使用管理办法.pdf', '行政部', '2026-06-08', 'PDF', '1.2 MB'),

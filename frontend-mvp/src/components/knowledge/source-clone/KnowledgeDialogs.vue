@@ -11,6 +11,8 @@ const props = defineProps<{
   kind: DialogKind
   target?: SourceKnowledgeBase | SourceKnowledgeNode | null | undefined
   destinations?: KnowledgeDestination[]
+  documentNameExists?: (name: string, destinationId: string, excludingId?: string) => boolean
+  defaultSpace?: KnowledgeSpace
   actorRole?: KnowledgeRole
   systemAdmin?: boolean
 }>()
@@ -19,6 +21,8 @@ const emit = defineEmits<{
   close: []
   create: [payload: { name: string; space: KnowledgeSpace }]
   folder: [payload: { name: string; kb: string }]
+  document: [payload: { name: string; content: string; destinationId: string }]
+  'edit-document': [payload: { name: string; content: string }]
   upload: [files: File[], destinationId: string, options: { monthlyReport: boolean }]
   rename: [name: string]
   permission: [payload: { resourceId: string; members: string[]; inheritParent: boolean; revision: number; roles: Record<string, KnowledgeRole>; subjectKinds?: Record<string, 'person' | 'department'>; initialPermissionSubjects?: string[]; syncedRoles?: Record<string, KnowledgeRole>; owner: string; ownershipTransfer?: KnowledgeOwnershipTransfer }]
@@ -26,8 +30,10 @@ const emit = defineEmits<{
 }>()
 
 const name = ref('')
+const documentContent = ref('')
 const space = ref<KnowledgeSpace>('public')
 const selectedKnowledgeBase = ref('')
+const selectedDocumentTarget = ref('')
 const selectedUploadTarget = ref('')
 const files = ref<File[]>([])
 const uploadMessages = ref<string[]>([])
@@ -138,6 +144,10 @@ const fileInput = ref<HTMLInputElement | null>(null)
 
 const isCreateValid = computed(() => Boolean(name.value.trim()))
 const isFolderValid = computed(() => Boolean(name.value.trim() && selectedKnowledgeBase.value))
+const duplicateDocument = computed(() => Boolean(name.value.trim() && props.documentNameExists?.(
+  name.value, selectedDocumentTarget.value, props.kind === 'edit-document' ? props.target?.id : undefined,
+)))
+const isDocumentValid = computed(() => Boolean(name.value.trim() && (props.kind === 'edit-document' || selectedDocumentTarget.value) && !duplicateDocument.value))
 const isRenameValid = computed(() => Boolean(name.value.trim()))
 const isUploadValid = computed(() => Boolean(selectedUploadTarget.value && files.value.length > 0))
 const hasExcelFiles = computed(() => files.value.some((file) => /\.xlsx?$/i.test(file.name)))
@@ -176,9 +186,11 @@ const impactedChildren = computed(() => {
 watch(
   () => [props.kind, props.target?.id] as const,
   () => {
-    name.value = props.kind === 'rename' ? props.target?.name ?? '' : ''
-    space.value = 'public'
+    name.value = ['rename', 'edit-document'].includes(props.kind ?? '') ? props.target?.name ?? '' : ''
+    documentContent.value = props.kind === 'edit-document' && props.target && 'content' in props.target ? props.target.content ?? '' : ''
+    space.value = props.defaultSpace ?? 'public'
     selectedKnowledgeBase.value = props.target && 'space' in props.target ? props.target.id : ''
+    selectedDocumentTarget.value = props.kind === 'document' ? props.target?.id ?? '' : ''
     selectedUploadTarget.value = props.kind === 'upload' ? props.target?.id ?? '' : ''
     files.value = []
     uploadMessages.value = []
@@ -236,6 +248,13 @@ function submitCreate() {
 function submitFolder() {
   if (!isFolderValid.value) return
   emit('folder', { name: name.value.trim(), kb: selectedKnowledgeBase.value })
+}
+
+function submitDocument() {
+  if (!isDocumentValid.value) return
+  const payload = { name: name.value.trim(), content: documentContent.value }
+  if (props.kind === 'edit-document') emit('edit-document', payload)
+  else emit('document', { ...payload, destinationId: selectedDocumentTarget.value })
 }
 
 function submitRename() {
@@ -450,7 +469,7 @@ function canRemoveDirectMember(member: string) {
     <div v-else-if="kind" class="dialog-overlay" @mousedown.self="close">
       <section
         class="dialog-surface"
-        :class="{ 'dialog-surface--upload': kind === 'upload', 'dialog-surface--permission': kind === 'permission' }"
+        :class="{ 'dialog-surface--upload': kind === 'upload', 'dialog-surface--permission': kind === 'permission', 'dialog-surface--document': kind === 'document' || kind === 'edit-document' }"
         :data-upload-layout="kind === 'upload' ? 'production' : undefined"
         role="dialog"
         aria-modal="true"
@@ -461,6 +480,8 @@ function canRemoveDirectMember(member: string) {
           <h2 :id="`${kind}-dialog-title`">
             <template v-if="kind === 'create'">新建知识库</template>
             <template v-else-if="kind === 'folder'">新建文件夹</template>
+            <template v-else-if="kind === 'document'">新建文档</template>
+            <template v-else-if="kind === 'edit-document'">编辑文档</template>
             <template v-else-if="kind === 'upload'">上传文件</template>
             <template v-else-if="kind === 'permission'">权限管理</template>
             <template v-else>删除知识库</template>
@@ -492,6 +513,22 @@ function canRemoveDirectMember(member: string) {
           <footer class="dialog-footer">
             <button class="button secondary" type="button" @click="close">取消</button>
             <button class="button primary" type="submit" :disabled="!isFolderValid">新建</button>
+          </footer>
+        </form>
+
+        <form v-else-if="kind === 'document' || kind === 'edit-document'" class="dialog-form document-form" data-testid="knowledge-document-form" @submit.prevent="submitDocument">
+          <label class="field-label" for="document-title"><i>*</i>文档名称</label>
+          <input id="document-title" v-model="name" class="text-field" maxlength="80" placeholder="文档名称" autofocus />
+          <span v-if="duplicateDocument" class="document-name-error" role="alert">同一位置已有同名文档</span>
+          <template v-if="kind === 'document'">
+            <label class="field-label" for="document-destination"><i>*</i>存放至</label>
+            <KnowledgeDestinationSelect id="document-destination" v-model="selectedDocumentTarget" :destinations="uploadDestinations" label="存放至" />
+          </template>
+          <label class="field-label" for="document-content">正文</label>
+          <textarea id="document-content" v-model="documentContent" class="document-body" aria-label="文档正文" />
+          <footer class="dialog-footer">
+            <button class="button secondary" type="button" @click="close">取消</button>
+            <button class="button primary" type="submit" :disabled="!isDocumentValid">{{ kind === 'document' ? '新建' : '保存' }}</button>
           </footer>
         </form>
 
@@ -703,4 +740,5 @@ function canRemoveDirectMember(member: string) {
 .permission-source-badge{flex:none;border-radius:4px;background:#eaf7f2;padding:1px 5px;color:#238466;font-size:11px;line-height:18px}
 .direct-badge{flex:none;border-radius:4px;background:#f3f0ff;padding:1px 5px;color:#6e43d6;font-size:11px;line-height:18px}
 .special-parse-option{display:flex;flex:none;align-items:flex-start;gap:9px;margin-top:12px;border:1px solid #e5e7eb;border-radius:9px;background:#fafafa;padding:10px 12px;cursor:pointer}.special-parse-option>input{width:16px;height:16px;margin:2px 0 0;accent-color:#111}.special-parse-option>span,.special-parse-option strong,.special-parse-option small{display:block}.special-parse-option strong{color:#333;font-size:13px;font-weight:500}.special-parse-option small{margin-top:3px;color:#999;font-size:11px}
+.dialog-surface--document{width:min(680px,calc(100vw - 24px))}.document-form .field-label:not(:first-child){margin-top:18px}.document-name-error{color:#d92d20;font-size:12px}.document-body{box-sizing:border-box;width:100%;min-height:240px;resize:vertical;border:1px solid #dedede;border-radius:7px;padding:12px;outline:none;color:#111;background:#fff;font:14px/1.65 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}.document-body:focus{border-color:#858585;box-shadow:0 0 0 2px rgba(0,0,0,.06)}
 </style>

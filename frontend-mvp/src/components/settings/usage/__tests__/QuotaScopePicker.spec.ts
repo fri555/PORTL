@@ -68,4 +68,36 @@ describe('quota scope picker', () => {
     expect(wrapper.find('[data-testid="scope-picker-selected"]').exists()).toBe(true)
     expect(wrapper.get('[data-testid="scope-picker-selected"]').text()).toContain('已选：1个')
   })
+
+  it('browses department levels with a breadcrumb without selecting the entered department', async () => {
+    await open()
+    expect(wrapper.get('[aria-label="部门路径"]').text()).toBe('全部')
+    expect(wrapper.find('input[value="department:dept-137517219"]').exists()).toBe(true)
+    await wrapper.get('button[aria-label="进入数字技术中心"]').trigger('click')
+    expect(wrapper.get('[aria-label="部门路径"]').text()).toContain('全部')
+    expect(wrapper.get('[aria-label="部门路径"]').text()).toContain('数字技术中心')
+    expect(wrapper.find('input[value="department:dept-861256974"]').exists()).toBe(true)
+    expect(wrapper.get('[aria-label="已选范围"]').text()).toContain('已选：1个')
+
+    await wrapper.get('button[aria-label="进入B2B研发部"]').trigger('click')
+    expect(wrapper.get('[aria-label="部门路径"]').text()).toContain('B2B研发部')
+    await wrapper.get('button[aria-label="返回全部部门"]').trigger('click')
+    expect(wrapper.get('[aria-label="部门路径"]').text()).toBe('全部')
+    expect(wrapper.find('input[value="department:dept-137304912"]').exists()).toBe(true)
+  })
+
+  it('shows people within the current breadcrumb scope and restores all people at the root', async () => {
+    await open()
+    await wrapper.get('button[aria-label="进入数字技术中心"]').trigger('click')
+    await wrapper.get('button[aria-label="进入B2B研发部"]').trigger('click')
+    await wrapper.get('[role="tab"][data-kind="person"]').trigger('click')
+    expect(wrapper.find('input[value="person:user-shuangzi"]').exists()).toBe(true)
+    expect(wrapper.find('input[value="person:user-chaomu"]').exists()).toBe(false)
+    expect(wrapper.find('input[value="person:user-qinghui"]').exists()).toBe(false)
+
+    await wrapper.get('button[aria-label="返回全部部门"]').trigger('click')
+    expect(wrapper.find('input[value="person:user-shuangzi"]').exists()).toBe(true)
+    expect(wrapper.find('input[value="person:user-chaomu"]').exists()).toBe(true)
+    expect(wrapper.find('input[value="person:user-qinghui"]').exists()).toBe(true)
+  })
 })

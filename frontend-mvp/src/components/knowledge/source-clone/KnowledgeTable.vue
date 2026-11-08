@@ -12,7 +12,7 @@ import {
 import type { SourceKnowledgeBase, SourceKnowledgeNode } from '@/types/knowledge-source'
 
 type KnowledgeTarget = SourceKnowledgeBase | SourceKnowledgeNode
-type KnowledgeAction = 'preview' | 'rename' | 'permission' | 'delete'
+type KnowledgeAction = 'preview' | 'edit-document' | 'rename' | 'permission' | 'delete'
 
 const props = withDefaults(
   defineProps<{
@@ -61,7 +61,7 @@ function toggleMenu(event: MouseEvent, item: KnowledgeTarget) {
 
   const trigger = event.currentTarget as HTMLElement
   const rect = trigger.getBoundingClientRect()
-  const menuHeight = 'kind' in item && item.kind === 'file' ? 148 : 116
+  const menuHeight = 'kind' in item && item.kind === 'file' ? item.content !== undefined ? 182 : 148 : 116
   const viewportPadding = 8
   const openAbove = rect.bottom + menuHeight + viewportPadding > window.innerHeight
   menuPlacement.value = openAbove ? 'top' : 'bottom'
@@ -107,7 +107,7 @@ onBeforeUnmount(() => {
   <div class="knowledge-table" :class="{ 'knowledge-table--detail': detail }">
     <div class="knowledge-table__header knowledge-table__grid" data-testid="knowledge-table-header">
       <span>名称</span>
-      <span>创建者</span>
+      <span>所有者</span>
       <button
         v-if="!detail"
         type="button"
@@ -192,6 +192,9 @@ onBeforeUnmount(() => {
             <span v-else-if="node.format" class="knowledge-table__file-format">
               {{ node.format.toUpperCase() }}
             </span>
+            <span v-if="node.kind === 'file' && node.sourceDocumentId" class="knowledge-table__sync-badge" aria-label="钉钉同步文档">
+              同步
+            </span>
             <LockKeyhole
               v-if="lockedIds?.has(node.id)"
               class="knowledge-table__lock"
@@ -222,6 +225,7 @@ onBeforeUnmount(() => {
               >
                 <Eye :size="14" />预览
               </button>
+              <button v-if="node.kind === 'file' && node.content !== undefined" type="button" role="menuitem" :disabled="canAction && !canAction('edit-document', node)" @click="chooseAction($event, 'edit-document', node)">编辑文档</button>
               <button type="button" role="menuitem" :disabled="canAction && !canAction('rename', node)" @click="chooseAction($event, 'rename', node)">重命名</button>
               <button type="button" role="menuitem" :disabled="canAction && !canAction('permission', node)" @click="chooseAction($event, 'permission', node)">权限管理</button>
               <button type="button" role="menuitem" class="knowledge-table__menu-delete" :disabled="canAction && !canAction('delete', node)" :title="canAction && !canAction('delete', node) ? '需要可管理权限' : ''" @click="chooseAction($event, 'delete', node)">删除</button>
@@ -232,7 +236,6 @@ onBeforeUnmount(() => {
         <div v-if="!nodes.length" class="knowledge-table__empty">
           <img :src="emptyIllustration" alt="" />
           <strong>暂无文件</strong>
-          <p>点击右上角上传文件或新建文件夹</p>
         </div>
       </template>
     </div>
@@ -387,6 +390,16 @@ onBeforeUnmount(() => {
   color: #577ba8;
 }
 
+.knowledge-table__sync-badge {
+  flex: 0 0 auto;
+  border-radius: 4px;
+  padding: 1px 5px;
+  background: #edf7f3;
+  color: #338060;
+  font-size: 10px;
+  line-height: 16px;
+}
+
 .knowledge-table__lock {
   flex: 0 0 auto;
   color: #777;
@@ -500,10 +513,4 @@ onBeforeUnmount(() => {
   line-height: 22px;
 }
 
-.knowledge-table__empty p {
-  margin: 4px 0 0;
-  color: #999;
-  font-size: 13px;
-  line-height: 20px;
-}
 </style>
