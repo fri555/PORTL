@@ -51,6 +51,20 @@ describe('DingTalk sync task management', () => {
     expect(wrapper.emitted('edit-task')?.[0]?.[0]).toMatchObject({ importTaskId: 'task-1', destinationId: 'kb1' })
   })
 
+  it('opens the last nonautomatic task menu upward so execute remains visible', async () => {
+    const wrapper = createPanel({ records: [
+      baseTask,
+      { ...baseTask, importTaskId: 'task-2', taskId: '26' },
+      { ...baseTask, importTaskId: 'task-manual', taskId: '27', frequency: '不自动同步', schedule: '—', enabled: false },
+    ] })
+
+    await wrapper.get('button[aria-label="任务27操作菜单"]').trigger('click')
+
+    const menu = wrapper.get('[role="menu"]')
+    expect(menu.text()).toContain('执行')
+    expect(menu.classes()).toContain('open-up')
+  })
+
   it('makes long task values discoverable', () => {
     const destinationPath = '公共空间 / 集团制度知识库 / 人力资源中心 / 规章制度归档'
     const wrapper = createPanel({ records: [{ ...baseTask, destinationPath }] })
