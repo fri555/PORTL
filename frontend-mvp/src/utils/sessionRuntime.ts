@@ -1,11 +1,13 @@
 import { computed, reactive } from 'vue'
-import { readPrototypeChatValue, writePrototypeChatValue } from './prototypeChatStore'
+import { listPrototypeChatSessions, readPrototypeChatValue, writePrototypeChatValue } from './prototypeChatStore'
+import { useTaskCenterStore } from '@/stores/taskCenter'
 
 /**
  * 会话执行运行时（原型级单例）。
  * 支撑「智能体并行开展多个会话」：记录哪些会话正在执行；
  * 组件卸载（用户切走）后由本模块继续倒计时，到点把持久化快照落成 done，
  * 执行结果因此不随页面切换丢失。
+ * 执行中的会话同步登记进全局任务中心（M6 联动），悬浮球角标与任务列表可见。
  */
 
 /** 原型演示的单轮执行时长，与 SourceChatDetail 的 scheduleExecution 保持一致。 */
@@ -33,6 +35,7 @@ export function markSessionRunning(sessionId: string, startedAt: number, opts: {
     finishesAt: startedAt + (opts.durationMs ?? SESSION_EXECUTION_DURATION_MS),
     background: !!opts.background,
   }
+  syncTaskCenter(sessionId, startedAt)
   ensureTicker()
 }
 
@@ -48,9 +51,31 @@ export function markSessionBackground(sessionId: string, startedAt: number, dura
   markSessionRunning(sessionId, startedAt, { background: true, durationMs })
 }
 
-/** 执行结束（完成/停止/取消/失败等）后清除运行时记录。 */
-export function clearSessionRuntime(sessionId: string) {
+/** 执行结束后清除运行时记录；result 传入时同步更新任务中心里的会话任务状态。 */
+export function clearSessionRuntime(sessionId: string, result?: 'success' | 'cancelled' | 'failed') {
   delete state[sessionId]
+  if (result) finishTaskCenterSession(sessionId, result)
+}
+
+// ─── 任务中心联动 ───────────────────────────────────────────────────────────
+
+function sessionTaskName(sessionId: string): string {
+  const session = listPrototypeChatSessions().find(item => item.id === sessionId)
+  const prompt = session?.prompt?.trim()
+  if (prompt) return prompt.length > 24 ? prompt.slice(0, 24) + '…' : prompt
+  return `智能体会话 ${sessionId}`
+}
+
+function syncTaskCenter(sessionId: string, startedAt: number) {
+  try {
+    useTaskCenterStore().registerSessionTask({ sessionId, name: sessionTaskName(sessionId), startedAt })
+  } catch { /* 任务中心不可用时（极端测试环境）不影响会话执行 */ }
+}
+
+function finishTaskCenterSession(sessionId: string, status: 'success' | 'cancelled' | 'failed') {
+  try {
+    useTaskCenterStore().finishSessionTask(sessionId, status)
+  } catch { /* 同上 */ }
 }
 
 let ticker: number | undefined
@@ -73,7 +98,7 @@ function tick() {
   }
 }
 
-/** 后台到点：把持久化快照从 running 落成 done，结果写回原会话。 */
+/** 后台到点：把持久化快照从 running 落成 done，结果写回原会话，并同步任务中心。 */
 function finishBackgroundSession(id: string) {
   const record = state[id]
   const snapshot = readPrototypeChatValue<Record<string, unknown>>('plan:' + id)
@@ -81,4 +106,5 @@ function finishBackgroundSession(id: string) {
     writePrototypeChatValue('plan:' + id, { ...snapshot, status: 'done', finishedAt: record.finishesAt })
   }
   delete state[id]
+  finishTaskCenterSession(id, 'success')
 }

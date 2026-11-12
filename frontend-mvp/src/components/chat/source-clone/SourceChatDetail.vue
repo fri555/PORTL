@@ -423,7 +423,7 @@ function scheduleExecution() {
     executionNow.value = finishesAt
     planStatus.value = 'done'
     finishExecutionClock()
-    clearSessionRuntime(props.sessionId)
+    clearSessionRuntime(props.sessionId, 'success')
   }
   if (Date.now() >= finishesAt) { complete(); return }
   executionClock = window.setInterval(() => { executionNow.value = Date.now() }, 100)
@@ -457,7 +457,7 @@ function stopPlan() {
   finishExecutionClock()
   executionFinishedAt.value = Date.now()
   planStatus.value = 'cancelled'
-  clearSessionRuntime(props.sessionId)
+  clearSessionRuntime(props.sessionId, 'cancelled')
 }
 function confirmAuthorization() {
   if (planStatus.value !== 'awaiting_confirmation') return

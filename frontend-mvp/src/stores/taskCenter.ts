@@ -194,10 +194,53 @@ function createTaskCenterStore() {
     return { ok: true }
   }
 
+  // ── M6 联动：智能体并行会话登记为全局任务 ──────────────────────────────
+  const SESSION_TASK_TYPE = '智能体会话任务'
+  const SESSION_TASK_SOURCE = '首页对话'
+  function sessionTaskId(sessionId: string) { return `session-task:${sessionId}` }
+
+  /** 会话开始（或重新开始）执行时登记/复位一条运行中的会话任务。 */
+  function registerSessionTask(input: { sessionId: string; name: string; startedAt: number }) {
+    const id = sessionTaskId(input.sessionId)
+    const existing = tasks.value.find(item => item.id === id)
+    if (existing) {
+      existing.status = 'running'
+      existing.progress = 0
+      existing.failureReason = undefined
+      existing.deleted = false
+      existing.updatedAt = nowText()
+      return
+    }
+    tasks.value.unshift({
+      id,
+      name: input.name,
+      type: SESSION_TASK_TYPE,
+      sourceModule: SESSION_TASK_SOURCE,
+      sourceLabel: `${SESSION_TASK_SOURCE} · 智能体执行`,
+      sourcePath: `/chat/${input.sessionId}`,
+      sourceAvailable: true,
+      status: 'running',
+      progress: 0,
+      createdAt: nowText(),
+      updatedAt: nowText(),
+    })
+  }
+
+  /** 会话执行结束（完成/停止/失败）时更新对应会话任务状态。 */
+  function finishSessionTask(sessionId: string, status: 'success' | 'cancelled' | 'failed', reason?: string) {
+    const task = tasks.value.find(item => item.id === sessionTaskId(sessionId))
+    if (!task || ['success', 'failed', 'cancelled'].includes(task.status)) return
+    task.status = status
+    task.progress = undefined
+    task.failureReason = status === 'failed' ? (reason ?? '会话执行失败') : undefined
+    task.updatedAt = nowText()
+  }
+
   return {
     tasks, open, filter, visibleTasks, filteredTasks, taskTypes,
     pendingCount, failedCount, badgeCount,
     resetFilter, artifactExpired, terminate, removeTask, downloadArtifact,
+    registerSessionTask, finishSessionTask,
   }
 }
 
