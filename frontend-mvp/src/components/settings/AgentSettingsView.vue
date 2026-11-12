@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, CirclePlus, Copy, FileText, ImageIcon, MoreHorizontal, Plus, Search, Settings2, Trash2, WandSparkles, X } from 'lucide-vue-next'
+import { AlertCircle, Check, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, CirclePlus, Copy, FileText, ImageIcon, MoreHorizontal, Plus, Search, Settings2, Trash2, WandSparkles, X } from 'lucide-vue-next'
 import { createUsageForm, usageContentFromForm, usageFormFromContent, validateUsageForm, validateUsageInstructions, normalizeSystemTags, stripAutomaticSystemTags, USAGE_TEXT_MAX_LENGTH, USAGE_TEMPLATE } from '@/utils/agentUsage'
 import { expertDrafts, getExpertDraft, publishExpertDraft, setExpertStatus, deleteExpert, isExpertDeleted } from '@/utils/expertPrototypeStore'
 import { AGENT_CATEGORY_META, type Agent } from '@/types/agent'
@@ -9,6 +9,8 @@ import { dailyAssistant } from '@/mock/agents'
 import { sourceKnowledgeBases } from '@/mock/knowledge-source'
 import type { SourceKnowledgeBase, SourceKnowledgeNode } from '@/types/knowledge-source'
 import ResourcePermissionDialog, { type PermissionMember } from '@/components/common/ResourcePermissionDialog.vue'
+import { SKILL_DESCRIPTION_MISSING_HINT, useSkillDescription, type SkillInfo } from '@/composables/useSkillDescription'
+import { UPLOAD_FORMAT_OPTIONS, readAllowedFormats, writeAllowedFormats } from '@/utils/uploadFormats'
 
 type AgentStatus = 'active' | 'disabled'
 
@@ -142,6 +144,7 @@ const draft = reactive({
   selectedDocs: [] as string[],
   legacySelectedDocs: [] as string[],
   selectedTools: [] as string[],
+  supportedFileFormats: readAllowedFormats(),
   dailyQuickPrompts: [
     { id: 'qp-1', title: '发消息', content: '给「花名」发条钉钉消息：「内容」' },
     { id: 'qp-2', title: '建待办', content: '给我建个钉钉待办：「标题」「内容」，「时间」前完成' },
@@ -248,6 +251,36 @@ function notify(message: string) {
   toastTimer = setTimeout(() => { toast.value = '' }, 2200)
 }
 
+// ── 技能简介（SKILL.md description）只读 + 启用/发布约束 ─
+const skillStore = useSkillDescription()
+const skillList = skillStore.skills
+const blockedSkills = skillStore.blockedSkills
+const { activationOf, canActivate, setEnabled, setPublished } = skillStore
+const uploadFormatOptions = UPLOAD_FORMAT_OPTIONS
+
+function toggleUploadFormat(value: string) {
+  const list = draft.supportedFileFormats
+  const index = list.indexOf(value)
+  if (index >= 0) {
+    if (list.length === 1) { notify('请至少保留一种允许上传的文件格式'); return }
+    list.splice(index, 1)
+  } else {
+    list.push(value)
+  }
+}
+
+function toggleSkillEnabled(skill: SkillInfo) {
+  const next = !activationOf(skill.id).enabled
+  const error = setEnabled(skill, next)
+  notify(error ?? (next ? `${skill.name} 已启用` : `${skill.name} 已停用`))
+}
+
+function toggleSkillPublished(skill: SkillInfo) {
+  const next = !activationOf(skill.id).published
+  const error = setPublished(skill, next)
+  notify(error ?? (next ? `${skill.name} 已发布` : `${skill.name} 已取消发布`))
+}
+
 function resetDraft() {
   knowledgeSearch.value = ''
   usageError.value = ''
@@ -262,7 +295,7 @@ function resetDraft() {
     applicableDepartments: ['通用'], connectedSystems: [],
     model: '', react: true, chainOfThought: false, historyTurns: 20, compressionThreshold: 3000,
     longTermMemory: false, markdown: true, rolePrompt: defaultPrompt, strictKnowledge: false,
-    monitoring: true, selectedDocs: [], legacySelectedDocs: [], selectedTools: [],
+    monitoring: true, selectedDocs: [], legacySelectedDocs: [], selectedTools: [], supportedFileFormats: readAllowedFormats(),
     dailyQuickPrompts: [
       { id: `qp-${++qpIdSeq}`, title: '发消息', content: '给「花名」发条钉钉消息：「内容」' },
       { id: `qp-${++qpIdSeq}`, title: '建待办', content: '给我建个钉钉待办：「标题」「内容」，「时间」前完成' },
@@ -305,7 +338,8 @@ function openEdit(agent: AgentRow) {
   const selectedIds = [...new Set(existingDraft?.capabilities?.selectedDocumentIds ?? [])]
   const resolvedNames = new Set(selectedIds.map(id => knowledgeDocs.value.find(document => document.id === id)?.name).filter((name): name is string => Boolean(name)))
   const legacyNames = (existingDraft?.capabilities?.selectedDocumentNames ?? []).filter(name => !resolvedNames.has(name))
-  Object.assign(draft, { applicableDepartments: existingDraft?.useDepartments ?? [], connectedSystems: existingDraft?.capabilities?.connectedSystems ?? [], selectedDocs: selectedIds, legacySelectedDocs: legacyNames, selectedTools: existingDraft?.capabilities?.selectedToolNames ?? [] })
+  const savedFormats = existingDraft?.capabilities?.supportedFileFormats
+  Object.assign(draft, { applicableDepartments: existingDraft?.useDepartments ?? [], connectedSystems: existingDraft?.capabilities?.connectedSystems ?? [], selectedDocs: selectedIds, legacySelectedDocs: legacyNames, selectedTools: existingDraft?.capabilities?.selectedToolNames ?? [], supportedFileFormats: savedFormats?.length ? [...savedFormats] : readAllowedFormats() })
   loadUsageForm(draft.usageInstructions, existingDraft ?? undefined)
   formMode.value = 'edit'
   activeStep.value = 1
@@ -407,6 +441,7 @@ function saveAgent() {
       selectedDocumentNames: [...new Set([...draft.legacySelectedDocs, ...draft.selectedDocs.map(id => knowledgeDocs.value.find(document => document.id === id)?.name).filter((name): name is string => Boolean(name))])],
       selectedDocumentIds: [...new Set(draft.selectedDocs)],
       selectedToolNames: [...draft.selectedTools],
+      supportedFileFormats: [...draft.supportedFileFormats],
       internetEnabled: previous && JSON.stringify(normalizeSystemTags(draft.selectedTools).sort()) === JSON.stringify(normalizeSystemTags(previous.capabilities?.selectedToolNames ?? []).sort())
         ? previous.capabilities?.internetEnabled
         : draft.selectedTools.includes('Brave网络搜索'),
@@ -414,6 +449,7 @@ function saveAgent() {
   })
   const error = publishExpertDraft(snapshot)
   if (error) { usageError.value = error; notify(error); return }
+  writeAllowedFormats([...draft.supportedFileFormats])
   if (existing) Object.assign(existing, payload)
   closeForm()
   notify('智能体已保存，专家中心信息已更新')
@@ -629,7 +665,7 @@ function importConfig(event: Event) {
         const current = draft[key]
         if (Array.isArray(current)) {
           if (!Array.isArray(value)) continue
-          if (['connectedSystems', 'applicableDepartments', 'selectedDocs', 'selectedTools'].includes(key) && !value.every(item => typeof item === 'string')) throw new Error('invalid list')
+          if (['connectedSystems', 'applicableDepartments', 'selectedDocs', 'selectedTools', 'supportedFileFormats'].includes(key) && !value.every(item => typeof item === 'string')) throw new Error('invalid list')
           ;(draft as Record<string, unknown>)[key] = value
         } else if (typeof value === typeof current && (typeof value !== 'number' || Number.isFinite(value))) {
           ;(draft as Record<string, unknown>)[key] = value
@@ -916,6 +952,102 @@ function toggleLimited(list: string[], value: string, limit: number) {
               <div class="flex items-center justify-between"><div><h2 class="text-lg font-semibold">工具箱</h2><p class="mt-1 text-xs text-zinc-400">拓展智能体的操作能力</p></div><button type="button" class="inline-flex h-9 items-center gap-2 rounded-lg border border-zinc-200 px-3 text-sm"><Plus class="h-4 w-4" />添加技能</button></div>
               <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><button v-for="tool in tools" :key="tool.name" type="button" class="rounded-xl border p-3 text-left" :class="draft.selectedTools.includes(tool.name) ? 'border-blue-400 bg-blue-50/40' : 'border-zinc-200'" @click="toggleArray(draft.selectedTools, tool.name)"><span class="flex justify-between"><b class="text-sm">{{ tool.name }}</b><input type="checkbox" :checked="draft.selectedTools.includes(tool.name)" tabindex="-1" /></span><small class="mt-1 block text-blue-500">{{ tool.category }}</small><p class="mt-2 line-clamp-2 text-xs text-zinc-400">{{ tool.description }}</p></button></div>
             </section>
+
+            <section class="border-t border-zinc-100 pt-6" data-testid="settings-upload-formats">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h2 class="text-lg font-semibold">允许上传的文件格式</h2>
+                  <p class="mt-1 text-xs text-zinc-400">首页对话仅可上传勾选的格式</p>
+                </div>
+                <span class="text-xs text-zinc-400">已选择 {{ draft.supportedFileFormats.length }}/{{ uploadFormatOptions.length }}</span>
+              </div>
+              <div class="mt-4 flex flex-wrap gap-2">
+                <button
+                  v-for="option in uploadFormatOptions"
+                  :key="option.value"
+                  type="button"
+                  :data-testid="`settings-upload-format-${option.value}`"
+                  :aria-pressed="draft.supportedFileFormats.includes(option.value)"
+                  class="rounded-full border px-3 py-1.5 text-xs transition"
+                  :class="draft.supportedFileFormats.includes(option.value) ? 'border-blue-400 bg-blue-50 text-blue-600' : 'border-zinc-200 text-zinc-500'"
+                  @click="toggleUploadFormat(option.value)"
+                >{{ option.label }}</button>
+              </div>
+              <p class="mt-2 text-[11px] text-zinc-400">至少保留一种格式。</p>
+            </section>
+
+            <section class="border-t border-zinc-100 pt-6" data-testid="settings-skill-section">
+              <div>
+                <h2 class="text-lg font-semibold">技能（Skill）</h2>
+                <p class="mt-1 text-xs text-zinc-400">技能简介来自当前版本 SKILL.md 的 description，只读展示，不允许手动输入；智能体简介仍可编辑</p>
+              </div>
+              <div
+                v-if="blockedSkills.length"
+                role="alert"
+                data-testid="settings-skill-blocked-hint"
+                class="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-700"
+              >
+                <AlertCircle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>有 {{ blockedSkills.length }} 个技能缺少或无法解析 SKILL.md description：允许保存智能体，但这些技能不得启用或发布。{{ SKILL_DESCRIPTION_MISSING_HINT }}。</span>
+              </div>
+              <div class="mt-4 space-y-3">
+                <div
+                  v-for="skill in skillList"
+                  :key="skill.id"
+                  :data-testid="`settings-skill-${skill.id}`"
+                  class="rounded-xl border border-zinc-200 p-4"
+                >
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex min-w-0 items-center gap-2">
+                      <strong class="text-sm font-medium text-zinc-900">{{ skill.name }}</strong>
+                      <span class="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] text-zinc-500">{{ skill.identifier }}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <button
+                        type="button"
+                        role="switch"
+                        :aria-checked="activationOf(skill.id).enabled"
+                        :aria-label="`${skill.name}启用技能`"
+                        :data-testid="`settings-skill-enable-${skill.id}`"
+                        :disabled="!canActivate(skill)"
+                        :title="!canActivate(skill) ? SKILL_DESCRIPTION_MISSING_HINT : '启用 / 停用技能'"
+                        class="relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                        :class="activationOf(skill.id).enabled ? 'bg-[#171717]' : 'bg-zinc-200'"
+                        @click="toggleSkillEnabled(skill)"
+                      ><i class="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all" :class="activationOf(skill.id).enabled ? 'left-[18px]' : 'left-0.5'" /></button>
+                      <span class="text-xs text-zinc-500">启用</span>
+                      <button
+                        type="button"
+                        :data-testid="`settings-skill-publish-${skill.id}`"
+                        :disabled="!canActivate(skill) || !activationOf(skill.id).enabled"
+                        :title="!canActivate(skill) ? SKILL_DESCRIPTION_MISSING_HINT : (!activationOf(skill.id).enabled ? '请先启用该技能' : '发布 / 取消发布技能')"
+                        class="h-8 rounded-lg border px-3 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-40"
+                        :class="activationOf(skill.id).published ? 'border-blue-400 bg-blue-50 text-blue-600' : 'border-zinc-200 text-zinc-600 hover:bg-zinc-50'"
+                        @click="toggleSkillPublished(skill)"
+                      >{{ activationOf(skill.id).published ? '已发布' : '发布' }}</button>
+                    </div>
+                  </div>
+
+                  <div class="mt-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <span class="font-medium text-zinc-600">技能简介 <span class="font-normal text-zinc-400">（只读 · 来源当前版本 SKILL.md）</span></span>
+                      <span v-if="!canActivate(skill)" class="text-amber-600">{{ SKILL_DESCRIPTION_MISSING_HINT }}</span>
+                    </div>
+                    <div
+                      v-if="canActivate(skill)"
+                      :data-testid="`settings-skill-description-${skill.id}`"
+                      class="skill-readonly mt-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm leading-6 text-zinc-700"
+                    >{{ skill.description }}</div>
+                    <div
+                      v-else
+                      :data-testid="`settings-skill-description-${skill.id}`"
+                      class="skill-readonly skill-readonly--missing mt-2 rounded-lg border border-dashed border-amber-300 bg-amber-50/50 px-3 py-2 text-sm text-amber-700"
+                    >{{ SKILL_DESCRIPTION_MISSING_HINT }}</div>
+                    <p v-if="!canActivate(skill)" class="mt-2 text-[11px] text-amber-600">该技能可随智能体保存，但简介缺失 / 解析失败期间不得启用或发布。</p>
+                  </div>
+                </div>
+              </div>
+            </section>
           </div>
 
           <div v-else-if="activeStep === 4" class="min-h-[450px]">
@@ -1092,4 +1224,6 @@ function toggleLimited(list: string[], value: string, limit: number) {
 <style scoped>
 .usage-invalid { border-color: #ef4444 !important; box-shadow: 0 0 0 1px #ef4444 !important; }
 .usage-invalid:deep(.el-input-tag__wrapper) { box-shadow: 0 0 0 1px #ef4444 inset !important; }
+.skill-readonly { cursor: default; user-select: text; }
+.skill-readonly--missing { border-color: #fcd34d !important; }
 </style>

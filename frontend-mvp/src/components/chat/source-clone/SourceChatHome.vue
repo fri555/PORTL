@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
+  AlertCircle,
   ArrowUp,
   BookmarkPlus,
   CalendarPlus,
   CalendarSearch,
   ClipboardCheck,
   Database,
+  Download,
   ExternalLink,
+  FileText,
   Globe2,
   MessageSquareText,
   PackageSearch,
@@ -24,6 +27,9 @@ import { AGENT_CATEGORY_META } from '@/types/agent'
 import { expertAgents as marketAgents } from '@/utils/expertPrototypeStore'
 import QuickPromptPanel from './QuickPromptPanel.vue'
 import ApprovalModeControl, { type ApprovalMode } from './ApprovalModeControl.vue'
+import { setPendingHomeAttachments, type HomeAttachmentMeta } from '@/composables/useHomeAttachments'
+import { readAllowedFormats } from '@/utils/uploadFormats'
+import type { PrototypeChatMode } from '@/utils/prototypeChatStore'
 
 
 interface UserQuickPrompt {
@@ -35,9 +41,12 @@ interface UserQuickPrompt {
 
 const props = defineProps<{ initialAgentId?: string; initialPrompt?: string; initialMode?: string; initialApprovalMode?: ApprovalMode }>()
 const emit = defineEmits<{
-  send: [prompt: string, approvalMode: ApprovalMode]
+  // 第三个参数为可选，无附件时仍只 emit 两个参数，保持向后兼容
+  send: [prompt: string, approvalMode: ApprovalMode, attachments?: HomeAttachmentMeta[]]
   'expert-selected': [id: string]
-  'mode-changed': [mode: 'daily' | 'expert']
+  'mode-changed': [mode: PrototypeChatMode]
+  // 新增的可选 emit：父视图 / 并行任务可按需监听首页附件
+  'home-attachments': [attachments: HomeAttachmentMeta[]]
 }>()
 
 const productionAssets = `${import.meta.env.BASE_URL}assets/production-home`
@@ -45,8 +54,11 @@ const { availableExperts } = { availableExperts: computed(() => marketAgents.fil
 const prompt = homeDraft
 if (props.initialPrompt) prompt.value = props.initialPrompt
 const networkEnabled = ref(true)
-const currentMode = ref<'daily' | 'expert'>(props.initialMode === 'expert' ? 'expert' : 'daily')
-function setMode(mode: 'daily' | 'expert') {
+function initialChatMode(value?: string): PrototypeChatMode {
+  return value === 'expert' || value === 'query' ? value : 'daily'
+}
+const currentMode = ref<PrototypeChatMode>(initialChatMode(props.initialMode))
+function setMode(mode: PrototypeChatMode) {
   currentMode.value = mode
   emit('mode-changed', mode)
 }
@@ -65,6 +77,93 @@ const selectedDepartment = ref('全部')
 const expertQuery = ref('')
 const userQuickPrompts = ref<UserQuickPrompt[]>([])
 const input = ref<HTMLTextAreaElement | null>(null)
+
+// ── 首页对话附件：图片发送前预览 ──
+const attachments = ref<HomeAttachmentMeta[]>([])
+const allowedFormats = ref<string[]>(readAllowedFormats())
+const fileInput = ref<HTMLInputElement | null>(null)
+const lightbox = ref<{ name: string; url: string } | null>(null)
+const uploadHint = ref('')
+let hintTimer: ReturnType<typeof setTimeout> | undefined
+
+const imageExts = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg', 'bmp']
+const acceptAttr = computed(() => allowedFormats.value.map((format) => `.${format}`).join(','))
+
+function showHint(message: string) {
+  uploadHint.value = message
+  if (hintTimer) clearTimeout(hintTimer)
+  hintTimer = setTimeout(() => { uploadHint.value = '' }, 2600)
+}
+function extOf(name: string) { return (name.split('.').pop() ?? '').toLowerCase() }
+function isImageExt(ext: string) { return imageExts.includes(ext) }
+function formatSize(size: number) {
+  if (!size) return '0 B'
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(0)} KB`
+  return `${(size / 1024 / 1024).toFixed(1)} MB`
+}
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result ?? ''))
+    reader.onerror = () => reject(new Error('read failed'))
+    reader.readAsDataURL(file)
+  })
+}
+function makeAttachmentId() {
+  return `att-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+}
+function fileUrl(file: File): string | undefined {
+  try {
+    return typeof URL.createObjectURL === 'function' ? URL.createObjectURL(file) : undefined
+  } catch {
+    return undefined
+  }
+}
+
+async function onFilesPicked(event: Event) {
+  const target = event.target as HTMLInputElement
+  const files = Array.from(target.files ?? [])
+  target.value = ''
+  for (const file of files) {
+    const ext = extOf(file.name)
+    if (!allowedFormats.value.includes(ext)) {
+      showHint(`「${file.name}」不在允许上传的文件格式中，请在智能体「能力扩展」里勾选`)
+      continue
+    }
+    if (attachments.value.some((item) => item.name === file.name)) continue
+    const base = { id: makeAttachmentId(), name: file.name, ext, size: file.size }
+    try {
+      if (isImageExt(ext)) {
+        const dataUrl = await readAsDataUrl(file)
+        attachments.value.push({ ...base, kind: 'image', dataUrl, url: dataUrl })
+      } else {
+        attachments.value.push({ ...base, kind: 'file', url: fileUrl(file) })
+      }
+    } catch {
+      showHint(`「${file.name}」读取失败，请重试`)
+    }
+  }
+}
+
+function removeAttachment(id: string) {
+  const index = attachments.value.findIndex((item) => item.id === id)
+  if (index >= 0) attachments.value.splice(index, 1)
+}
+function openLightbox(att: HomeAttachmentMeta) {
+  const url = att.dataUrl || att.url
+  if (url) lightbox.value = { name: att.name, url }
+}
+function closeLightbox() { lightbox.value = null }
+function onGlobalKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Escape') return
+  if (lightbox.value) lightbox.value = null
+}
+onMounted(() => window.addEventListener('keydown', onGlobalKeydown))
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onGlobalKeydown)
+  if (hintTimer) clearTimeout(hintTimer)
+})
 
 watch(
   () => [props.initialAgentId, props.initialPrompt],
@@ -179,7 +278,18 @@ function pickDailyPrompt(text: string) {
 function send() {
   const value = prompt.value.trim()
   if (!value) return
-  emit('send', value, approvalMode.value)
+  const payload = attachments.value.map((item) => ({ ...item }))
+  if (payload.length) {
+    // 附件元信息落到共享状态，供会话详情页做灯箱与下载原图
+    setPendingHomeAttachments(payload)
+    emit('home-attachments', payload)
+    emit('send', value, approvalMode.value, payload)
+  } else {
+    // 无附件时保持原有两参数 emit，向后兼容
+    emit('send', value, approvalMode.value)
+  }
+  attachments.value = []
+  lightbox.value = null
   prompt.value = ''
 }
 
@@ -227,11 +337,13 @@ function deleteQuickPrompt(id: string) {
         />
       </div>
 
-      <!-- 模式切换胶囊按钮 -->
-      <div class="source-chat-home__modes">
-        <button type="button" :class="{ active: currentMode === 'daily' }" @click="setMode('daily')">日常办公</button>
-        <button type="button" :class="{ active: currentMode === 'expert' }" @click="setMode('expert')">业务专家</button>
+      <!-- 模式切换胶囊按钮：日常办公 / 业务专家 / 智能问数 -->
+      <div class="source-chat-home__modes" :class="{ 'has-hint': currentMode === 'query' }" data-testid="mode-switcher" role="tablist" aria-label="对话模式">
+        <button type="button" role="tab" data-mode="daily" :aria-selected="currentMode === 'daily'" :class="{ active: currentMode === 'daily' }" @click="setMode('daily')">日常办公</button>
+        <button type="button" role="tab" data-mode="expert" :aria-selected="currentMode === 'expert'" :class="{ active: currentMode === 'expert' }" @click="setMode('expert')">业务专家</button>
+        <button type="button" role="tab" data-mode="query" :aria-selected="currentMode === 'query'" :class="{ active: currentMode === 'query' }" @click="setMode('query')">智能问数</button>
       </div>
+      <p v-if="currentMode === 'query'" class="source-chat-home__mode-hint">智能问数 · 直接提问经营指标，返回可下载的数据报表</p>
 
       <div class="source-chat-home__composer" data-testid="hero-composer">
         <ExpertMentionMenu v-if="mentionOpen" id="home-expert-mentions" :experts="mentionResults" :active-index="mentionIndex" :keyword="mentionKeyword" :has-more="mentionHasMore" :total="mentionAllResults.length" @load-more="mention.loadMore" @select="mention.choose" @close="mentionOpen = false" @panel-press="mention.onPanelPress" />
@@ -256,15 +368,64 @@ function deleteQuickPrompt(id: string) {
           @keydown="onKeydown"
         />
         </div>
+        <!-- 附件预览区：图片缩略图（点击放大）/ 其它文件 -->
+        <div v-if="uploadHint" class="source-chat-home__hint" role="status" data-testid="home-upload-hint">
+          <AlertCircle :size="13" />{{ uploadHint }}
+        </div>
+        <div v-if="attachments.length" class="source-chat-home__attachments" data-testid="home-attachment-list">
+          <div
+            v-for="att in attachments"
+            :key="att.id"
+            class="source-chat-home__attachment"
+            :data-testid="`home-attachment-${att.kind}`"
+          >
+            <template v-if="att.kind === 'image'">
+              <button
+                type="button"
+                class="source-chat-home__thumb"
+                :aria-label="`放大图片 ${att.name}`"
+                data-testid="home-image-thumb"
+                @click="openLightbox(att)"
+              ><img :src="att.dataUrl" :alt="att.name" /></button>
+              <span class="source-chat-home__att-name" :title="att.name">{{ att.name }}</span>
+              <span class="source-chat-home__att-size">{{ formatSize(att.size) }}</span>
+            </template>
+            <template v-else>
+              <span class="source-chat-home__att-icon"><FileText :size="14" /></span>
+              <span class="source-chat-home__att-name" :title="att.name">{{ att.name }}</span>
+              <span class="source-chat-home__att-size">{{ formatSize(att.size) }}</span>
+              <a v-if="att.url" class="source-chat-home__att-action" :href="att.url" :download="att.name" aria-label="下载原文件"><Download :size="12" />下载</a>
+            </template>
+            <button
+              type="button"
+              class="source-chat-home__att-remove"
+              :aria-label="`移除附件 ${att.name}`"
+              data-testid="home-attachment-remove"
+              @click="removeAttachment(att.id)"
+            ><X :size="12" /></button>
+          </div>
+        </div>
         <div class="source-chat-home__toolbar">
           <button
             type="button"
             class="source-chat-home__icon-button"
             title="添加参考文件"
             aria-label="添加参考文件"
+            data-testid="home-add-reference-file"
+            @click="fileInput?.click()"
           >
             <Plus :size="19" />
           </button>
+          <input
+            ref="fileInput"
+            class="source-chat-home__file-input"
+            type="file"
+            multiple
+            :accept="acceptAttr"
+            data-testid="home-file-input"
+            aria-label="选择参考文件"
+            @change="onFilesPicked"
+          />
           <ApprovalModeControl v-if="currentMode === 'expert'" v-model="approvalMode" />
           <button
             type="button"
@@ -422,6 +583,21 @@ function deleteQuickPrompt(id: string) {
         >{{ shortcut }}<ExternalLink :size="12" /></button>
       </div>
     </div>
+
+    <!-- 图片发送前预览灯箱：仅点击缩略图打开，不提供鼠标悬浮大图 -->
+    <div
+      v-if="lightbox"
+      class="source-chat-home__lightbox"
+      role="dialog"
+      aria-modal="true"
+      aria-label="图片预览"
+      data-testid="home-image-lightbox"
+      @click.self="closeLightbox"
+    >
+      <button type="button" class="source-chat-home__lightbox-close" aria-label="关闭图片预览" @click="closeLightbox"><X :size="22" /></button>
+      <img :src="lightbox.url" :alt="lightbox.name" data-testid="home-image-lightbox-img" />
+      <span class="source-chat-home__lightbox-caption">{{ lightbox.name }}</span>
+    </div>
   </section>
 </template>
 
@@ -474,20 +650,30 @@ function deleteQuickPrompt(id: string) {
 
 .source-chat-home__modes {
   display: flex;
-  width: 206px;
+  width: max-content;
+  min-width: 206px;
   height: 38px;
   box-sizing: border-box;
   align-items: center;
   gap: 2px;
   margin: 6px auto 64px;
   border-radius: 24px;
-  padding: 3px;
+  padding: 3px 5px;
   background: #f7f7f9;
+}
+
+.source-chat-home__modes.has-hint { margin-bottom: 10px; }
+.source-chat-home__mode-hint {
+  margin: 0 auto 64px;
+  color: #8a9099;
+  font-size: 12px;
+  text-align: center;
 }
 
 .source-chat-home__modes button {
   height: 32px;
-  flex: 1;
+  flex: 0 0 auto;
+  padding: 0 16px;
   border: 0;
   border-radius: 18px;
   background: transparent;
@@ -513,7 +699,8 @@ function deleteQuickPrompt(id: string) {
   top: 0;
   z-index: 20;
   box-sizing: border-box;
-  height: 150px;
+  min-height: 150px;
+  height: auto;
   border: 1px solid #dedede;
   border-radius: 16px;
   padding: 11px 12px;
@@ -1050,7 +1237,155 @@ function deleteQuickPrompt(id: string) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-.source-chat-home__selected-chip button{display:grid;place-items:center;border:0;background:transparent;color:inherit;cursor:pointer;padding:2px}.source-chat-home__expert-empty p{color:#7b8592;font-size:13px}.source-chat-home__expert-grid button:disabled{opacity:.55;cursor:not-allowed}</style>
+.source-chat-home__selected-chip button{display:grid;place-items:center;border:0;background:transparent;color:inherit;cursor:pointer;padding:2px}.source-chat-home__expert-empty p{color:#7b8592;font-size:13px}.source-chat-home__expert-grid button:disabled{opacity:.55;cursor:not-allowed}
+
+/* 首页对话附件：图片缩略图 / 灯箱 */
+.source-chat-home__file-input { display: none; }
+
+.source-chat-home__hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 3px 0;
+  color: #c0392b;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.source-chat-home__attachments {
+  display: flex;
+  max-height: 116px;
+  flex-wrap: wrap;
+  gap: 6px;
+  overflow-y: auto;
+  margin: 4px 0 2px;
+  padding: 2px 0;
+}
+
+.source-chat-home__attachment {
+  display: flex;
+  height: 44px;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #ededed;
+  border-radius: 10px;
+  padding: 0 6px 0 4px;
+  background: #fafafa;
+  font-size: 11px;
+}
+
+.source-chat-home__thumb {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  place-items: center;
+  overflow: hidden;
+  border: 0;
+  border-radius: 7px;
+  padding: 0;
+  background: #eee;
+  cursor: pointer;
+}
+
+.source-chat-home__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.source-chat-home__att-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  place-items: center;
+  border-radius: 7px;
+  background: #eef4ff;
+  color: #376fd0;
+}
+
+.source-chat-home__att-name {
+  max-width: 150px;
+  overflow: hidden;
+  color: #333;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source-chat-home__att-size { flex: 0 0 auto; color: #a1a1aa; }
+
+.source-chat-home__att-action {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 3px;
+  border: 1px solid #dbe7f8;
+  border-radius: 6px;
+  padding: 3px 7px;
+  background: #fff;
+  color: #246ec9;
+  font: inherit;
+  font-size: 11px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.source-chat-home__att-action:hover { background: #eef5ff; }
+
+.source-chat-home__att-remove {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #999;
+  cursor: pointer;
+}
+
+.source-chat-home__att-remove:hover { background: #eee; color: #333; }
+
+.source-chat-home__lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: rgba(17, 17, 17, 0.78);
+}
+
+.source-chat-home__lightbox img {
+  max-width: 86vw;
+  max-height: 78vh;
+  border-radius: 8px;
+  background: #fff;
+  object-fit: contain;
+}
+
+.source-chat-home__lightbox-caption { color: #fff; font-size: 13px; }
+
+.source-chat-home__lightbox-close {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  cursor: pointer;
+}
+</style>
 
 
 

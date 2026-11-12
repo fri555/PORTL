@@ -4,8 +4,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { Toaster, toast } from 'vue-sonner'
 import { listVideoTasks, startPrototypeVideoQueue } from '@/composables/useVideoPrototype'
 import AppHeader from '@/components/common/AppHeader.vue'
+import TaskCenterFloat from '@/components/task-center/TaskCenterFloat.vue'
+import { useAppStore } from '@/stores/app'
 
 const route = useRoute()
+const appStore = useAppStore()
 const router = useRouter()
 let stopQueue: (() => void) | undefined
 function completed(event: Event) {
@@ -25,6 +28,7 @@ const showLayout = computed(() => !route.path.startsWith('/auth'))
     <main class="flex-1">
       <router-view />
     </main>
+    <TaskCenterFloat v-if="appStore.user" />
   </div>
   <router-view v-else />
 </template>

@@ -3,12 +3,14 @@
  * Production must load the immutable conversation mode and plan state from the authenticated service.
  */
 export type PrototypeApprovalMode = 'default' | 'autonomous'
+/** 首页三种对话模式：日常办公 / 业务专家 / 智能问数。 */
+export type PrototypeChatMode = 'daily' | 'expert' | 'query'
 export interface PrototypeChatSession {
   id: string
   approvalMode: PrototypeApprovalMode
   agentId: string
   prompt: string
-  mode: 'daily' | 'expert'
+  mode: PrototypeChatMode
   timestamp: string
   createdLocally: boolean
 }
@@ -42,7 +44,7 @@ export function listPrototypeChatSessions(): PrototypeChatSession[] {
     !!record && typeof record === 'object' && typeof record.id === 'string'
     && (record.approvalMode === 'default' || record.approvalMode === 'autonomous')
     && typeof record.agentId === 'string' && typeof record.prompt === 'string'
-    && (record.mode === 'daily' || record.mode === 'expert')
+    && (record.mode === 'daily' || record.mode === 'expert' || record.mode === 'query')
     && typeof record.timestamp === 'string' && typeof record.createdLocally === 'boolean',
   )
 }

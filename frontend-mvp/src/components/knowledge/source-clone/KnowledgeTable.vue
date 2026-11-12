@@ -21,14 +21,20 @@ const props = withDefaults(
     nodes?: SourceKnowledgeNode[]
     lockedIds?: Set<string>
     canAction?: (action: KnowledgeAction, target: KnowledgeTarget) => boolean
+    selectedIds?: Set<string>
   }>(),
-  { detail: null, nodes: () => [] },
+  { detail: null, nodes: () => [], selectedIds: () => new Set<string>() },
 )
 
 const emit = defineEmits<{
   select: [item: SourceKnowledgeBase]
   'navigate-node': [node: SourceKnowledgeNode]
   action: [payload: { kind: KnowledgeAction; target: KnowledgeTarget }]
+  'toggle-select': [id: string]
+  'toggle-all': [ids: string[], checked: boolean]
+  move: []
+  'batch-delete': []
+  'clear-selection': []
 }>()
 
 const openMenuId = ref<string | null>(null)
@@ -50,6 +56,33 @@ const visibleItems = computed(() => {
 
 function toggleSort() {
   sortDirection.value = sortDirection.value === 'desc' ? 'asc' : 'desc'
+}
+
+// ─── 多选（跨位置保留本批选择，由父视图持有选中集合） ────────────────────────
+const currentIds = computed(() =>
+  props.detail ? props.nodes.map((node) => node.id) : visibleItems.value.map((item) => item.id),
+)
+const visibleSelectedCount = computed(
+  () => currentIds.value.filter((id) => props.selectedIds.has(id)).length,
+)
+const allVisibleSelected = computed(
+  () => currentIds.value.length > 0 && visibleSelectedCount.value === currentIds.value.length,
+)
+const partiallySelected = computed(
+  () => visibleSelectedCount.value > 0 && !allVisibleSelected.value,
+)
+const hasOtherLocationSelection = computed(
+  () => props.selectedIds.size > visibleSelectedCount.value,
+)
+function isSelected(id: string) {
+  return props.selectedIds.has(id)
+}
+function toggleAll() {
+  emit('toggle-all', currentIds.value, !allVisibleSelected.value)
+}
+/** checkbox 的点击/按键不应冒泡触发整行的进入或导航 */
+function stopPropagation(event: Event) {
+  event.stopPropagation()
 }
 
 function toggleMenu(event: MouseEvent, item: KnowledgeTarget) {
@@ -105,8 +138,30 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="knowledge-table" :class="{ 'knowledge-table--detail': detail }">
+    <div v-if="selectedIds.size" class="knowledge-table__batch" data-testid="knowledge-batch-bar">
+      <span class="knowledge-table__batch-count">
+        已选 <strong>{{ selectedIds.size }}</strong> 项
+        <small v-if="hasOtherLocationSelection">（含本次会话其它位置的已选项）</small>
+      </span>
+      <div class="knowledge-table__batch-actions">
+        <button type="button" class="knowledge-table__batch-button" aria-label="批量移动" @click="emit('move')">移动</button>
+        <button type="button" class="knowledge-table__batch-button danger" aria-label="批量删除" @click="emit('batch-delete')">批量删除</button>
+        <button type="button" class="knowledge-table__batch-button ghost" aria-label="取消选择" @click="emit('clear-selection')">取消选择</button>
+      </div>
+    </div>
     <div class="knowledge-table__header knowledge-table__grid" data-testid="knowledge-table-header">
-      <span>名称</span>
+      <span class="knowledge-table__heading-cell">
+        <input
+          type="checkbox"
+          class="knowledge-table__checkbox"
+          aria-label="全选"
+          :checked="allVisibleSelected"
+          :indeterminate.prop="partiallySelected"
+          @change="toggleAll"
+          @click="stopPropagation"
+        />
+        <span>名称</span>
+      </span>
       <span>所有者</span>
       <button
         v-if="!detail"
@@ -138,6 +193,15 @@ onBeforeUnmount(() => {
           @keydown.space.prevent="emit('select', item)"
         >
           <span class="knowledge-table__name">
+            <input
+              type="checkbox"
+              class="knowledge-table__checkbox"
+              :aria-label="`选择${item.name}`"
+              :checked="isSelected(item.id)"
+              @change="emit('toggle-select', item.id)"
+              @click="stopPropagation"
+              @keydown="stopPropagation"
+            />
             <img class="knowledge-table__book" :src="bookIcon" alt="" />
             <span class="knowledge-table__ellipsis">{{ item.name }}</span>
             <LockKeyhole v-if="lockedIds?.has(item.id)" class="knowledge-table__lock" :size="14" aria-label="已单独设置权限" />
@@ -178,6 +242,15 @@ onBeforeUnmount(() => {
           @keydown.space.prevent="navigateNode(node)"
         >
           <span class="knowledge-table__name">
+            <input
+              type="checkbox"
+              class="knowledge-table__checkbox"
+              :aria-label="`选择${node.name}`"
+              :checked="isSelected(node.id)"
+              @change="emit('toggle-select', node.id)"
+              @click="stopPropagation"
+              @keydown="stopPropagation"
+            />
             <span
               class="knowledge-table__node-icon"
               :class="node.kind === 'folder' ? 'is-folder' : 'is-file'"
@@ -513,4 +586,84 @@ onBeforeUnmount(() => {
   line-height: 22px;
 }
 
+.knowledge-table__empty p {
+  margin: 4px 0 0;
+  color: #999;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+/* ─── 多选与批量工具栏 ─── */
+.knowledge-table__batch {
+  display: flex;
+  flex: 0 0 auto;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 8px;
+  padding: 0 12px;
+  border: 1px solid #dbe6ff;
+  border-radius: 10px;
+  background: #f3f7ff;
+  font-size: 13px;
+}
+.knowledge-table__batch-count {
+  color: #333;
+}
+.knowledge-table__batch-count strong {
+  color: #1677ff;
+  font-size: 14px;
+}
+.knowledge-table__batch-count small {
+  margin-left: 6px;
+  color: #8a94a6;
+}
+.knowledge-table__batch-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.knowledge-table__batch-button {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid #1677ff;
+  border-radius: 7px;
+  background: #1677ff;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+.knowledge-table__batch-button:hover {
+  background: #0f5fd6;
+}
+.knowledge-table__batch-button.danger {
+  border-color: #f0c2c4;
+  background: #fff;
+  color: #d92d20;
+}
+.knowledge-table__batch-button.danger:hover {
+  background: #fff1f0;
+}
+.knowledge-table__batch-button.ghost {
+  border-color: #dcdfe5;
+  background: #fff;
+  color: #555;
+}
+.knowledge-table__batch-button.ghost:hover {
+  background: #f5f6f8;
+}
+.knowledge-table__heading-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.knowledge-table__checkbox {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  margin: 0;
+  accent-color: #111;
+  cursor: pointer;
+}
 </style>

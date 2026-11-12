@@ -9,8 +9,10 @@ import { X } from 'lucide-vue-next'
 import SourceChatSidebar from '@/components/chat/source-clone/SourceChatSidebar.vue'
 import SourceChatHome from '@/components/chat/source-clone/SourceChatHome.vue'
 import SourceChatDetail from '@/components/chat/source-clone/SourceChatDetail.vue'
+import ProjectDetailPanel from '@/components/chat/source-clone/ProjectDetailPanel.vue'
 import ConversationSearchDialog from '@/components/chat/source-clone/ConversationSearchDialog.vue'
-import { listPrototypeChatSessions, rememberPrototypeChatSession, removePrototypeChatSession, type PrototypeChatSession } from '@/utils/prototypeChatStore'
+import { useProjectsStore } from '@/stores/projects'
+import { listPrototypeChatSessions, rememberPrototypeChatSession, removePrototypeChatSession, type PrototypeChatSession, type PrototypeChatMode } from '@/utils/prototypeChatStore'
 
 const route = useRoute()
 const sidebar = ref<InstanceType<typeof SourceChatSidebar> | null>(null)
@@ -22,10 +24,18 @@ const searchOpen = ref(false)
 const renameSessionId = ref('')
 const renameValue = ref('')
 const deleteSessionId = ref('')
-const activeMode = ref<'daily' | 'expert'>('daily')
+const activeMode = ref<PrototypeChatMode>('daily')
 const activeExpertId = ref('')
 const sessionId = computed(() => String(route.params.sessionId ?? ''))
+const projectId = computed(() => String(route.query.project ?? ''))
+const isProjectView = computed(() => Boolean(projectId.value))
 const isDetail = computed(() => Boolean(sessionId.value))
+const projectsStore = useProjectsStore()
+const newProjectOpen = ref(false)
+const newProjectName = ref('')
+const assignSessionId = ref('')
+const assignProjectId = ref('')
+const deleteProjectTarget = ref('')
 const currentSession = ref<PrototypeChatSession | null>(null)
 const localSessions = ref(listPrototypeChatSessions())
 const currentApprovalMode = computed(() => currentSession.value?.approvalMode ?? 'default')
@@ -67,7 +77,7 @@ async function handleHomeSend(prompt: string, approvalMode: 'default' | 'autonom
   try {
     rememberPrototypeChatSession({
       id, prompt, approvalMode, agentId: sentExpertId,
-      mode: expert ? 'expert' : 'daily', timestamp: nowLabel(), createdLocally: true,
+      mode: activeMode.value, timestamp: nowLabel(), createdLocally: true,
     })
     localSessions.value = listPrototypeChatSessions()
     const failure = await router.push({ path: '/chat/' + id })
@@ -92,6 +102,45 @@ function newChat() {
 }
 function openFiles() {
   router.push('/files')
+}
+function createProject() {
+  const name = newProjectName.value.trim()
+  if (!name) return
+  const project = projectsStore.createProject(name)
+  newProjectOpen.value = false
+  newProjectName.value = ''
+  router.push({ path: '/chat', query: { project: project.id } })
+}
+function openProject(id: string) {
+  shareOpen.value = false
+  router.push({ path: '/chat', query: { project: id } })
+}
+function closeProject() { router.push('/chat') }
+function openAssign(id: string) {
+  assignSessionId.value = id
+  assignProjectId.value = projectsStore.projectOfSession(id)?.id ?? projectsStore.projectList[0]?.id ?? ''
+}
+function applyAssign() {
+  if (!assignSessionId.value) return
+  if (assignProjectId.value) projectsStore.addSessionToProject(assignSessionId.value, assignProjectId.value)
+  else projectsStore.removeSessionFromProject(assignSessionId.value)
+  assignSessionId.value = ''
+}
+function newSessionInProject(id: string) {
+  const sessionKey = 'project-chat-' + Date.now().toString(36)
+  rememberPrototypeChatSession({
+    id: sessionKey, prompt: '项目内新建对话', approvalMode: 'default',
+    agentId: '', mode: 'daily', timestamp: nowLabel(), createdLocally: true,
+  })
+  projectsStore.addSessionToProject(sessionKey, id)
+  localSessions.value = listPrototypeChatSessions()
+  router.push('/chat/' + sessionKey)
+}
+function askDeleteProject(id: string) { deleteProjectTarget.value = id }
+function confirmDeleteProject() {
+  projectsStore.removeProject(deleteProjectTarget.value)
+  deleteProjectTarget.value = ''
+  router.push('/chat')
 }
 function openRename(id: string) {
   renameSessionId.value = id
@@ -176,10 +225,14 @@ onBeforeUnmount(() => { copyAttempt++; window.removeEventListener('tianma:chat-a
       ref="sidebar"
       v-show="sidebarOpen"
       :active-session-id="sessionId"
+      :active-project-id="projectId"
       :additional-sessions="localSessions.filter(item => item.createdLocally).map(item => ({ id: item.id, title: item.prompt, timestamp: item.timestamp, mode: item.mode }))"
       @collapse="sidebarOpen = false"
       @search="searchOpen = true"
       @new-chat="newChat"
+      @new-project="newProjectOpen = true"
+      @open-project="openProject"
+      @assign-session="openAssign"
       @open-session="openSession"
       @open-files="openFiles"
       @share-session="
@@ -192,8 +245,17 @@ onBeforeUnmount(() => { copyAttempt++; window.removeEventListener('tianma:chat-a
       @delete-session="(id) => (deleteSessionId = id)"
     />
     <section class="source-chat-main" :class="{ 'source-chat-main--full': !sidebarOpen }">
+      <ProjectDetailPanel
+        v-if="isProjectView"
+        :key="projectId"
+        :project-id="projectId"
+        @close="closeProject"
+        @open-session="openSession"
+        @new-session="newSessionInProject"
+        @delete-project="askDeleteProject"
+      />
       <SourceChatHome
-        v-if="!isDetail"
+        v-else-if="!isDetail"
         :key="'home-' + route.fullPath"
         :initial-mode="String(route.query.mode ?? '')"
         :initial-agent-id="String(route.query.agent ?? '')"
@@ -203,7 +265,7 @@ onBeforeUnmount(() => { copyAttempt++; window.removeEventListener('tianma:chat-a
         @mode-changed="
           (mode) => {
             activeMode = mode
-            if (mode === 'daily') activeExpertId = ''
+            if (mode !== 'expert') activeExpertId = ''
           }
         "
         @expert-selected="(id) => (activeExpertId = id)"
@@ -232,6 +294,29 @@ onBeforeUnmount(() => { copyAttempt++; window.removeEventListener('tianma:chat-a
         @close="searchOpen = false"
         @open="openSearchResult"
       />
+      <div v-if="newProjectOpen" class="chat-dialog-overlay" @mousedown.self="newProjectOpen = false">
+        <section class="action-dialog" role="dialog" aria-modal="true" aria-label="新建项目">
+          <header><strong>新建项目</strong><button type="button" aria-label="关闭" @click="newProjectOpen = false"><X :size="18" /></button></header>
+          <label class="dialog-field"><span>项目名称</span><input v-model="newProjectName" autofocus placeholder="例如：耶运动旗舰店经营分析" aria-label="项目名称" @keyup.enter="createProject" /></label>
+          <p class="dialog-hint">一个项目可以放多个对话，这些对话共用同一批文件。</p>
+          <footer><button type="button" @click="newProjectOpen = false">取消</button><button class="primary" type="button" :disabled="!newProjectName.trim()" @click="createProject">创建</button></footer>
+        </section>
+      </div>
+      <div v-if="assignSessionId" class="chat-dialog-overlay" @mousedown.self="assignSessionId = ''">
+        <section class="action-dialog" role="dialog" aria-modal="true" aria-label="设置会话归属">
+          <header><strong>移入项目</strong><button type="button" aria-label="关闭" @click="assignSessionId = ''"><X :size="18" /></button></header>
+          <p class="dialog-hint">移入后，这个会话能看到并使用该项目下的共享文件；移出后不再共享。</p>
+          <label class="dialog-field"><span>归属项目</span><select v-model="assignProjectId" aria-label="选择归属项目"><option value="">不归属任何项目（移出）</option><option v-for="item in projectsStore.projectList" :key="item.id" :value="item.id">{{ item.name }}</option></select></label>
+          <footer><button type="button" @click="assignSessionId = ''">取消</button><button class="primary" type="button" @click="applyAssign">确定</button></footer>
+        </section>
+      </div>
+      <div v-if="deleteProjectTarget" class="chat-dialog-overlay" @mousedown.self="deleteProjectTarget = ''">
+        <section class="action-dialog" role="alertdialog" aria-modal="true" aria-label="删除项目确认">
+          <header><strong>删除项目</strong><button type="button" aria-label="关闭" @click="deleteProjectTarget = ''"><X :size="18" /></button></header>
+          <p>删除后只解除组织关系，项目内的对话和共享文件会保留。确定删除吗？</p>
+          <footer><button type="button" @click="deleteProjectTarget = ''">取消</button><button class="danger" type="button" @click="confirmDeleteProject">删除项目</button></footer>
+        </section>
+      </div>
       <div
         v-if="copyFallbackOpen"
         class="chat-dialog-overlay"
@@ -499,5 +584,11 @@ onBeforeUnmount(() => { copyAttempt++; window.removeEventListener('tianma:chat-a
   background: #df342e;
   color: #fff;
 }
+
+/* 项目模式弹窗 */
+.dialog-field { display: grid; gap: 6px; margin: 14px 0; }
+.dialog-field span { color: #8a9099; font-size: 12px; }
+.dialog-field input, .dialog-field select { box-sizing: border-box; width: 100%; height: 34px; padding: 0 10px; border: 1px solid #dfe2e7; border-radius: 8px; color: #333; background: #fff; font-size: 13px; }
+.dialog-hint { margin: 12px 0; color: #8a9099; font-size: 12px; line-height: 19px; }
 </style>
 

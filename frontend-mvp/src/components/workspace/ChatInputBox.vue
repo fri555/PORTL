@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useChatController, type RunMode } from '@/composables/useWorkspaceChat'
+import type { ChatAttachment } from '@/composables/useAIChat'
 import {
   AlertCircle, Check, ChevronDown, FileText, Globe,
-  Plus, SendHorizontal, Square, User, X, Zap,
+  Image as ImageIcon, Plus, SendHorizontal, Square, User, X, Zap,
 } from 'lucide-vue-next'
 
 const chat = useChatController()
@@ -91,6 +92,48 @@ function formatSize(bytes?: number) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
+
+// ── 图片附件发送前预览：缩略图（点击放大）/ 可移除，不提供鼠标悬浮大图 ──
+type AttachmentWithImage = ChatAttachment & { dataUrl?: string; url?: string }
+
+const imageInput = ref<HTMLInputElement | null>(null)
+const lightbox = ref<{ name: string; url: string } | null>(null)
+
+function imageUrl(att: ChatAttachment): string {
+  const extra = att as AttachmentWithImage
+  return extra.dataUrl || extra.url || ''
+}
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result ?? ''))
+    reader.onerror = () => reject(new Error('read failed'))
+    reader.readAsDataURL(file)
+  })
+}
+async function onImagePicked(event: Event) {
+  const target = event.target as HTMLInputElement
+  const files = Array.from(target.files ?? [])
+  target.value = ''
+  for (const file of files) {
+    if (!/^image\//.test(file.type)) continue
+    try {
+      const dataUrl = await readAsDataUrl(file)
+      const ext = (file.name.split('.').pop() || 'png').toLowerCase()
+      // 复用现有 attachedFiles 状态；dataUrl 作为附件信息随发送带出
+      const attachment: AttachmentWithImage = { name: file.name, ext, size: file.size, dataUrl }
+      chat.addAttachedFile(attachment)
+    } catch {
+      // 单张图片读取失败时忽略，不影响其它附件
+    }
+  }
+}
+function onAttachmentClick(att: ChatAttachment) {
+  const url = imageUrl(att)
+  if (url) { lightbox.value = { name: att.name, url }; return }
+  if (att.ext === 'txt') chat.openTextPreview({ name: att.name, size: att.size })
+}
+function closeLightbox() { lightbox.value = null }
 </script>
 
 <template>
@@ -124,9 +167,10 @@ function formatSize(bytes?: number) {
           v-for="(att, i) in chat.attachedFiles.value"
           :key="i"
           class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-zinc-200 bg-zinc-50 py-1 pl-2 pr-1 text-xs transition hover:border-zinc-300"
-          @click="att.ext === 'txt' ? chat.openTextPreview({ name: att.name, size: att.size }) : null"
+          @click="onAttachmentClick(att)"
         >
-          <FileText class="h-3.5 w-3.5 shrink-0" :class="fileIconColor(att.ext)" />
+          <img v-if="imageUrl(att)" :src="imageUrl(att)" :alt="att.name" class="chat-image-thumb" data-testid="chat-image-thumb" />
+          <FileText v-else class="h-3.5 w-3.5 shrink-0" :class="fileIconColor(att.ext)" />
           <span class="max-w-[160px] truncate font-medium text-zinc-700">{{ att.name }}</span>
           <span v-if="att.size" class="shrink-0 text-[10px] text-zinc-400">{{ formatSize(att.size) }}</span>
           <button type="button" class="flex h-4 w-4 items-center justify-center rounded text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700" @click.stop="chat.removeAttachedFile(i)">
@@ -157,6 +201,10 @@ function formatSize(bytes?: number) {
         <button type="button" class="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-600 transition hover:bg-zinc-50" aria-label="添加附件" @click="chat.openUploadModal()">
           <Plus class="h-4 w-4" />
         </button>
+        <button type="button" class="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-600 transition hover:bg-zinc-50" aria-label="添加图片" title="添加图片（发送前可预览）" data-testid="chat-add-image" @click="imageInput?.click()">
+          <ImageIcon class="h-4 w-4" />
+        </button>
+        <input ref="imageInput" class="hidden" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" multiple aria-label="选择图片" @change="onImagePicked" />
 
         <!-- 模式切换按钮 -->
         <div class="relative" data-mode-menu @focusout="onModeBlur">
@@ -239,5 +287,62 @@ function formatSize(bytes?: number) {
         {{ prompt }}
       </button>
     </div>
+
+    <!-- 图片发送前预览灯箱：仅点击缩略图打开，不提供鼠标悬浮大图 -->
+    <div v-if="lightbox" class="chat-image-lightbox" role="dialog" aria-modal="true" aria-label="图片预览" data-testid="chat-image-lightbox" @click.self="closeLightbox">
+      <button type="button" class="chat-image-lightbox__close" aria-label="关闭图片预览" @click="closeLightbox"><X class="h-5 w-5" /></button>
+      <img :src="lightbox.url" :alt="lightbox.name" data-testid="chat-image-lightbox-img" />
+      <span class="chat-image-lightbox__caption">{{ lightbox.name }}</span>
+    </div>
   </div>
 </template>
+
+<style scoped>
+.chat-image-thumb {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.chat-image-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: rgba(17, 17, 17, 0.78);
+}
+
+.chat-image-lightbox img {
+  max-width: 86vw;
+  max-height: 78vh;
+  border-radius: 8px;
+  background: #fff;
+  object-fit: contain;
+}
+
+.chat-image-lightbox__caption {
+  color: #fff;
+  font-size: 13px;
+}
+
+.chat-image-lightbox__close {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  cursor: pointer;
+}
+</style>

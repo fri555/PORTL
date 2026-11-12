@@ -11,6 +11,8 @@ import KnowledgeTable from '@/components/knowledge/source-clone/KnowledgeTable.v
 import KnowledgeDownloadAction from '@/components/knowledge/source-clone/KnowledgeDownloadAction.vue'
 import KnowledgeAccessPanel from '@/components/knowledge/source-clone/KnowledgeAccessPanel.vue'
 import DingTalkDocumentImport from '@/components/knowledge/source-clone/DingTalkDocumentImport.vue'
+import MoveFilesDialog from '@/components/knowledge/source-clone/MoveFilesDialog.vue'
+import BatchMoveResultDialog from '@/components/knowledge/source-clone/BatchMoveResultDialog.vue'
 import { boundDingTalkIdentity, getPrototypeScenario, personalDingTalkDocuments, prototypeCanWriteKnowledge, type ImportableDocument } from '@/components/knowledge/source-clone/dingtalkPrototype'
 import { dingTalkImportTaskFixtures, scopedDingTalkImportTasks } from '@/mock/dingtalk-import-tasks'
 import { expertAgents } from '@/utils/expertPrototypeStore'
@@ -34,6 +36,7 @@ import { applyKnowledgeOwnershipTransfer } from '@/utils/knowledgeOwnership'
 import type { KnowledgeOwnershipTransfer } from '@/types/knowledge-source'
 import { toast } from 'vue-sonner'
 import { useModuleSidebar } from '@/composables/useModuleSidebar'
+import { useKnowledgeMove, type MoveRequest, type MoveResult } from '@/composables/useKnowledgeMove'
 
 const knowledgeItemsStoreKey = 'tianma.prototype.knowledge-items.v2'
 function loadKnowledgeItems(): SourceKnowledgeBase[] {
@@ -57,6 +60,87 @@ const roleValues: KnowledgeRole[] = ['OWNER', 'MANAGER', 'EDITOR', 'DOWNLOADER',
 const prototypeRole = computed<KnowledgeRole>(() => roleValues.includes(route?.query.permissionRole as KnowledgeRole) ? route.query.permissionRole as KnowledgeRole : appStore?.user?.role === 'admin' ? 'OWNER' : 'DOWNLOADER')
 const systemKnowledgeAdmin = computed(() => !route?.query.permissionRole && appStore?.user?.role === 'admin')
 const appStore = getActivePinia() ? useAppStore() : null
+
+// ─── PRD M4：移动文件与批量操作 ───
+const move = useKnowledgeMove({ items, roleOf: effectiveResourceRole })
+const { selectedIds, moveTargets, forbiddenIds, selectedTargets } = move
+const moveDialogOpen = ref(false)
+const batchDeleteConfirmOpen = ref(false)
+const resultOpen = ref(false)
+const resultTitle = ref('移动结果')
+const resultTargetName = ref('')
+const resultKind = ref<'move' | 'delete'>('move')
+const batchResults = ref<MoveResult[]>([])
+const lastMoveRequest = ref<MoveRequest | null>(null)
+
+function toggleSelect(id: string) {
+  move.toggleSelect(id)
+}
+function toggleAll(ids: string[], checked: boolean) {
+  move.setSelection(ids, checked)
+}
+function clearSelection() {
+  move.clearSelection()
+}
+function openMoveDialog() {
+  if (!selectedIds.value.size) return
+  closeCreateMenu()
+  dialog.value = null
+  dialogTarget.value = null
+  moveDialogOpen.value = true
+}
+function confirmMove(request: MoveRequest) {
+  lastMoveRequest.value = request
+  batchResults.value = move.executeMove(request)
+  resultKind.value = 'move'
+  resultTitle.value = '移动结果'
+  resultTargetName.value = moveTargets.value.find((item) => item.id === request.targetId)?.path ?? ''
+  moveDialogOpen.value = false
+  resultOpen.value = true
+  pruneViewState()
+}
+function openBatchDelete() {
+  if (!selectedIds.value.size) return
+  closeCreateMenu()
+  dialog.value = null
+  dialogTarget.value = null
+  batchDeleteConfirmOpen.value = true
+}
+function confirmBatchDelete() {
+  batchResults.value = move.executeDelete()
+  resultKind.value = 'delete'
+  resultTitle.value = '删除结果'
+  resultTargetName.value = ''
+  batchDeleteConfirmOpen.value = false
+  resultOpen.value = true
+  pruneViewState()
+}
+function retryResult(id: string) {
+  const fresh = resultKind.value === 'move' && lastMoveRequest.value
+    ? move.executeMove(lastMoveRequest.value, [id])
+    : move.executeDelete([id])
+  const replacement = fresh[0]
+  if (replacement) batchResults.value = batchResults.value.map((item) => item.id === id ? replacement : item)
+  pruneViewState()
+}
+function closeResult() {
+  resultOpen.value = false
+  if (resultKind.value === 'delete') move.clearSelection()
+  else move.replaceSelection(batchResults.value.filter((item) => item.status !== 'success').map((item) => item.id))
+}
+/** 移动/删除后清理已失效的选中知识库、面包屑与预览引用 */
+function pruneViewState() {
+  if (selected.value && !items.value.some((item) => item.id === selected.value?.id)) {
+    goRoot()
+    return
+  }
+  if (previewNode.value && !nodeStillExists(previewNode.value.id)) previewNode.value = null
+  if (nodePath.value.length && !nodeStillExists(nodePath.value.at(-1)!.id)) nodePath.value = []
+}
+function nodeStillExists(id: string) {
+  return items.value.some((kb) => Boolean(findNodePath(kb.nodes ?? [], id)))
+}
+
 const localDepartmentMembers = computed<Record<string, readonly string[]>>(() => {
   const user = appStore?.user
   return user?.department ? { [user.department]: [user.displayName] } : {}
@@ -207,6 +291,10 @@ const query = ref('')
 watch(() => appStore?.user?.id, (next, previous) => {
   if (next === previous) return
   items.value = loadKnowledgeItems()
+  move.clearSelection()
+  moveDialogOpen.value = false
+  batchDeleteConfirmOpen.value = false
+  resultOpen.value = false
   selected.value = null
   nodePath.value = []
   previewNode.value = null
@@ -911,9 +999,15 @@ function savePermission(payload: KnowledgePermissionSnapshot & { resourceId: str
           :detail="selected"
           :nodes="currentNodes"
           :can-action="canResourceAction"
+          :selected-ids="selectedIds"
           @select="selectItem"
           @navigate-node="navigateNode"
           @action="handleAction"
+          @toggle-select="toggleSelect"
+          @toggle-all="toggleAll"
+          @move="openMoveDialog"
+          @batch-delete="openBatchDelete"
+          @clear-selection="clearSelection"
         />
       </section>
 
@@ -960,6 +1054,41 @@ function savePermission(payload: KnowledgePermissionSnapshot & { resourceId: str
       @permission="savePermission"
       @confirm-delete="deleteKnowledge"
     />
+
+    <!-- PRD M4：移动文件与批量操作 -->
+    <MoveFilesDialog
+      v-if="moveDialogOpen"
+      :targets="moveTargets"
+      :selections="selectedTargets"
+      :forbidden-ids="forbiddenIds"
+      :analyze="move.analyzeMove"
+      @close="moveDialogOpen = false"
+      @confirm="confirmMove"
+    />
+    <BatchMoveResultDialog
+      v-if="resultOpen"
+      :results="batchResults"
+      :title="resultTitle"
+      :target-name="resultTargetName"
+      @close="closeResult"
+      @retry="retryResult"
+    />
+    <div v-if="batchDeleteConfirmOpen" class="batch-delete-overlay" @mousedown.self="batchDeleteConfirmOpen = false">
+      <section class="batch-delete-surface" role="dialog" aria-modal="true" aria-labelledby="batch-delete-title" data-testid="batch-delete-dialog">
+        <header class="batch-delete-header">
+          <h2 id="batch-delete-title">批量删除</h2>
+          <button class="batch-close" type="button" aria-label="关闭批量删除确认" @click="batchDeleteConfirmOpen = false"><X :size="19" /></button>
+        </header>
+        <div class="batch-delete-body">
+          <p>确定要删除已选中的 <strong>{{ selectedIds.size }}</strong> 项吗？</p>
+          <p class="batch-delete-note">删除后不可恢复，所选资源及其下级内容将一并移除。</p>
+        </div>
+        <footer class="batch-delete-footer">
+          <button class="batch-btn secondary" type="button" @click="batchDeleteConfirmOpen = false">取消</button>
+          <button class="batch-btn danger" type="button" @click="confirmBatchDelete">确定删除</button>
+        </footer>
+      </section>
+    </div>
   </main>
 </template>
 
@@ -1178,6 +1307,98 @@ function savePermission(payload: KnowledgePermissionSnapshot & { resourceId: str
 }
 .preview-actions{display:flex;justify-content:flex-end;padding:12px 18px 0}.preview-actions:empty{display:none}
 .preview-edit{border:1px solid #e3e5e8;border-radius:7px;background:#fff;padding:6px 10px;color:#444;font:12px/18px inherit;cursor:pointer}.preview-edit:hover{background:#f7f8fa}.document-preview-content{min-height:80px;white-space:pre-wrap;overflow-wrap:anywhere;color:#394250;font-size:13px;line-height:1.85}
+
+
+/* ─── PRD M4：批量删除二次确认 ─── */
+.batch-delete-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.4);
+}
+.batch-delete-surface {
+  width: min(440px, calc(100vw - 24px));
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.18);
+}
+.batch-delete-header {
+  display: flex;
+  min-height: 66px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+}
+.batch-delete-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+.batch-close {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #777;
+  cursor: pointer;
+}
+.batch-close:hover {
+  background: #f6f6f7;
+  color: #111;
+}
+.batch-delete-body {
+  padding: 0 24px;
+  color: #333;
+  font-size: 14px;
+  line-height: 22px;
+}
+.batch-delete-body p {
+  margin: 0;
+}
+.batch-delete-body strong {
+  color: #d92d20;
+}
+.batch-delete-body .batch-delete-note {
+  margin-top: 10px;
+  border-radius: 7px;
+  background: #fff5f5;
+  padding: 9px 12px;
+  color: #b42318;
+  font-size: 13px;
+}
+.batch-delete-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 24px;
+}
+.batch-btn {
+  height: 34px;
+  min-width: 80px;
+  border-radius: 7px;
+  padding: 0 16px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.batch-btn.secondary {
+  border: 1px solid #d9dce1;
+  background: #fff;
+  color: #4e5969;
+}
+.batch-btn.danger {
+  border: 1px solid #d92d20;
+  background: #d92d20;
+  color: #fff;
+}
+.batch-btn.danger:hover {
+  background: #b42318;
+}
 </style>
 
 

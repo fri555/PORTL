@@ -6,7 +6,6 @@ import {
   CalendarCheck,
   CheckCircle2,
   ChevronDown,
-  ChevronRight,
   CirclePause,
   Copy,
   Download,
@@ -14,7 +13,9 @@ import {
   FileSpreadsheet,
   FileText,
   Globe2,
+  Image as ImageIcon,
   Link2,
+  PanelRight,
   Plus,
   Play,
   Presentation,
@@ -31,6 +32,9 @@ import ExpertMentionMenu from './ExpertMentionMenu.vue'
 import { useExpertCatalog, isExpertAvailable } from '@/composables/useExpertCatalog'
 import { useExpertMention } from '@/composables/useExpertMention'
 import AnswerCitations from './AnswerCitations.vue'
+import ArtifactPanel from './ArtifactPanel.vue'
+import UserMessageBubble from './UserMessageBubble.vue'
+import { getPendingHomeAttachments, type HomeAttachmentMeta } from '@/composables/useHomeAttachments'
 import InlineExecutionTrace from './InlineExecutionTrace.vue'
 import ExpertTodoProgress from './ExpertTodoProgress.vue'
 import { citationSources, citedParagraphs, dailySource } from '@/mock/citations'
@@ -40,6 +44,7 @@ import FollowUpPlan from './FollowUpPlan.vue'
 import TaskStallReminder from './TaskStallReminder.vue'
 import ApprovalModeControl, { type ApprovalMode } from './ApprovalModeControl.vue'
 import { readPrototypeChatValue, writePrototypeChatValue } from '@/utils/prototypeChatStore'
+import { clearSessionRuntime, markSessionBackground, markSessionForeground, markSessionRunning, SESSION_EXECUTION_DURATION_MS } from '@/utils/sessionRuntime'
 import { recordExpertSuccessfulSend } from '@/utils/expertSendRecent'
 
 const props = defineProps<{ sessionId: string; agentId?: string; initialPrompt?: string; approvalMode?: ApprovalMode; persistState?: boolean }>()
@@ -47,6 +52,7 @@ const emit = defineEmits<{ share: [] }>()
 
 const assetBase = import.meta.env.BASE_URL
 const taskFilesOpen = ref(false)
+const artifactPreviewing = ref(false)
 const citationPanelOpen = ref(false)
 const citationExplorer = ref<InstanceType<typeof AnswerCitations> | null>(null)
 const isCitationDemo = computed(() => props.sessionId.startsWith('citation-'))
@@ -72,6 +78,67 @@ const loadCitationPreview: CitationPreviewLoader = async source => {
 }
 function onCitationPanel(open: boolean) { citationPanelOpen.value = open; if (open) taskFilesOpen.value = false }
 function openTaskFiles() { citationExplorer.value?.closePanel(false); taskFilesOpen.value = true }
+function toggleTaskFiles() {
+  if (taskFilesOpen.value) {
+    taskFilesOpen.value = false
+    artifactPreviewing.value = false
+    return
+  }
+  openTaskFiles()
+}
+
+// 消息导航轨：每条提问和每段内容一个短横标记，悬停出预览卡，点击滚到对应位置。
+const anchorHover = ref(-1)
+interface AnchorItem { id: string; label: string; preview: string }
+const anchorItems = computed<AnchorItem[]>(() => {
+  const items: AnchorItem[] = [{ id: 'anchor-msg-0', label: '本次提问', preview: title.value }]
+  followUps.value.forEach((turn, index) => {
+    items.push({ id: `anchor-msg-${index + 1}`, label: turn.interjected ? `插话 ${index + 1}` : `第 ${index + 1} 次追问`, preview: turn.text })
+  })
+  if (isDwsAction.value) {
+    items.push({ id: 'dws-anchor-auth', label: '钉钉授权', preview: '钉钉账号授权' })
+    if (dwsStage.value !== 'auth') items.push({ id: 'dws-anchor-confirm', label: '操作确认', preview: '确认后才会创建待办' })
+    return items
+  }
+  if (isExpert.value) {
+    items.push({ id: 'anchor-data', label: '阶段状态', preview: '阶段状态与执行过程' })
+    if (planStatus.value === 'done') items.push({ id: 'anchor-report', label: '出报告', preview: '出报告 · 文件呈现示例' })
+    return items
+  }
+  items.push({ id: 'anchor-calendar', label: '今日日程', preview: '今日日程 · 时间、主题、参与人' })
+  items.push({ id: 'anchor-todo', label: '待办事项', preview: '待办事项 · 状态与截止时间' })
+  items.push({ id: 'anchor-note', label: '补充说明', preview: '补充说明 · 口径与来源' })
+  return items
+})
+function anchorPreviewText(item: AnchorItem): string {
+  const text = item.preview.replace(/\s+/g, ' ').trim()
+  return text.length > 22 ? `${text.slice(0, 22)}…` : text
+}
+function scrollToAnchor(id: string) {
+  const target = document.getElementById(id)
+  if (!target) return
+  target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+// 产物栏打开或引用预览展开时，右侧快捷跳转保持可用；窄屏折叠为可展开入口。
+const narrowScreen = ref(false)
+const anchorExpanded = ref(false)
+function updateNarrow() { narrowScreen.value = window.innerWidth <= 900 }
+onMounted(() => { updateNarrow(); window.addEventListener('resize', updateNarrow) })
+onBeforeUnmount(() => window.removeEventListener('resize', updateNarrow))
+
+// 首页发送的图片附件：会话内可点开灯箱并下载原图。
+const homeImages = computed(() => getPendingHomeAttachments().filter(item => item.kind === 'image' && !!item.dataUrl))
+const lightbox = ref<HomeAttachmentMeta | null>(null)
+function downloadImage(item: HomeAttachmentMeta) {
+  if (!item.dataUrl) return
+  const anchor = document.createElement('a')
+  anchor.href = item.dataUrl
+  anchor.download = item.name
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+}
 const prompt = ref('')
 const input = ref<HTMLTextAreaElement | null>(null)
 const { availableExperts } = useExpertCatalog()
@@ -79,7 +146,9 @@ const { availableExperts } = useExpertCatalog()
 const pendingExpertId = ref('')
 const pendingExpert = computed(() => getHistoricalExpert(pendingExpertId.value))
 const pendingExpertName = computed(() => pendingExpert.value?.name || (pendingExpertId.value ? '历史专家（暂不可用）' : ''))
-const followUps = ref<{ id: number; text: string; expert: string; expertId?: string; usesExpert: boolean; time: string; templateLabel: string }[]>([])
+const followUps = ref<{ id: number; text: string; expert: string; expertId?: string; usesExpert: boolean; time: string; templateLabel: string; interjected?: boolean }[]>([])
+/** 本轮执行中收到的插话条数（执行中插入的消息）。 */
+const interjectedCount = computed(() => followUps.value.filter(turn => turn.interjected).length)
 const followUpRunning = ref(false)
 const followUpBlocked = ref(false)
 const mention = useExpertMention(prompt, input, availableExperts, agent => { pendingExpertId.value = agent.id })
@@ -105,6 +174,20 @@ function demoClarifications(): PlanClarification[] {
 }
 const authorizationKind = demoQuery.get('authorization') === 'tool' ? '工具调用' : '对外分享'
 const requestedDemoState = demoQuery.get('planState') as PlanStatus
+/** 演示参数：拉长单轮执行时长（毫秒），方便演示并行会话与执行中插话；默认 1.8 秒。
+ *  URL 参数会写入 sessionStorage，SPA 内切换会话后依然生效（整轮演示使用同一时长）。 */
+const execDurationMs = (() => {
+  const parse = (raw: unknown) => {
+    const num = Number(raw)
+    return Number.isFinite(num) && num >= 600 && num <= 60000 ? num : undefined
+  }
+  const fromUrl = parse(demoQuery.get('execMs'))
+  if (fromUrl !== undefined) {
+    try { sessionStorage.setItem('tianma.prototype.execMs', String(fromUrl)) } catch { /* 原型：忽略 */ }
+    return fromUrl
+  }
+  try { return parse(sessionStorage.getItem('tianma.prototype.execMs')) } catch { return undefined }
+})()
 interface FailedExecutionAttempt { version: number; steps: ExecutionStep[] }
 interface PrototypePlanSnapshot {
   status: PlanStatus
@@ -301,9 +384,11 @@ const expertName = computed(() =>
   isExpert.value ? selectedAgent.value?.name || '业务专家' : dailyAssistant.name,
 )
 const placeholder = computed(() =>
-  isExpert.value
-    ? `向${expertName.value}补充任务要求，输入 @ 可切换专家…`
-    : '描述你的任务，输入 @ 可快捷选择专家…',
+  planStatus.value === 'running'
+    ? '任务执行中，可继续输入补充要求（插话），发送后在当前步骤结束后处理…'
+    : isExpert.value
+      ? `向${expertName.value}补充任务要求，输入 @ 可切换专家…`
+      : '描述你的任务，输入 @ 可快捷选择专家…',
 )
 
 function preparePlan() {
@@ -331,13 +416,14 @@ function scheduleExecution() {
   window.clearTimeout(executionTimer)
   finishExecutionClock()
   executionNow.value = Date.now()
-  const finishesAt = (executionStartedAt.value ?? Date.now()) + 1800
+  const finishesAt = (executionStartedAt.value ?? Date.now()) + (execDurationMs ?? SESSION_EXECUTION_DURATION_MS)
   const complete = () => {
     if (planStatus.value !== 'running') return
     executionFinishedAt.value = finishesAt
     executionNow.value = finishesAt
     planStatus.value = 'done'
     finishExecutionClock()
+    clearSessionRuntime(props.sessionId)
   }
   if (Date.now() >= finishesAt) { complete(); return }
   executionClock = window.setInterval(() => { executionNow.value = Date.now() }, 100)
@@ -352,6 +438,7 @@ function beginExecution(startedAt = Date.now()) {
   executionStartedAt.value = startedAt
   executionFinishedAt.value = null
   planStatus.value = 'running'
+  markSessionRunning(props.sessionId, startedAt, { durationMs: execDurationMs })
   scheduleExecution()
 }
 function runPlan() {
@@ -370,6 +457,7 @@ function stopPlan() {
   finishExecutionClock()
   executionFinishedAt.value = Date.now()
   planStatus.value = 'cancelled'
+  clearSessionRuntime(props.sessionId)
 }
 function confirmAuthorization() {
   if (planStatus.value !== 'awaiting_confirmation') return
@@ -409,13 +497,15 @@ function modifyPlan() {
   nextTick(() => input.value?.focus())
 }
 function submitFollowUp() {
-  if (!prompt.value.trim() || ['running','awaiting_clarification','awaiting_confirmation','unknown'].includes(planStatus.value) || followUpRunning.value || followUpBlocked.value) return
+  // 执行中允许发送：作为插话处理，不中断当前步骤；等待类状态仍按原有交互。
+  if (!prompt.value.trim() || ['awaiting_clarification','awaiting_confirmation','unknown'].includes(planStatus.value) || followUpRunning.value || followUpBlocked.value) return
   const targetExpertId = pendingExpertId.value || (isExpert.value ? props.agentId || selectedAgent.value?.id : '')
   const targetExpert = targetExpertId ? agents.find(agent => agent.id === targetExpertId) : null
   if (targetExpertId && (!targetExpert || !isExpertAvailable(targetExpert))) { ElMessage.error('该专家暂不可用，请重新选择'); return }
   const text = prompt.value.trim()
   const choice = draftOfficialTemplate.value
-  followUps.value.push({ id: followUps.value.length+1, text, expert: targetExpert?.name || expertName.value, expertId: targetExpertId || '', usesExpert: !!targetExpertId || isExpert.value, time: new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).format(new Date()), templateLabel: choice ? templateLabel.value : '普通模板' })
+  const interjected = planStatus.value === 'running'
+  followUps.value.push({ id: followUps.value.length+1, text, expert: targetExpert?.name || expertName.value, expertId: targetExpertId || '', usesExpert: !!targetExpertId || isExpert.value, time: new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).format(new Date()), templateLabel: choice ? templateLabel.value : '普通模板', interjected })
   if (targetExpertId) recordExpertSuccessfulSend(targetExpertId)
   templateHintDismissed.value = false
   draftOfficialTemplate.value = false
@@ -453,6 +543,8 @@ watch([planStatus, clarifications, clarificationConfirmed, authorizationConfirme
 onMounted(() => {
   if (isExpert.value && planStatus.value === 'running') {
     if (executionStartedAt.value === null) executionStartedAt.value = Date.now()
+    // 回到正在执行的会话：转前台接管进度，不重新开始执行
+    markSessionForeground(props.sessionId, executionStartedAt.value, execDurationMs)
     scheduleExecution()
   } else if (planStatus.value === 'awaiting_confirmation' && authorizationRequired && !humanAuthorizationRequired) beginExecution()
   else preparePlan()
@@ -462,18 +554,27 @@ onBeforeUnmount(() => {
   savePrototypePlan()
   window.clearTimeout(executionTimer)
   finishExecutionClock()
+  // 用户切走时任务转后台继续执行；其余状态清掉运行时记录
+  if (planStatus.value === 'running') markSessionBackground(props.sessionId, executionStartedAt.value ?? Date.now(), execDurationMs)
+  else clearSessionRuntime(props.sessionId)
 })
 </script>
 
 <template>
-  <section class="detail-shell" :class="{ 'detail-shell--preview': citationPanelOpen }">
+  <section class="detail-shell" :class="{ 'detail-shell--preview': citationPanelOpen, 'detail-shell--artifacts': taskFilesOpen, 'detail-shell--artifact-wide': taskFilesOpen && artifactPreviewing }">
+    <div class="detail-shell__main">
     <div class="conversation" role="log" data-testid="conversation-log" aria-label="会话内容">
       <div class="conversation-inner">
-        <div class="user-row">
+        <div class="user-row" id="anchor-msg-0">
           <div class="user-message">
-            <div class="user-bubble">{{ title }}</div>
+            <UserMessageBubble :text="title" />
             <time class="message-time" :title="fixtureUserTime" data-testid="user-message-time">{{ fixtureUserTime }}</time>
           </div>
+        </div>
+        <div v-if="homeImages.length" class="sent-attachments" data-testid="sent-image-attachments">
+          <button v-for="image in homeImages" :key="image.id" type="button" :title="image.name" @click="lightbox = image">
+            <img :src="image.dataUrl" :alt="image.name" /><span>{{ image.name }}</span>
+          </button>
         </div>
         <article class="answer">
           <header class="answer-agent">
@@ -494,6 +595,9 @@ onBeforeUnmount(() => {
             :steps="executionSteps"
             :attempt="executionAttempt"
           />
+          <p v-if="interjectedCount && planStatus === 'done'" class="interject-done" data-testid="interject-done">
+            <CheckCircle2 :size="13" />本轮结果已结合执行中收到的 {{ interjectedCount }} 条插话补充。
+          </p>
           <template v-if="isDwsAction">
             <TaskStallReminder v-if="isDwsAction" :task-id="sessionId" :title="title" :agent-name="expertName" :detail-url="'/PORTL/chat/' + encodeURIComponent(sessionId)" :state="dwsStage === 'auth' ? 'dws_auth' : dwsStage === 'confirm' ? 'awaiting_confirmation' : dwsStage" :progress-key="dwsStage" />
             <p>创建待办属于钉钉写操作。首次使用需要本人完成账号授权；自主执行可在授权完成后自动同意本轮操作确认。</p>
@@ -502,6 +606,7 @@ onBeforeUnmount(() => {
               v-if="dwsStage === 'auth'"
               class="dws-card dws-auth-card"
               data-testid="dws-auth-card"
+              id="dws-anchor-auth"
             >
               <span class="dws-card__icon"><ShieldCheck :size="22" /></span>
               <div class="dws-card__body">
@@ -540,6 +645,7 @@ onBeforeUnmount(() => {
                 v-if="dwsStage === 'confirm'"
                 class="dws-card dws-confirm-card"
                 data-testid="dws-confirm-card"
+                id="dws-anchor-confirm"
               >
                 <span class="dws-card__icon is-warning"><CalendarCheck :size="22" /></span>
                 <div class="dws-card__body">
@@ -767,30 +873,58 @@ onBeforeUnmount(() => {
             </button>
           </div>
         </article>
-        <template v-for="turn in followUps" :key="turn.id">
-          <div class="user-row sent-follow-up"><div class="user-message"><div class="user-bubble" data-testid="sent-follow-up">{{turn.text}}</div><time class="message-time" :title="turn.time">{{turn.time}}</time></div></div>
+        <template v-for="(turn, turnIndex) in followUps" :key="turn.id">
+          <div class="user-row sent-follow-up" :id="`anchor-msg-${turnIndex + 1}`"><div class="user-message"><UserMessageBubble :text="turn.text" test-id="sent-follow-up" /><time class="message-time" :title="turn.time">{{turn.time}}</time><em v-if="turn.interjected" class="interject-tag" data-testid="interject-tag">执行中插入</em></div></div>
+          <p v-if="turn.interjected" class="interject-ack" :data-testid="'interject-ack-' + turn.id">已收到插话，当前任务继续执行；本条补充将在当前步骤结束后处理。</p>
           <p class="follow-up-routing" data-testid="follow-up-expert">本轮专家：{{turn.expert}} · 历史回复保留原专家。</p>
-          <FollowUpPlan v-if="turn.usesExpert" :active="turn.id === followUps.at(-1)?.id && !['running','awaiting_clarification','awaiting_confirmation','unknown'].includes(planStatus)" :approval-mode="normalizedApprovalMode" :template-label="turn.templateLabel" :state-key="persistState ? sessionId + ':turn:' + turn.id : undefined" @running="followUpRunning = $event" @blocked="followUpBlocked = $event" @modify="input?.focus()" />
+          <FollowUpPlan v-if="turn.usesExpert && !turn.interjected" :active="turn.id === followUps.at(-1)?.id && !['running','awaiting_clarification','awaiting_confirmation','unknown'].includes(planStatus)" :approval-mode="normalizedApprovalMode" :template-label="turn.templateLabel" :state-key="persistState ? sessionId + ':turn:' + turn.id : undefined" @running="followUpRunning = $event" @blocked="followUpBlocked = $event" @modify="input?.focus()" />
         </template>
       </div>
     </div>
 
-    <aside class="anchor-rail">
-      <strong>回答锚点</strong>
-      <a v-if="isDwsAction" href="#">钉钉授权</a>
-      <a v-if="isDwsAction && dwsStage !== 'auth'" href="#">操作确认</a>
-      <a v-if="isExpert && !isDwsAction" href="#anchor-data">阶段状态</a>
-      <a v-if="isExpert && planStatus === 'done'" href="#anchor-report">出报告</a>
-
-      <a v-if="!isExpert && !isDwsAction && !isCitationDemo" href="#anchor-calendar">今日日程</a>
-      <a v-if="!isExpert && !isDwsAction && !isCitationDemo" href="#anchor-todo">待办事项</a>
-      <a v-if="!isExpert && !isDwsAction && !isCitationDemo" href="#anchor-note">补充说明</a>
-      <a v-if="isCitationDemo" :href="`#answer-${sessionId}-paragraph-0`">内部知识</a>
-      <a v-if="isCitationDemo" :href="`#answer-${sessionId}-paragraph-3`">联网来源</a>
-      <button type="button" @click="openTaskFiles">
-        <FileText :size="15" />展开任务文件<ChevronRight :size="14" />
-      </button>
+    <aside
+      class="anchor-rail"
+      :class="{ 'anchor-rail--collapsed': narrowScreen && !anchorExpanded }"
+      aria-label="回答锚点"
+      @mouseleave="anchorHover = -1"
+    >
+      <span class="visually-hidden">回答锚点</span>
+      <div class="anchor-dashes">
+        <button
+          v-for="(item, index) in anchorItems"
+          :key="item.id"
+          class="anchor-dash"
+          :class="{ 'is-active': anchorHover === index }"
+          type="button"
+          :aria-label="item.label"
+          @mouseenter="anchorHover = index"
+          @focus="anchorHover = index"
+          @click="scrollToAnchor(item.id)"
+        />
+      </div>
+      <button v-if="narrowScreen" class="anchor-collapse" type="button" @click="anchorExpanded = false">收起快捷跳转</button>
+      <div v-if="anchorHover >= 0" class="anchor-preview" role="tooltip">
+        <p
+          v-for="(item, index) in anchorItems"
+          :key="item.id"
+          :class="{ 'is-active': index === anchorHover }"
+        >
+          {{ anchorPreviewText(item) }}
+        </p>
+      </div>
     </aside>
+    <button
+      class="anchor-panel-toggle"
+      type="button"
+      :aria-expanded="taskFilesOpen"
+      :title="taskFilesOpen ? '收起任务文件' : '展开任务文件'"
+      @click="toggleTaskFiles"
+    >
+      <PanelRight :size="16" /><span class="visually-hidden">展开任务文件（产物栏）</span>
+    </button>
+    <button v-if="narrowScreen" class="anchor-fab" type="button" :aria-expanded="anchorExpanded" @click="anchorExpanded = !anchorExpanded">
+      <Link2 :size="14" />快捷跳转
+    </button>
 
     <div class="compact-composer">
       <ExpertMentionMenu v-if="mentionOpen" id="detail-expert-mentions" :experts="mentionResults" :total="mentionAllResults.length" :active-index="mentionIndex" :keyword="mentionKeyword" :has-more="mentionHasMore" @load-more="mention.loadMore" @select="mention.choose" @close="mentionOpen = false" @panel-press="mention.onPanelPress" />
@@ -826,8 +960,8 @@ onBeforeUnmount(() => {
       <button
         type="button"
         aria-label="发送"
-        :title="prompt.trim() ? '发送' : '请输入内容'"
-        :disabled="!prompt.trim() || ['running', 'awaiting_clarification', 'awaiting_confirmation', 'unknown'].includes(planStatus) || followUpRunning || followUpBlocked"
+        :title="prompt.trim() ? (planStatus === 'running' ? '发送（执行中插话）' : '发送') : '请输入内容'"
+        :disabled="!prompt.trim() || ['awaiting_clarification', 'awaiting_confirmation', 'unknown'].includes(planStatus) || followUpRunning || followUpBlocked"
         @click="submitFollowUp"
       >
         <ArrowUp :size="16" />
@@ -835,47 +969,22 @@ onBeforeUnmount(() => {
       <small>内容由 AI 生成，请核实重要信息</small>
     </div>
 
-    <aside v-if="taskFilesOpen" class="task-drawer" data-testid="conversation-task-files">
-      <p v-if="isExpert && planStatus !== 'done'">任务尚未完成，暂无可下载文件。</p>
-      <header>
-        <strong>任务文件（演示）</strong
-        ><button
-          type="button"
-          aria-label="关闭任务文件"
-          title="关闭"
-          @click="taskFilesOpen = false"
-        >
-          <X :size="18" />
-        </button>
-      </header>
-      <button
-        v-if="!isExpert || planStatus === 'done'"
-        class="task-file"
-        disabled
-        title="原型示例，无真实文件"
-      >
-        <FileText :size="18" /><span>经营分析结果.html<small>293.6 KB</small></span>
-      </button>
-      <button
-        v-if="!isExpert || planStatus === 'done'"
-        class="task-file"
-        disabled
-        title="原型示例，无真实文件"
-      >
-        <FileText :size="18" /><span>任务明细.xlsx<small>42.0 KB</small></span>
-      </button>
-      <button
-        v-if="!isExpert || planStatus === 'done'"
-        class="task-file"
-        disabled
-        title="原型示例，无真实文件"
-      >
-        <Presentation :size="18" /><span
-          >任务汇报.pptx<small>{{ templateLabel }} · 示例</small></span
-        >
-      </button>
+    </div>
+
+    <aside v-if="taskFilesOpen" class="artifact-side" :class="{ 'artifact-side--wide': artifactPreviewing }" data-testid="conversation-task-files">
+      <ArtifactPanel :session-id="sessionId" @close="taskFilesOpen = false" @preview-change="artifactPreviewing = $event" />
     </aside>
   </section>
+
+    <Teleport to="body">
+      <div v-if="lightbox" class="image-lightbox" role="dialog" aria-modal="true" aria-label="图片预览" @click.self="lightbox = null">
+        <div class="image-lightbox__panel">
+          <header><strong>{{ lightbox.name }}</strong><button type="button" aria-label="关闭图片预览" @click="lightbox = null"><X :size="18" /></button></header>
+          <img :src="lightbox.dataUrl" :alt="lightbox.name" />
+          <footer><button type="button" @click="downloadImage(lightbox)"><Download :size="14" />下载原图</button></footer>
+        </div>
+      </div>
+    </Teleport>
 </template>
 
 <style scoped>
@@ -894,6 +1003,7 @@ onBeforeUnmount(() => {
 .artifact-feedback {padding:16px;border:1px solid #f0d7af;border-radius:10px;background:#fff9ef;margin:16px 0;font-size:13px;line-height:1.8;color:#775827}.artifact-feedback p{margin:6px 0}.artifact-feedback button{padding:7px 12px;margin:6px 10px 0 0;border:1px solid #e2c79d;border-radius:6px;background:white;cursor:pointer}
 .detail-shell {
   position: relative;
+  display: flex;
   height: calc(100vh - 57px);
   min-height: 620px;
   background: #fff;
@@ -906,13 +1016,20 @@ onBeforeUnmount(() => {
     'Microsoft YaHei',
     sans-serif;
 }
+/* 对话列与文件侧栏并排：侧栏占布局宽度，对话区随之收窄，消息导航轨贴在对话列右缘。 */
+.detail-shell__main {
+  position: relative;
+  height: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
+}
 .conversation {
   height: 100%;
   overflow: auto;
-  padding: 36px 215px 142px 52px;
+  padding: 32px 76px 142px;
 }
 .conversation-inner {
-  width: min(780px, 100%);
+  width: min(800px, 100%);
   margin: 0 auto;
 }
 .user-row {
@@ -1026,7 +1143,6 @@ onBeforeUnmount(() => {
 }
 .answer-actions button,
 .compact-composer button,
-.task-drawer button,
 .anchor-rail button {
   border: 0;
   background: transparent;
@@ -1072,43 +1188,143 @@ onBeforeUnmount(() => {
 .sent-follow-up {
   margin-top: 28px;
 }
+/* 执行中插话：消息带「执行中插入」标识，发送后给接收提示，完成后给结合说明 */
+.interject-tag {
+  flex: 0 0 auto;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #fff4e8;
+  color: #d9730d;
+  font-size: 10px;
+  font-style: normal;
+  line-height: 15px;
+}
+.interject-ack {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 0;
+  color: #1f7a3d;
+  font-size: 12px;
+}
+.interject-ack::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #34a853;
+}
+.interject-done {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border: 1px solid #f3e3c8;
+  border-radius: 8px;
+  background: #fffaf0;
+  color: #9a6b13;
+  font-size: 12px;
+}
+.interject-done svg {
+  flex: 0 0 13px;
+  color: #c98a1e;
+}
+/* 消息导航轨：贴右缘的一条窄轨，每条提问一个短横，悬停出预览卡。 */
 .anchor-rail {
   position: absolute;
-  top: 45px;
-  right: 24px;
-  width: 160px;
-  border-left: 1px solid #ededed;
-  padding-left: 18px;
-}
-.anchor-rail strong {
-  display: block;
-  margin-bottom: 12px;
-  font-size: 13px;
-}
-.anchor-rail a {
-  display: block;
-  margin: 9px 0;
-  color: #888;
-  font-size: 12px;
-  text-decoration: none;
-}
-.anchor-rail a:hover {
-  color: #111;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
+  display: flex;
+  width: 44px;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
 }
 .anchor-rail button {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 22px;
-  padding: 8px 0;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.anchor-panel-toggle {
+  position: absolute;
+  top: 12px;
+  right: 10px;
+  z-index: 7;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #8a9099;
+  cursor: pointer;
+}
+.anchor-panel-toggle:hover,
+.anchor-panel-toggle[aria-expanded='true'] {
+  background: #f2f3f5;
+  color: #303540;
+}
+.anchor-dashes {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  margin: auto 0;
+}
+.anchor-rail .anchor-dash {
+  width: 14px;
+  height: 3px;
+  padding: 0;
+  border-radius: 2px;
+  background: #d2d5da;
+  transition: width 120ms ease, background 120ms ease;
+}
+.anchor-rail .anchor-dash:hover,
+.anchor-rail .anchor-dash.is-active {
+  width: 18px;
+  background: #8b9199;
+}
+.anchor-preview {
+  position: absolute;
+  top: 50%;
+  right: 48px;
+  width: 232px;
+  transform: translateY(-50%);
+  border: 1px solid #ebe9f4;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fdfcff;
+  box-shadow: 0 10px 26px rgba(24, 22, 48, 0.1);
+  pointer-events: none;
+}
+.anchor-preview p {
+  overflow: hidden;
+  margin: 0;
+  color: #8f939c;
   font-size: 12px;
-  color: #555;
+  line-height: 2;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.anchor-preview p.is-active {
+  color: #21252d;
+  font-weight: 600;
 }
 .compact-composer {
   position: absolute;
   left: 50%;
   bottom: 16px;
-  width: min(760px, calc(100% - 300px));
+  width: min(800px, calc(100% - 152px));
   transform: translateX(-50%);
   display: grid;
   grid-template-columns: 1fr auto auto;
@@ -1147,56 +1363,53 @@ onBeforeUnmount(() => {
   color: #aaa;
   font-size: 10px;
 }
-.task-drawer {
-  position: absolute;
-  inset: 0 0 0 auto;
-  z-index: 20;
-  width: 380px;
+/* 文件侧栏是布局内的一列，不覆盖对话区；预览态按阅读宽度铺开。 */
+.artifact-side {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex: 0 0 380px;
+  min-width: 0;
+  overflow: hidden;
   border-left: 1px solid #e8e8e8;
   background: #fff;
-  box-shadow: -8px 0 30px rgba(0, 0, 0, 0.05);
-  padding: 0 20px;
+  transition: flex-basis 180ms ease;
 }
-.task-drawer header {
-  display: flex;
-  height: 64px;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid #eee;
+.artifact-side--wide {
+  flex-basis: min(54%, 860px);
+  max-width: calc(100% - 280px);
 }
-.task-drawer header button {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  place-items: center;
-  border-radius: 7px;
+/* 文件侧栏打开时对话列收窄，右侧只要给窄轨留位，不再按 215px 空留。 */
+.detail-shell--artifacts .conversation {
+  padding: 32px 60px 142px 34px;
 }
-.task-file {
-  display: flex !important;
-  width: 100%;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 4px !important;
-  border-bottom: 1px solid #f0f0f0 !important;
-  text-align: left;
-}
-.task-file span,
-.task-file small {
-  display: block;
-}
-.task-file small {
-  margin-top: 2px;
-  color: #aaa;
+.detail-shell--artifacts .compact-composer {
+  width: min(720px, calc(100% - 108px));
 }
 @media (max-width: 900px) {
   .conversation {
     padding: 28px 20px 150px;
   }
   .anchor-rail {
-    display: none;
+    z-index: 30;
+    width: 36px;
+  }
+  .anchor-preview {
+    width: 208px;
+    right: 40px;
   }
   .compact-composer {
     width: calc(100% - 32px);
+  }
+  /* 窄屏下文件区占据整列，对话列让位，避免两边都被压扁。 */
+  .detail-shell--artifacts .detail-shell__main {
+    display: none;
+  }
+  .detail-shell--artifacts .artifact-side {
+    flex: 1 1 auto;
+    max-width: 100%;
   }
 }
 .plan-card {
@@ -1679,9 +1892,27 @@ button:disabled {
   .detail-shell--preview .conversation{width:calc(100% - 430px);padding-right:24px;padding-left:36px;box-sizing:border-box}
   .detail-shell--preview .compact-composer{left:calc((100% - 430px)/2);width:min(760px,calc(100% - 500px));box-sizing:border-box}
 }
-.detail-shell--preview .anchor-rail{display:none}
+.detail-shell--preview .anchor-rail{z-index:6}
 .plan-line{width:100%;background:transparent;text-align:left;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) auto 14px;align-items:center;gap:9px;margin:14px 0;border-top:1px solid #edf0f4;border-bottom:1px solid #edf0f4;padding:10px 0;white-space:nowrap}.plan-details{margin:0 0 14px;padding-left:24px;color:#637080;font-size:12px;line-height:1.9}.plan-line-count{border-radius:10px;background:#edf4fd;padding:2px 7px;color:#2d72c2;font-size:10px}.plan-line strong{overflow:hidden;text-overflow:ellipsis;font-size:12px}.plan-line small{overflow:hidden;max-width:210px;text-overflow:ellipsis;color:#8a94a1;font-size:10px}.tool-call-row{display:grid;grid-template-columns:30px minmax(0,1fr) auto;align-items:center;gap:10px;padding:12px 0}.tool-call-icon{display:grid;width:28px;height:28px;place-items:center;border-radius:8px;background:#edf4fd;color:#3477c5}.tool-call-row>div strong,.tool-call-row>div small{display:block}.tool-call-row>div strong{font-size:12px}.tool-call-row>div small{margin-top:2px;color:#8b94a0;font-size:10px}.tool-call-row>span:last-child{color:#778291;font-size:10px;white-space:nowrap}.tool-call-row.failed .tool-call-icon{background:#fff0ed;color:#c84a43}.ai-reply-row{display:flex;align-items:flex-start;gap:10px;border-top:1px solid #eef0f3;padding:11px 0 5px}.ai-reply-row>span{flex:none;border-radius:5px;background:#f2f3f5;padding:2px 6px;color:#687382;font-size:10px}.ai-reply-row p{margin:0;color:#586575;font-size:11px}.ppt-skill-card{background:#f7f8fa;color:#4f5b69}.ppt-skill-card .skill-icon{display:grid;width:30px;height:30px;flex:none;place-items:center;border-radius:8px;background:#fff0e8;color:#d3672b}.ppt-skill-card>span:nth-child(2){line-height:1.45}.ppt-skill-card>span:nth-child(2) strong{display:block;color:#343d49}.ppt-skill-card button{display:inline-flex!important;width:auto!important;height:28px!important;align-items:center;gap:4px;border-radius:7px!important;padding:0 8px!important;background:#fff!important;color:#526173!important}.visually-hidden{position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important}
 .message-time{display:block;min-height:16px;margin-top:6px;color:#a0a5ad;font-size:10px;line-height:16px;opacity:0;transition:opacity .15s}.user-message>time.message-time{text-align:right;order:2}.user-message:hover>.message-time,.user-message:focus-within>.message-time,.answer:hover>.message-time,.answer:focus-within>.message-time{opacity:1}.process-summary>button{border:0!important;border-radius:0!important;background:transparent!important;padding:5px 0!important;min-height:24px;gap:8px}.process-summary>button:hover{background:transparent!important}.process-title{font-weight:400!important;font-size:12px;color:#7c838c!important}.process-title i{width:5px;height:5px;background:#a3a9b2!important;box-shadow:none!important}.process-meta{font-size:10px}.process-overview{background:transparent!important;border:0!important;border-left:1px solid #e6e8eb!important;border-radius:0!important;padding:8px 0 8px 16px!important;margin:4px 0 12px!important}.process-overview>header{border:0!important;padding-bottom:6px!important}.tool-call-row{padding:6px 0!important}.tool-call-icon{background:#f1f2f4!important;color:#858c96!important;width:22px!important;height:22px!important;border-radius:5px!important}.ai-reply-row{padding:7px 0!important;border:0!important}.process-attempts{background:transparent}
+
+.anchor-rail--collapsed{display:none}
+.anchor-fab{display:none}
+.anchor-collapse{margin-top:8px!important;color:#9aa0a8!important;font-size:11px!important}
+@media (max-width:900px){.anchor-fab{display:flex;position:absolute;top:50px;right:8px;z-index:31;align-items:center;gap:5px;padding:7px 10px;border:1px solid #e4e6ea;border-radius:8px;color:#555;background:#fff;box-shadow:0 4px 14px rgba(0,0,0,.06);font-size:11px;cursor:pointer}}
+.sent-attachments{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin:-20px 0 28px}
+.sent-attachments button{display:flex;flex-direction:column;gap:4px;max-width:150px;padding:6px;border:1px solid #eaecef;border-radius:10px;background:#fff;cursor:pointer}
+.sent-attachments img{width:100%;max-height:110px;object-fit:cover;border-radius:6px}
+.sent-attachments span{overflow:hidden;color:#8a9099;font-size:10px;text-overflow:ellipsis;white-space:nowrap}
+.image-lightbox{position:fixed;inset:0;z-index:2000;display:grid;place-items:center;background:rgba(15,18,24,.62)}
+.image-lightbox__panel{display:flex;flex-direction:column;width:min(720px,calc(100vw - 40px));max-height:calc(100vh - 60px);padding:14px;border-radius:13px;background:#fff}
+.image-lightbox__panel header{display:flex;align-items:center;justify-content:space-between;padding-bottom:10px}
+.image-lightbox__panel header strong{overflow:hidden;font-size:13px;font-weight:500;text-overflow:ellipsis;white-space:nowrap}
+.image-lightbox__panel header button{display:grid;place-items:center;width:28px;height:28px;border:0;border-radius:7px;color:#666;background:transparent;cursor:pointer}
+.image-lightbox__panel header button:hover{background:#f2f3f5}
+.image-lightbox__panel img{min-height:0;max-height:calc(100vh - 180px);object-fit:contain}
+.image-lightbox__panel footer{display:flex;justify-content:flex-end;padding-top:10px}
+.image-lightbox__panel footer button{display:inline-flex;align-items:center;gap:5px;padding:7px 12px;border:1px solid #e4e6ea;border-radius:8px;color:#444;background:#fff;font-size:12px;cursor:pointer}
 </style>
 
 
